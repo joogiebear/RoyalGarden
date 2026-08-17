@@ -42,11 +42,9 @@ public final class GardenProtection implements Listener {
     public static final String BYPASS = "royalgarden.bypass";
 
     private final GardenWorlds worlds;
-    private final GardenBorder border;
 
-    public GardenProtection(GardenWorlds worlds, GardenBorder border) {
+    public GardenProtection(GardenWorlds worlds) {
         this.worlds = worlds;
-        this.border = border;
     }
 
     /**
@@ -84,7 +82,6 @@ public final class GardenProtection implements Listener {
         }
         event.setCancelled(true);
         deny(player, "Plot " + GardenLayout.plotName(px, pz) + " is locked.");
-        border.flashRed(player);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

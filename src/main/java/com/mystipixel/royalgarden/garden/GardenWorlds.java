@@ -11,6 +11,8 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -38,16 +40,104 @@ public final class GardenWorlds {
      */
     private static final String PREFIX = "garden_";
 
+    /**
+     * Blocks written per tick while laying out a board.
+     *
+     * <p>Everything is spread against this budget rather than done a plot at a time, because a plot is
+     * not a fixed amount of work once a template is involved: the default is four courses, a captured
+     * farm can be forty. A block budget is the thing that actually stays constant.
+     */
+    private static final int BLOCKS_PER_TICK = 24_000;
+
+    /** Where the captured plot template is kept, in the extension's data folder. */
+    private static final String TEMPLATE_FILE = "plot-template.dat";
+
     private final EcoPlugin plugin;
     private final IslandWorldService worlds;
     private final GardenStore store;
+    private final File dataFolder;
     private final Logger logger;
 
-    public GardenWorlds(EcoPlugin plugin, IslandWorldService worlds, GardenStore store, Logger logger) {
+    /** The plot every non-farmhouse plot is stamped from, or null to use the default field. */
+    private PlotTemplate template;
+
+    public GardenWorlds(EcoPlugin plugin, IslandWorldService worlds, GardenStore store,
+                        File dataFolder, Logger logger) {
         this.plugin = plugin;
         this.worlds = worlds;
         this.store = store;
+        this.dataFolder = dataFolder;
         this.logger = logger;
+        loadTemplate();
+    }
+
+    // ── the plot template ──────────────────────────────────────────────────────
+
+    private File templateFile() {
+        return new File(dataFolder, TEMPLATE_FILE);
+    }
+
+    /** Whether a captured template is in use. */
+    public boolean hasTemplate() {
+        return template != null;
+    }
+
+    /** Height of the captured template, or 0 if there isn't one. */
+    public int templateHeight() {
+        return template == null ? 0 : template.height();
+    }
+
+    private void loadTemplate() {
+        try {
+            this.template = PlotTemplate.load(templateFile());
+            if (template != null) {
+                logger.info("Plot template loaded (" + template.height() + " layers).");
+            }
+        } catch (IOException bad) {
+            // Refuse rather than fall back silently: stamping the default field over a board somebody
+            // designed, because their template failed to parse, is the worse of the two failures.
+            this.template = null;
+            logger.severe("Plot template could not be read, using the default plot: " + bad.getMessage());
+        }
+    }
+
+    /**
+     * Capture a plot and make every plot look like it from now on.
+     *
+     * <p>Existing plots are not restamped — that is {@link #restamp} and it is a separate, destructive
+     * decision. This only changes what a plot generated after now will contain.
+     */
+    public void captureTemplate(World world, int px, int pz) throws IOException {
+        PlotTemplate captured = PlotTemplate.capture(world, px, pz);
+        captured.save(templateFile());
+        this.template = captured;
+        logger.info("Captured plot " + GardenLayout.plotName(px, pz) + " as the plot template ("
+                + captured.height() + " layers).");
+    }
+
+    /** Forget the template and go back to the plain grass plot. */
+    public boolean clearTemplate() {
+        this.template = null;
+        return templateFile().delete();
+    }
+
+    /**
+     * Re-lay every plot except the farmhouse from the current template.
+     *
+     * <p>Destructive, and deliberately not automatic: it overwrites whatever is standing on those
+     * plots. It exists so a Garden made before the template was captured can be brought into line
+     * without being deleted.
+     */
+    public void restamp(World world) {
+        List<int[]> plots = new ArrayList<>();
+        for (int px = 0; px < GardenLayout.GRID; px++) {
+            for (int pz = 0; pz < GardenLayout.GRID; pz++) {
+                if (!GardenLayout.isCentre(px, pz)) {
+                    plots.add(new int[]{px, pz});
+                }
+            }
+        }
+        lay(world, plots, "restamping");
     }
 
     /** The world name for a player's Garden. */
@@ -270,12 +360,26 @@ public final class GardenWorlds {
         if (missing.isEmpty()) {
             return;
         }
+        lay(world, missing, "generating");
+    }
 
+    /**
+     * Write a list of plots into the world, a fixed number of blocks per tick.
+     *
+     * <p>Row by row against a block budget rather than plot by plot: with a tall template one plot is
+     * far too much for a single tick, and with the default field it is far too little. Work is
+     * persisted once at the end — an interrupted run simply leaves plots ungenerated, and the next load
+     * finds them missing and lays them again.
+     */
+    private void lay(World world, List<int[]> plots, String verb) {
         String name = world.getName();
-        logger.info("Garden '" + name + "': generating " + missing.size() + " plot(s).");
+        logger.info("Garden '" + name + "': " + verb + " " + plots.size() + " plot(s)"
+                + (template != null ? " from the template" : "") + ".");
+        long started = System.nanoTime();
+
         new BukkitRunnable() {
-            private int next = 0;
-            private long slowest = 0;
+            private int plot = 0;
+            private int row = 0;
 
             @Override
             public void run() {
@@ -285,21 +389,36 @@ public final class GardenWorlds {
                     cancel();
                     return;
                 }
-                if (next >= missing.size()) {
-                    cancel();
-                    worlds.saveIsland(name);   // persist the board we just laid
-                    // The slowest plot is the number that matters: it is how long the longest tick
-                    // this spent was, and therefore whether one-plot-per-tick is fine or too coarse.
-                    logger.info("Garden '" + name + "': board complete (slowest plot "
-                            + slowest / 1_000_000 + "ms).");
-                    return;
+                int budget = BLOCKS_PER_TICK;
+                while (budget > 0 && plot < plots.size()) {
+                    int[] at = plots.get(plot);
+                    budget -= writeRow(world, at[0], at[1], row);
+                    if (++row >= GardenLayout.PLOT_SIZE) {
+                        row = 0;
+                        plot++;
+                    }
                 }
-                int[] plot = missing.get(next++);
-                long started = System.nanoTime();
-                GardenBuilder.generatePlot(world, plot[0], plot[1]);
-                slowest = Math.max(slowest, System.nanoTime() - started);
+                if (plot >= plots.size()) {
+                    cancel();
+                    worlds.saveIsland(name);
+                    logger.info("Garden '" + name + "': board complete in "
+                            + (System.nanoTime() - started) / 1_000_000 + "ms.");
+                }
             }
         }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+    /**
+     * Write one row of one plot, from the template if there is one.
+     *
+     * <p>The farmhouse plot is never templated. It carries the barn, the desk and Sam, and stamping a
+     * captured farm over it would delete all three.
+     */
+    private int writeRow(World world, int px, int pz, int row) {
+        if (template != null && !GardenLayout.isCentre(px, pz)) {
+            return template.pasteRow(world, px, pz, row);
+        }
+        return GardenBuilder.generatePlotRow(world, px, pz, row);
     }
 
     /** Walk an async failure's cause chain looking for ASP's "no such world" signal. */

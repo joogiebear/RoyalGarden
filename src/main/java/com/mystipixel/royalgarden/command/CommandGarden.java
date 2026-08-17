@@ -1,6 +1,7 @@
 package com.mystipixel.royalgarden.command;
 
 import com.mystipixel.royalgarden.garden.GardenBuilder;
+import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenWorlds;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.willfp.eco.core.EcoPlugin;
@@ -11,7 +12,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * {@code /garden} — go to your Garden, building it if you have never been.
@@ -42,8 +45,87 @@ public final class CommandGarden extends PluginCommand {
         this.sam = sam;
     }
 
+    /** Lets a player capture and stamp plot templates. */
+    public static final String ADMIN = "royalgarden.admin";
+
     @Override
     public void onExecute(Player player, List<String> args) {
+        if (!args.isEmpty()) {
+            admin(player, args);
+            return;
+        }
+        visit(player);
+    }
+
+    /**
+     * The template subcommands: capture a plot, stamp it over the others, or forget it.
+     *
+     * <p>Kept as arguments on {@code /garden} rather than a command of their own — three admin verbs
+     * do not need their own name in the command map, and grouping them means the permission that gates
+     * them is one node instead of three.
+     */
+    private void admin(Player player, List<String> args) {
+        if (!player.hasPermission(ADMIN)) {
+            player.sendMessage(Component.text("You cannot do that.", NamedTextColor.RED));
+            return;
+        }
+        World world = player.getWorld();
+        if (!GardenWorlds.isGarden(world)) {
+            player.sendMessage(Component.text("Stand in a Garden first.", NamedTextColor.RED));
+            return;
+        }
+
+        switch (args.get(0).toLowerCase(Locale.ROOT)) {
+            case "capture" -> capture(player, world);
+            case "restamp" -> {
+                if (!worlds.hasTemplate()) {
+                    player.sendMessage(Component.text("No plot template captured yet.", NamedTextColor.RED));
+                    return;
+                }
+                player.sendMessage(Component.text("Restamping every plot but the farmhouse…",
+                        NamedTextColor.GRAY));
+                worlds.restamp(world);
+            }
+            case "cleartemplate" -> player.sendMessage(worlds.clearTemplate()
+                    ? Component.text("Plot template cleared — new plots will be plain grass.",
+                            NamedTextColor.GREEN)
+                    : Component.text("There was no plot template to clear.", NamedTextColor.RED));
+            default -> player.sendMessage(Component.text(
+                    "/garden — go to your Garden. Admin: capture, restamp, cleartemplate.",
+                    NamedTextColor.GRAY));
+        }
+    }
+
+    /** Capture the plot the player is standing on as the template for every other plot. */
+    private void capture(Player player, World world) {
+        int px = GardenLayout.plotAt(player.getLocation().getBlockX());
+        int pz = GardenLayout.plotAt(player.getLocation().getBlockZ());
+        if (!GardenLayout.inGrid(px, pz)) {
+            player.sendMessage(Component.text("Stand on a plot to capture it.", NamedTextColor.RED));
+            return;
+        }
+        if (GardenLayout.isCentre(px, pz)) {
+            // Capturing the farmhouse would make every plot a barn, and the farmhouse plot is never
+            // stamped anyway — so this is always a mistake rather than an unusual choice.
+            player.sendMessage(Component.text(
+                    "That is the farmhouse plot. Build the template on any other plot.",
+                    NamedTextColor.RED));
+            return;
+        }
+        try {
+            worlds.captureTemplate(world, px, pz);
+            player.sendMessage(Component.text("Captured plot " + GardenLayout.plotName(px, pz)
+                    + " (" + worlds.templateHeight() + " layers). ", NamedTextColor.GREEN)
+                    .append(Component.text("New plots will look like it; /garden restamp applies it "
+                            + "to existing ones.", NamedTextColor.GRAY)));
+        } catch (IOException failed) {
+            player.sendMessage(Component.text("Could not save the template: " + failed.getMessage(),
+                    NamedTextColor.RED));
+            getPlugin().getLogger().severe("Plot template capture failed: " + failed);
+        }
+    }
+
+    private void visit(Player player) {
         boolean firstVisit = !worlds.isLoaded(player.getUniqueId());
         if (firstVisit) {
             player.sendMessage(Component.text("Opening your Garden…", NamedTextColor.GRAY));

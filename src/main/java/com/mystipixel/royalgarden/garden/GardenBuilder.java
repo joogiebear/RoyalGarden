@@ -71,8 +71,40 @@ public final class GardenBuilder {
      * were lost, and cheap enough (9,216 columns) to run inside a click handler.
      */
     public static void generatePlot(World world, int px, int pz) {
-        groundPlot(world, px, pz);
-        plotEdging(world, px, pz);
+        for (int row = 0; row < GardenLayout.PLOT_SIZE; row++) {
+            generatePlotRow(world, px, pz, row);
+        }
+    }
+
+    /** Blocks written by one call to {@link #generatePlotRow} — four courses across the plot. */
+    public static int rowCost() {
+        return GardenLayout.PLOT_SIZE * 4;
+    }
+
+    /**
+     * Generate one x-row of the default plot: grass over dirt over stone, with a path along the rim.
+     *
+     * <p>A row at a time so the caller can spend a fixed block budget per tick. The whole board is
+     * 230,400 columns, and laying it in one go is seconds of frozen server.
+     *
+     * <p>The bottom course is bedrock: a plot floats over the void, and the floor is the only thing
+     * between a player with a shovel and a fall out of their own Garden.
+     */
+    public static int generatePlotRow(World world, int px, int pz, int row) {
+        int y = GardenLayout.GROUND_Y;
+        int x = GardenLayout.plotMin(px) + row;
+        int zMin = GardenLayout.plotMin(pz);
+        int zMax = GardenLayout.plotMax(pz);
+        boolean edgeRow = row == 0 || row == GardenLayout.PLOT_SIZE - 1;
+
+        for (int z = zMin; z <= zMax; z++) {
+            boolean rim = edgeRow || z == zMin || z == zMax;
+            world.getBlockAt(x, y, z).setType(rim ? Material.DIRT_PATH : Material.GRASS_BLOCK, false);
+            world.getBlockAt(x, y - 1, z).setType(Material.DIRT, false);
+            world.getBlockAt(x, y - 2, z).setType(Material.DIRT, false);
+            world.getBlockAt(x, y - 3, z).setType(Material.BEDROCK, false);
+        }
+        return rowCost();
     }
 
     /**
@@ -85,25 +117,6 @@ public final class GardenBuilder {
         return !world.getBlockAt((int) GardenLayout.plotCentre(world, px, pz).getX(),
                 GardenLayout.GROUND_Y, (int) GardenLayout.plotCentre(world, px, pz).getZ())
                 .getType().isAir();
-    }
-
-    /**
-     * Lay one plot's ground: grass over dirt over bedrock.
-     *
-     * <p>Bedrock on the bottom course, not stone. A farming plot floats over the void, and the floor is
-     * the only thing between a player with a shovel and a fall out of their own Garden — so it is the
-     * one block in the build that must not be removable.
-     */
-    private static void groundPlot(World world, int px, int pz) {
-        int y = GardenLayout.GROUND_Y;
-        for (int x = GardenLayout.plotMin(px); x <= GardenLayout.plotMax(px); x++) {
-            for (int z = GardenLayout.plotMin(pz); z <= GardenLayout.plotMax(pz); z++) {
-                world.getBlockAt(x, y, z).setType(Material.GRASS_BLOCK, false);
-                world.getBlockAt(x, y - 1, z).setType(Material.DIRT, false);
-                world.getBlockAt(x, y - 2, z).setType(Material.DIRT, false);
-                world.getBlockAt(x, y - 3, z).setType(Material.BEDROCK, false);
-            }
-        }
     }
 
     /**
@@ -130,29 +143,6 @@ public final class GardenBuilder {
         Block block = world.getBlockAt(x, y, z);
         if (block.getType() == LEGACY_BOUNDARY) {
             block.setType(Material.AIR, false);
-        }
-    }
-
-    /**
-     * A path around the plot's rim.
-     *
-     * <p>Cosmetic, but it earns its place: the grid is invisible on an unbroken field of grass, and a
-     * visible edge is the difference between "a big lawn" and "the first of twenty-five plots". It also
-     * makes the layout arithmetic checkable by standing on it.
-     */
-    private static void plotEdging(World world, int px, int pz) {
-        int y = GardenLayout.GROUND_Y;
-        int min = GardenLayout.plotMin(px);
-        int max = GardenLayout.plotMax(px);
-        int zMin = GardenLayout.plotMin(pz);
-        int zMax = GardenLayout.plotMax(pz);
-        for (int x = min; x <= max; x++) {
-            world.getBlockAt(x, y, zMin).setType(Material.DIRT_PATH, false);
-            world.getBlockAt(x, y, zMax).setType(Material.DIRT_PATH, false);
-        }
-        for (int z = zMin; z <= zMax; z++) {
-            world.getBlockAt(min, y, z).setType(Material.DIRT_PATH, false);
-            world.getBlockAt(max, y, z).setType(Material.DIRT_PATH, false);
         }
     }
 

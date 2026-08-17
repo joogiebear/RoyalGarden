@@ -34,12 +34,10 @@ public final class GardenMenu {
     private static final int COLUMN_OFFSET = 3;
 
     private final GardenWorlds worlds;
-    private final GardenBorder border;
     private final Menu menu;
 
-    public GardenMenu(GardenWorlds worlds, GardenBorder border) {
+    public GardenMenu(GardenWorlds worlds) {
         this.worlds = worlds;
-        this.border = border;
         this.menu = build();
     }
 
@@ -133,11 +131,6 @@ public final class GardenMenu {
             player.sendMessage(Component.text("Unlocked plot " + GardenLayout.plotName(px, pz) + ".",
                     NamedTextColor.GREEN));
             clicked.refresh(player);
-            // Everyone standing in this Garden sees the border move out, not just the buyer.
-            World world = Bukkit.getWorld(GardenWorlds.worldName(player.getUniqueId()));
-            if (world != null) {
-                border.applyToWorld(world);
-            }
         }
     }
 

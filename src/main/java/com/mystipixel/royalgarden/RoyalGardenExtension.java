@@ -2,7 +2,6 @@ package com.mystipixel.royalgarden;
 
 import com.mystipixel.royalgarden.command.CommandDesk;
 import com.mystipixel.royalgarden.command.CommandGarden;
-import com.mystipixel.royalgarden.garden.GardenBorder;
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenMenu;
 import com.mystipixel.royalgarden.garden.GardenProtection;
@@ -52,7 +51,6 @@ public final class RoyalGardenExtension extends Extension {
     private GardenWorlds gardens;
     private Sam sam;
     private GardenProtection protection;
-    private GardenBorder border;
     private PluginCommand gardenCommand;
     private PluginCommand deskCommand;
 
@@ -106,19 +104,18 @@ public final class RoyalGardenExtension extends Extension {
     /** Stand everything up. Only reached once the host's services are known to exist. */
     private void start() {
         GardenStore store = new GardenStore(getDataFolder(), getLogger());
-        this.gardens = new GardenWorlds(getPlugin(), worlds, store, getLogger());
+        this.gardens = new GardenWorlds(getPlugin(), worlds, store, getDataFolder(), getLogger());
 
-        this.border = new GardenBorder(getPlugin(), gardens);
-        GardenMenu menu = new GardenMenu(gardens, border);
+        GardenMenu menu = new GardenMenu(gardens);
         this.sam = new Sam(getPlugin(), menu);
-        this.protection = new GardenProtection(gardens, border);
-        Bukkit.getPluginManager().registerEvents(border, getPlugin());
+        this.protection = new GardenProtection(gardens);
         Bukkit.getPluginManager().registerEvents(sam, getPlugin());
         Bukkit.getPluginManager().registerEvents(protection, getPlugin());
 
         declare(CommandGarden.PERMISSION, PermissionDefault.TRUE, "Go to your Garden.");
         declare(CommandDesk.PERMISSION, PermissionDefault.TRUE, "Open the Garden desk.");
         declare(GardenProtection.BYPASS, PermissionDefault.OP, "Edit a Garden's protected blocks.");
+        declare(CommandGarden.ADMIN, PermissionDefault.OP, "Capture and stamp plot templates.");
 
         this.gardenCommand = new CommandGarden(getPlugin(), gardens, sam);
         this.deskCommand = new CommandDesk(getPlugin(), menu);
@@ -188,13 +185,10 @@ public final class RoyalGardenExtension extends Extension {
             HandlerList.unregisterAll(protection);
             protection = null;
         }
-        if (border != null) {
-            HandlerList.unregisterAll(border);
-            border = null;
-        }
         Bukkit.getPluginManager().removePermission(CommandGarden.PERMISSION);
         Bukkit.getPluginManager().removePermission(CommandDesk.PERMISSION);
         Bukkit.getPluginManager().removePermission(GardenProtection.BYPASS);
+        Bukkit.getPluginManager().removePermission(CommandGarden.ADMIN);
         this.gardens = null;
         this.islands = null;
         this.worlds = null;
