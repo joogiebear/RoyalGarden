@@ -7,6 +7,7 @@ import com.mystipixel.royalgarden.garden.GardenMenu;
 import com.mystipixel.royalgarden.garden.GardenProtection;
 import com.mystipixel.royalgarden.garden.GardenStore;
 import com.mystipixel.royalgarden.garden.GardenWorlds;
+import com.mystipixel.royalgarden.garden.PresetLibrary;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.mystipixel.royalskyblock.RoyalSkyblockPlugin;
 import com.mystipixel.royalskyblock.data.Storage;
@@ -104,7 +105,8 @@ public final class RoyalGardenExtension extends Extension {
     /** Stand everything up. Only reached once the host's services are known to exist. */
     private void start() {
         GardenStore store = new GardenStore(getDataFolder(), getLogger());
-        this.gardens = new GardenWorlds(getPlugin(), worlds, store, getDataFolder(), getLogger());
+        PresetLibrary presets = new PresetLibrary(getDataFolder(), getLogger());
+        this.gardens = new GardenWorlds(getPlugin(), worlds, store, presets, getLogger());
 
         GardenMenu menu = new GardenMenu(gardens);
         this.sam = new Sam(getPlugin(), menu);

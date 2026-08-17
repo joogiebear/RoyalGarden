@@ -3,6 +3,7 @@ package com.mystipixel.royalgarden.command;
 import com.mystipixel.royalgarden.garden.GardenBuilder;
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenWorlds;
+import com.mystipixel.royalgarden.garden.PresetLibrary;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.willfp.eco.core.EcoPlugin;
 import com.willfp.eco.core.command.impl.PluginCommand;
@@ -75,29 +76,58 @@ public final class CommandGarden extends PluginCommand {
             return;
         }
 
-        switch (args.get(0).toLowerCase(Locale.ROOT)) {
-            case "capture" -> capture(player, world);
-            case "restamp" -> {
-                if (!worlds.hasTemplate()) {
-                    player.sendMessage(Component.text("No plot template captured yet.", NamedTextColor.RED));
+        String verb = args.get(0).toLowerCase(Locale.ROOT);
+        String name = args.size() > 1 ? args.get(1).toLowerCase(Locale.ROOT) : null;
+        PresetLibrary presets = worlds.presets();
+
+        switch (verb) {
+            case "capture" -> capture(player, world, name);
+            case "apply" -> apply(player, world, name);
+            case "flat" -> apply(player, world, null);
+            case "default" -> {
+                if (name != null && !presets.exists(name)) {
+                    player.sendMessage(Component.text("No preset called '" + name + "'.", NamedTextColor.RED));
                     return;
                 }
-                player.sendMessage(Component.text("Restamping every plot but the farmhouse…",
-                        NamedTextColor.GRAY));
-                worlds.restamp(world);
+                presets.setDefault(name);
+                player.sendMessage(Component.text(name == null
+                        ? "New plots will be flat."
+                        : "New plots will be built from '" + name + "'.", NamedTextColor.GREEN));
             }
-            case "cleartemplate" -> player.sendMessage(worlds.clearTemplate()
-                    ? Component.text("Plot template cleared — new plots will be plain grass.",
-                            NamedTextColor.GREEN)
-                    : Component.text("There was no plot template to clear.", NamedTextColor.RED));
+            case "delete" -> player.sendMessage(presets.delete(name)
+                    ? Component.text("Deleted preset '" + name + "'.", NamedTextColor.GREEN)
+                    : Component.text("No preset called '" + name + "'.", NamedTextColor.RED));
+            case "presets" -> list(player, presets);
             default -> player.sendMessage(Component.text(
-                    "/garden — go to your Garden. Admin: capture, restamp, cleartemplate.",
-                    NamedTextColor.GRAY));
+                    "/garden — go to your Garden. Admin: capture <name>, apply <name>, flat, "
+                            + "default [name], delete <name>, presets.", NamedTextColor.GRAY));
         }
     }
 
-    /** Capture the plot the player is standing on as the template for every other plot. */
-    private void capture(Player player, World world) {
+    private void list(Player player, PresetLibrary presets) {
+        List<String> ids = presets.ids();
+        if (ids.isEmpty()) {
+            player.sendMessage(Component.text("No presets captured yet.", NamedTextColor.GRAY));
+            return;
+        }
+        player.sendMessage(Component.text("Presets:", NamedTextColor.GREEN));
+        for (String id : ids) {
+            boolean isDefault = id.equals(presets.defaultId());
+            player.sendMessage(Component.text("  " + id, NamedTextColor.WHITE)
+                    .append(isDefault
+                            ? Component.text("  (default)", NamedTextColor.YELLOW)
+                            : Component.empty()));
+        }
+    }
+
+    /** Capture the plot the player is standing on under a name. */
+    private void capture(Player player, World world, String name) {
+        if (name == null || !PresetLibrary.validId(name)) {
+            player.sendMessage(Component.text(
+                    "Name the preset: /garden capture <name>  (a-z, 0-9, _ and - only)",
+                    NamedTextColor.RED));
+            return;
+        }
         int px = GardenLayout.plotAt(player.getLocation().getBlockX());
         int pz = GardenLayout.plotAt(player.getLocation().getBlockZ());
         if (!GardenLayout.inGrid(px, pz)) {
@@ -105,24 +135,43 @@ public final class CommandGarden extends PluginCommand {
             return;
         }
         if (GardenLayout.isCentre(px, pz)) {
-            // Capturing the farmhouse would make every plot a barn, and the farmhouse plot is never
-            // stamped anyway — so this is always a mistake rather than an unusual choice.
+            // The farmhouse plot is never stamped, so capturing it could only ever be a mistake.
             player.sendMessage(Component.text(
-                    "That is the farmhouse plot. Build the template on any other plot.",
-                    NamedTextColor.RED));
+                    "That is the farmhouse plot. Build presets on any other plot.", NamedTextColor.RED));
             return;
         }
         try {
-            worlds.captureTemplate(world, px, pz);
+            int layers = worlds.capture(world, px, pz, name).height();
             player.sendMessage(Component.text("Captured plot " + GardenLayout.plotName(px, pz)
-                    + " (" + worlds.templateHeight() + " layers). ", NamedTextColor.GREEN)
-                    .append(Component.text("New plots will look like it; /garden restamp applies it "
-                            + "to existing ones.", NamedTextColor.GRAY)));
+                    + " as '" + name + "' (" + layers + " layers).", NamedTextColor.GREEN));
         } catch (IOException failed) {
-            player.sendMessage(Component.text("Could not save the template: " + failed.getMessage(),
+            player.sendMessage(Component.text("Could not save the preset: " + failed.getMessage(),
                     NamedTextColor.RED));
-            getPlugin().getLogger().severe("Plot template capture failed: " + failed);
+            getPlugin().getLogger().severe("Preset capture failed: " + failed);
         }
+    }
+
+    /** Stamp a preset onto the plot the player is standing on, or flatten it. */
+    private void apply(Player player, World world, String name) {
+        int px = GardenLayout.plotAt(player.getLocation().getBlockX());
+        int pz = GardenLayout.plotAt(player.getLocation().getBlockZ());
+        if (!GardenLayout.inGrid(px, pz)) {
+            player.sendMessage(Component.text("Stand on the plot you want to change.", NamedTextColor.RED));
+            return;
+        }
+        if (GardenLayout.isCentre(px, pz)) {
+            player.sendMessage(Component.text("The farmhouse plot cannot be replaced.", NamedTextColor.RED));
+            return;
+        }
+        if (name != null && !worlds.presets().exists(name)) {
+            player.sendMessage(Component.text("No preset called '" + name + "'.", NamedTextColor.RED));
+            return;
+        }
+        worlds.applyPreset(world, px, pz, name);
+        player.sendMessage(Component.text(name == null
+                ? "Flattening plot " + GardenLayout.plotName(px, pz) + "…"
+                : "Applying '" + name + "' to plot " + GardenLayout.plotName(px, pz) + "…",
+                NamedTextColor.GREEN));
     }
 
     private void visit(Player player) {

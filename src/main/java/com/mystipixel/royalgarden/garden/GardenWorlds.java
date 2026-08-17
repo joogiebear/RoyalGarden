@@ -49,95 +49,54 @@ public final class GardenWorlds {
      */
     private static final int BLOCKS_PER_TICK = 24_000;
 
-    /** Where the captured plot template is kept, in the extension's data folder. */
-    private static final String TEMPLATE_FILE = "plot-template.dat";
-
     private final EcoPlugin plugin;
     private final IslandWorldService worlds;
     private final GardenStore store;
-    private final File dataFolder;
+    private final PresetLibrary presets;
     private final Logger logger;
 
-    /** The plot every non-farmhouse plot is stamped from, or null to use the default field. */
-    private PlotTemplate template;
-
     public GardenWorlds(EcoPlugin plugin, IslandWorldService worlds, GardenStore store,
-                        File dataFolder, Logger logger) {
+                        PresetLibrary presets, Logger logger) {
         this.plugin = plugin;
         this.worlds = worlds;
         this.store = store;
-        this.dataFolder = dataFolder;
+        this.presets = presets;
         this.logger = logger;
-        loadTemplate();
     }
 
-    // ── the plot template ──────────────────────────────────────────────────────
-
-    private File templateFile() {
-        return new File(dataFolder, TEMPLATE_FILE);
+    /** The preset library — what can be stamped onto a plot. */
+    public PresetLibrary presets() {
+        return presets;
     }
 
-    /** Whether a captured template is in use. */
-    public boolean hasTemplate() {
-        return template != null;
-    }
-
-    /** Height of the captured template, or 0 if there isn't one. */
-    public int templateHeight() {
-        return template == null ? 0 : template.height();
-    }
-
-    private void loadTemplate() {
-        try {
-            this.template = PlotTemplate.load(templateFile());
-            if (template != null) {
-                logger.info("Plot template loaded (" + template.height() + " layers).");
-            }
-        } catch (IOException bad) {
-            // Refuse rather than fall back silently: stamping the default field over a board somebody
-            // designed, because their template failed to parse, is the worse of the two failures.
-            this.template = null;
-            logger.severe("Plot template could not be read, using the default plot: " + bad.getMessage());
-        }
-    }
+    // ── applying presets ───────────────────────────────────────────────────────
 
     /**
-     * Capture a plot and make every plot look like it from now on.
+     * Capture a plot and store it under a preset id.
      *
-     * <p>Existing plots are not restamped — that is {@link #restamp} and it is a separate, destructive
-     * decision. This only changes what a plot generated after now will contain.
+     * <p>Nothing already built changes. Capturing records what a plot looks like; applying it is a
+     * separate, destructive act, and keeping the two apart is what makes capture safe to run at any
+     * time while you are still building.
      */
-    public void captureTemplate(World world, int px, int pz) throws IOException {
+    public PlotTemplate capture(World world, int px, int pz, String id) throws IOException {
         PlotTemplate captured = PlotTemplate.capture(world, px, pz);
-        captured.save(templateFile());
-        this.template = captured;
-        logger.info("Captured plot " + GardenLayout.plotName(px, pz) + " as the plot template ("
+        presets.save(id, captured);
+        logger.info("Captured plot " + GardenLayout.plotName(px, pz) + " as preset '" + id + "' ("
                 + captured.height() + " layers).");
-    }
-
-    /** Forget the template and go back to the plain grass plot. */
-    public boolean clearTemplate() {
-        this.template = null;
-        return templateFile().delete();
+        return captured;
     }
 
     /**
-     * Re-lay every plot except the farmhouse from the current template.
+     * Stamp a preset onto one plot, or flatten it back to a plain field with a null id.
      *
-     * <p>Destructive, and deliberately not automatic: it overwrites whatever is standing on those
-     * plots. It exists so a Garden made before the template was captured can be brought into line
-     * without being deleted.
+     * <p>Overwrites the plot completely. That is the intended behaviour and the reason it is only ever
+     * reached from a deliberate action: a plot someone has farmed for a week and a plot they just
+     * unlocked look the same to this method.
      */
-    public void restamp(World world) {
-        List<int[]> plots = new ArrayList<>();
-        for (int px = 0; px < GardenLayout.GRID; px++) {
-            for (int pz = 0; pz < GardenLayout.GRID; pz++) {
-                if (!GardenLayout.isCentre(px, pz)) {
-                    plots.add(new int[]{px, pz});
-                }
-            }
-        }
-        lay(world, plots, "restamping");
+    public void applyPreset(World world, int px, int pz, String id) {
+        PlotTemplate preset = id == null ? null : presets.get(id);
+        lay(world, List.of(new int[]{px, pz}), id == null ? "flattening" : "applying '" + id + "' to",
+                preset);
     }
 
     /** The world name for a player's Garden. */
@@ -360,7 +319,7 @@ public final class GardenWorlds {
         if (missing.isEmpty()) {
             return;
         }
-        lay(world, missing, "generating");
+        lay(world, missing, "generating", presets.defaultPreset());
     }
 
     /**
@@ -371,10 +330,10 @@ public final class GardenWorlds {
      * persisted once at the end — an interrupted run simply leaves plots ungenerated, and the next load
      * finds them missing and lays them again.
      */
-    private void lay(World world, List<int[]> plots, String verb) {
+    private void lay(World world, List<int[]> plots, String verb, PlotTemplate preset) {
         String name = world.getName();
         logger.info("Garden '" + name + "': " + verb + " " + plots.size() + " plot(s)"
-                + (template != null ? " from the template" : "") + ".");
+                + (preset != null ? " (" + preset.height() + " layers)" : " (flat)") + ".");
         long started = System.nanoTime();
 
         new BukkitRunnable() {
@@ -392,7 +351,7 @@ public final class GardenWorlds {
                 int budget = BLOCKS_PER_TICK;
                 while (budget > 0 && plot < plots.size()) {
                     int[] at = plots.get(plot);
-                    budget -= writeRow(world, at[0], at[1], row);
+                    budget -= writeRow(world, at[0], at[1], row, preset);
                     if (++row >= GardenLayout.PLOT_SIZE) {
                         row = 0;
                         plot++;
@@ -414,9 +373,9 @@ public final class GardenWorlds {
      * <p>The farmhouse plot is never templated. It carries the barn, the desk and Sam, and stamping a
      * captured farm over it would delete all three.
      */
-    private int writeRow(World world, int px, int pz, int row) {
-        if (template != null && !GardenLayout.isCentre(px, pz)) {
-            return template.pasteRow(world, px, pz, row);
+    private int writeRow(World world, int px, int pz, int row, PlotTemplate preset) {
+        if (preset != null && !GardenLayout.isCentre(px, pz)) {
+            return preset.pasteRow(world, px, pz, row);
         }
         return GardenBuilder.generatePlotRow(world, px, pz, row);
     }
