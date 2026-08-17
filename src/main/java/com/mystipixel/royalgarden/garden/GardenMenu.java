@@ -95,7 +95,7 @@ public final class GardenMenu {
         }
         return item(Material.GRAY_STAINED_GLASS_PANE,
                 Component.text("Plot " + name, NamedTextColor.DARK_GRAY),
-                List.of(grey("Locked."),
+                List.of(grey("Locked — you cannot farm here."),
                         grey("Unlock a plot next to it first.")));
     }
 
@@ -108,8 +108,9 @@ public final class GardenMenu {
                 List.of(grey(state.unlockedCount() + " of " + total + " plots unlocked"),
                         grey("Each plot is " + GardenLayout.PLOT_SIZE + "×" + GardenLayout.PLOT_SIZE),
                         Component.empty(),
-                        grey("Walls mark the edge of what you own."),
-                        grey("They move outward as you unlock.")));
+                        grey("The border sits at the edge of what"),
+                        grey("you have reached, and moves out as"),
+                        grey("you unlock further from the farmhouse.")));
     }
 
     // ── clicking ───────────────────────────────────────────────────────────────

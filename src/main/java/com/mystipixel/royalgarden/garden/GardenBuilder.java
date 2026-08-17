@@ -29,14 +29,8 @@ public final class GardenBuilder {
     /** Wall height between the floor and the eaves. */
     private static final int WALL = 5;
 
-    /**
-     * The block a plot boundary is drawn in.
-     *
-     * <p>A wall block rather than a fence or a slab: it stands 1.5 blocks tall, which is above jump
-     * height, so a single course keeps a player on their own plots without needing to be two blocks of
-     * eyesore.
-     */
-    private static final Material BOUNDARY = Material.STONE_BRICK_WALL;
+    /** What plot boundaries used to be drawn in, kept only so old Gardens can be cleaned up. */
+    private static final Material LEGACY_BOUNDARY = Material.STONE_BRICK_WALL;
 
     private GardenBuilder() {
     }
@@ -113,70 +107,30 @@ public final class GardenBuilder {
     }
 
     /**
-     * Put a wall along every edge of every unlocked plot that faces somewhere you do not own, and take
-     * one away everywhere that is now interior.
+     * Strip any boundary wall left behind by an earlier version.
      *
-     * <p>This is the border that moves. Unlocking a plot does not redraw a boundary somewhere else — it
-     * removes the wall between the two plots and puts one around the new plot's far side, which is the
-     * same operation applied to a larger set. Running it over the whole board each time keeps that
-     * true even if unlock state is repaired or edited by hand.
-     *
-     * <p>A single wall block is 1.5 blocks tall, which is above jump height, so one course is enough to
-     * stop someone walking off a plot into the void.
+     * <p>Plot edges were once drawn in stone brick wall, before the border became a real world border.
+     * A Garden built then still has them standing, and nothing else would ever remove them — so this
+     * runs once per load and clears the course above every plot rim. Cheap, and it means an old Garden
+     * repairs itself rather than needing to be wiped.
      */
-    public static void applyWalls(World world, GardenState state) {
-        for (int px = 0; px < GardenLayout.GRID; px++) {
-            for (int pz = 0; pz < GardenLayout.GRID; pz++) {
-                if (!state.isUnlocked(px, pz)) {
-                    continue;
-                }
-                edge(world, px, pz, 0, -1, !state.isUnlocked(px, pz - 1));
-                edge(world, px, pz, 0, 1, !state.isUnlocked(px, pz + 1));
-                edge(world, px, pz, -1, 0, !state.isUnlocked(px - 1, pz));
-                edge(world, px, pz, 1, 0, !state.isUnlocked(px + 1, pz));
-            }
-        }
-    }
-
-    /** Wall or clear one edge of one plot. {@code dx}/{@code dz} pick which of the four it is. */
-    private static void edge(World world, int px, int pz, int dx, int dz, boolean wall) {
+    public static void clearLegacyWalls(World world) {
         int y = GardenLayout.GROUND_Y + 1;
-        int xMin = GardenLayout.plotMin(px);
-        int xMax = GardenLayout.plotMax(px);
-        int zMin = GardenLayout.plotMin(pz);
-        int zMax = GardenLayout.plotMax(pz);
-
-        int fixedX = dx < 0 ? xMin : xMax;
-        int fixedZ = dz < 0 ? zMin : zMax;
-
-        if (dx != 0) {
-            for (int z = zMin; z <= zMax; z++) {
-                setWall(world, fixedX, y, z, wall);
-            }
-        } else {
-            for (int x = xMin; x <= xMax; x++) {
-                setWall(world, x, y, fixedZ, wall);
+        for (int p = 0; p < GardenLayout.GRID; p++) {
+            for (int v = GardenLayout.boardMin(); v <= GardenLayout.boardMax(); v++) {
+                clearWall(world, GardenLayout.plotMin(p), y, v);
+                clearWall(world, GardenLayout.plotMax(p), y, v);
+                clearWall(world, v, y, GardenLayout.plotMin(p));
+                clearWall(world, v, y, GardenLayout.plotMax(p));
             }
         }
     }
 
-    /** Place or remove a boundary wall block, touching nothing else that happens to be standing there. */
-    private static void setWall(World world, int x, int y, int z, boolean wall) {
+    private static void clearWall(World world, int x, int y, int z) {
         Block block = world.getBlockAt(x, y, z);
-        if (wall) {
-            if (block.getType().isAir() || isWall(block.getType())) {
-                block.setType(BOUNDARY, false);
-            }
-            return;
+        if (block.getType() == LEGACY_BOUNDARY) {
+            block.setType(Material.AIR, false);
         }
-        if (isWall(block.getType())) {
-            block.setType(Material.AIR, false);   // only ever remove our own wall
-        }
-    }
-
-    /** Whether a material is one of ours to remove. */
-    public static boolean isWall(Material material) {
-        return material == BOUNDARY;
     }
 
     /**

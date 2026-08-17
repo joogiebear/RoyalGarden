@@ -7,7 +7,10 @@ import org.bukkit.Difficulty;
 import org.bukkit.GameRule;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
+import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -79,11 +82,11 @@ public final class GardenWorlds {
     }
 
     /**
-     * Unlock a plot: record it, persist it, generate it and redraw the walls.
+     * Unlock a plot: record it, persist it, and move the border out if it reached further.
      *
-     * <p>Returns false if the plot was not a legal purchase. Generation is skipped when the world is
-     * not loaded — {@link #prepare} regenerates anything missing on the next visit, so the unlock is
-     * never lost for want of a loaded world.
+     * <p>Nothing is generated here — every plot is built when the Garden is created, locked or not, so
+     * unlocking is purely a change of what you are allowed onto. Returns false if the plot was not a
+     * legal purchase.
      */
     public boolean unlock(UUID owner, int px, int pz) {
         GardenState state = store.get(owner);
@@ -93,8 +96,7 @@ public final class GardenWorlds {
         store.save(state);
         World world = Bukkit.getWorld(worldName(owner));
         if (world != null) {
-            GardenBuilder.generatePlot(world, px, pz);
-            GardenBuilder.applyWalls(world, state);
+            applyBorder(world, state);
         }
         return true;
     }
@@ -175,15 +177,7 @@ public final class GardenWorlds {
      * added.
      */
     public void prepare(World world) {
-        // The board's edge, enforced by the world's own border. Per-player borders are left alone:
-        // RoyalSkyblock's BorderService clears them for any non-island world, and clearing a per-player
-        // border falls the player back to exactly this one. The two systems agree by not overlapping.
-        WorldBorder border = world.getWorldBorder();
-        border.setCenter(0.0, 0.0);
-        border.setSize(GardenLayout.SPAN);
-        border.setWarningDistance(3);
-        border.setDamageAmount(0.0);
-        border.setDamageBuffer(0.0);
+        applyBorder(world, stateOf(world));
 
         // A farm, not a survival world: no hostiles, and nothing that rearranges what you planted.
         world.setDifficulty(Difficulty.PEACEFUL);
@@ -199,27 +193,84 @@ public final class GardenWorlds {
     }
 
     /**
-     * Make the world match the unlock state: generate any unlocked plot that isn't there, then redraw
-     * the walls.
+     * The border: a square centred on the farmhouse, one plot wider each way per ring you have reached.
      *
-     * <p>Run on every load, not just after an unlock. A plot can be unlocked while the world is
-     * unloaded (from the menu, standing anywhere), and a world can come back from a rollback missing
-     * blocks it should have. Reconciling on load means the unlock file is the record and the world is
-     * brought to agree with it, rather than the two drifting apart with no way back.
+     * <p>The world's own border rather than blocks. Per-player borders are left alone, and that is what
+     * makes the two systems agree: RoyalSkyblock's {@code BorderService} clears the per-player border
+     * for any non-island world, and a cleared per-player border falls the player back to exactly this
+     * one.
+     *
+     * <p>A world border is a centred square and cannot be anything else, so it is sized to
+     * {@link GardenState#ring()}. Buying one plot in a new ring therefore opens the border across that
+     * whole ring — you can walk it, but protection is still per plot, so you cannot farm what you have
+     * not bought.
+     */
+    public void applyBorder(World world, GardenState state) {
+        int ring = state == null ? GardenLayout.CENTRE : state.ring();
+        WorldBorder border = world.getWorldBorder();
+        border.setCenter(0.0, 0.0);
+        border.setSize((2L * ring + 1) * GardenLayout.PLOT_SIZE);
+        border.setWarningDistance(3);
+        border.setDamageAmount(0.0);
+        border.setDamageBuffer(0.0);
+    }
+
+    /**
+     * Bring the world up to date with what it should contain: every plot generated, locked or not, and
+     * no leftovers from an older layout.
+     *
+     * <p>All twenty-five are built, because a locked plot you can see across the border reads as a
+     * place you are going to own — an empty hole reads as a bug. Unlocking changes where the border is,
+     * not whether the ground exists.
+     *
+     * <p>Generation is spread one plot per tick. The board is 230,400 columns; laying it in a single
+     * tick is roughly a five-second freeze, and the player is standing on the farmhouse plot — built
+     * synchronously before this starts — while the rest fills in behind them.
      */
     public void sync(World world) {
-        GardenState state = stateOf(world);
-        if (state == null) {
-            return;
-        }
-        for (int[] plot : state.plots()) {
-            if (!GardenBuilder.isGenerated(world, plot[0], plot[1])) {
-                logger.info("Garden '" + world.getName() + "': generating plot "
-                        + GardenLayout.plotName(plot[0], plot[1]) + ".");
-                GardenBuilder.generatePlot(world, plot[0], plot[1]);
+        GardenBuilder.clearLegacyWalls(world);
+
+        List<int[]> missing = new ArrayList<>();
+        for (int px = 0; px < GardenLayout.GRID; px++) {
+            for (int pz = 0; pz < GardenLayout.GRID; pz++) {
+                if (!GardenBuilder.isGenerated(world, px, pz)) {
+                    missing.add(new int[]{px, pz});
+                }
             }
         }
-        GardenBuilder.applyWalls(world, state);
+        if (missing.isEmpty()) {
+            return;
+        }
+
+        String name = world.getName();
+        logger.info("Garden '" + name + "': generating " + missing.size() + " plot(s).");
+        new BukkitRunnable() {
+            private int next = 0;
+            private long slowest = 0;
+
+            @Override
+            public void run() {
+                // The world can be unloaded under us — the host unloads an empty Garden after its
+                // grace period, and writing blocks into a world nobody holds would throw every tick.
+                if (Bukkit.getWorld(name) == null) {
+                    cancel();
+                    return;
+                }
+                if (next >= missing.size()) {
+                    cancel();
+                    worlds.saveIsland(name);   // persist the board we just laid
+                    // The slowest plot is the number that matters: it is how long the longest tick
+                    // this spent was, and therefore whether one-plot-per-tick is fine or too coarse.
+                    logger.info("Garden '" + name + "': board complete (slowest plot "
+                            + slowest / 1_000_000 + "ms).");
+                    return;
+                }
+                int[] plot = missing.get(next++);
+                long started = System.nanoTime();
+                GardenBuilder.generatePlot(world, plot[0], plot[1]);
+                slowest = Math.max(slowest, System.nanoTime() - started);
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
     }
 
     /** Walk an async failure's cause chain looking for ASP's "no such world" signal. */

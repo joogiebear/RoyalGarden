@@ -64,6 +64,27 @@ public final class GardenState {
         return unlocked.add(key(px, pz));
     }
 
+    /**
+     * How far out from the farmhouse your unlocks reach, measured in plots.
+     *
+     * <p>Chebyshev distance — the side length of the smallest square of plots, centred on the
+     * farmhouse, that contains everything you own. 0 with only the farmhouse, 2 with a full board.
+     *
+     * <p>This exists because a Minecraft world border is a <em>centred square</em> and nothing else. It
+     * cannot describe an L-shape, so the border is sized to this instead. The consequence is honest and
+     * worth knowing: buying one plot in a new ring opens the border across that whole ring. You still
+     * only own what you bought — protection is per plot — but you can walk the ring you have reached
+     * into.
+     */
+    public int ring() {
+        int max = 0;
+        for (int[] plot : plots()) {
+            max = Math.max(max, Math.max(Math.abs(plot[0] - GardenLayout.CENTRE),
+                    Math.abs(plot[1] - GardenLayout.CENTRE)));
+        }
+        return max;
+    }
+
     /** Every unlocked plot as {@code {px, pz}} pairs, in unlock order. */
     public Iterable<int[]> plots() {
         Set<int[]> out = new LinkedHashSet<>();

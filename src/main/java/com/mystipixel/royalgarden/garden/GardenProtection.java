@@ -21,10 +21,12 @@ import org.bukkit.event.player.PlayerBucketEmptyEvent;
  * <ol>
  *   <li><b>The farmhouse plot is read-only.</b> It carries the barn, the desk and Sam, and it is the
  *       one plot every Garden has — so it is the one plot whose contents can be relied upon.</li>
- *   <li><b>Locked plots are read-only</b>, which mostly matters for placing: a locked plot is empty
- *       sky, and bridging out into it would let a player build past a border they have not bought.</li>
- *   <li><b>Boundary walls are read-only</b>, or the border that "moves as you unlock" would instead
- *       move whenever someone brought a pickaxe.</li>
+ *   <li><b>Locked plots are read-only.</b> The whole board is generated, so a locked plot is real
+ *       ground you may be able to walk on — the world border is a centred square and opens a whole
+ *       ring at a time. Owning it is a separate question from standing on it, and this is where that
+ *       distinction is enforced.</li>
+ *   <li><b>The bedrock floor is read-only</b>, since it is all that stands between a shovel and a
+ *       fall out of the world.</li>
  * </ol>
  *
  * <p>{@code royalgarden.bypass} (operators by default) skips all three — the same shape as the host's
@@ -79,9 +81,6 @@ public final class GardenProtection implements Listener {
         World world = block.getWorld();
         if (!GardenWorlds.isGarden(world) || player.hasPermission(BYPASS)) {
             return null;
-        }
-        if (GardenBuilder.isWall(block.getType())) {
-            return "That is a plot boundary.";
         }
         if (block.getType() == Material.BEDROCK) {
             return "That is the floor of your Garden.";
