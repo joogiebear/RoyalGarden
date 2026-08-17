@@ -85,6 +85,28 @@ public final class GardenState {
         return max;
     }
 
+    /**
+     * The smallest plot-aligned box containing everything you own, as
+     * {@code {minPx, minPz, maxPx, maxPz}}.
+     *
+     * <p>Used to place the border. A world border is a square and cannot be an L-shape, so it is drawn
+     * around this box — which hugs the direction your Garden actually grew, rather than assuming it
+     * grew evenly in all four.
+     */
+    public int[] bounds() {
+        int minX = GardenLayout.GRID;
+        int minZ = GardenLayout.GRID;
+        int maxX = -1;
+        int maxZ = -1;
+        for (int[] plot : plots()) {
+            minX = Math.min(minX, plot[0]);
+            maxX = Math.max(maxX, plot[0]);
+            minZ = Math.min(minZ, plot[1]);
+            maxZ = Math.max(maxZ, plot[1]);
+        }
+        return new int[]{minX, minZ, maxX, maxZ};
+    }
+
     /** Every unlocked plot as {@code {px, pz}} pairs, in unlock order. */
     public Iterable<int[]> plots() {
         Set<int[]> out = new LinkedHashSet<>();

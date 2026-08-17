@@ -2,6 +2,7 @@ package com.mystipixel.royalgarden;
 
 import com.mystipixel.royalgarden.command.CommandDesk;
 import com.mystipixel.royalgarden.command.CommandGarden;
+import com.mystipixel.royalgarden.garden.GardenBorder;
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenMenu;
 import com.mystipixel.royalgarden.garden.GardenProtection;
@@ -51,6 +52,7 @@ public final class RoyalGardenExtension extends Extension {
     private GardenWorlds gardens;
     private Sam sam;
     private GardenProtection protection;
+    private GardenBorder border;
     private PluginCommand gardenCommand;
     private PluginCommand deskCommand;
 
@@ -106,9 +108,11 @@ public final class RoyalGardenExtension extends Extension {
         GardenStore store = new GardenStore(getDataFolder(), getLogger());
         this.gardens = new GardenWorlds(getPlugin(), worlds, store, getLogger());
 
-        GardenMenu menu = new GardenMenu(gardens);
+        this.border = new GardenBorder(getPlugin(), gardens);
+        GardenMenu menu = new GardenMenu(gardens, border);
         this.sam = new Sam(getPlugin(), menu);
-        this.protection = new GardenProtection(gardens);
+        this.protection = new GardenProtection(gardens, border);
+        Bukkit.getPluginManager().registerEvents(border, getPlugin());
         Bukkit.getPluginManager().registerEvents(sam, getPlugin());
         Bukkit.getPluginManager().registerEvents(protection, getPlugin());
 
@@ -183,6 +187,10 @@ public final class RoyalGardenExtension extends Extension {
         if (protection != null) {
             HandlerList.unregisterAll(protection);
             protection = null;
+        }
+        if (border != null) {
+            HandlerList.unregisterAll(border);
+            border = null;
         }
         Bukkit.getPluginManager().removePermission(CommandGarden.PERMISSION);
         Bukkit.getPluginManager().removePermission(CommandDesk.PERMISSION);

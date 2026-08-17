@@ -2,6 +2,7 @@ package com.mystipixel.royalgarden.garden;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -11,7 +12,10 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 
 /**
  * What you may and may not change inside a Garden.
@@ -38,9 +42,49 @@ public final class GardenProtection implements Listener {
     public static final String BYPASS = "royalgarden.bypass";
 
     private final GardenWorlds worlds;
+    private final GardenBorder border;
 
-    public GardenProtection(GardenWorlds worlds) {
+    public GardenProtection(GardenWorlds worlds, GardenBorder border) {
         this.worlds = worlds;
+        this.border = border;
+    }
+
+    /**
+     * Keep a player out of a plot they have not unlocked.
+     *
+     * <p>This, not the border, is what makes locking exact. A world border is a square and a player has
+     * one, so it can enclose the box your Garden grew into but cannot cut a locked plot out of the
+     * middle of it. A move check can, for any shape, and it is the difference between "the border is
+     * roughly right" and "you cannot walk onto a plot you do not own".
+     *
+     * <p>Only block-to-block movement is considered — looking around and shuffling within a block fire
+     * this event constantly, and comparing block coordinates first keeps the common case to two integer
+     * comparisons. Teleports are a separate event class and deliberately pass through, so the menu's
+     * "click to visit" and admin teleports still work.
+     */
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    public void onMove(PlayerMoveEvent event) {
+        Location to = event.getTo();
+        Location from = event.getFrom();
+        if (to.getBlockX() == from.getBlockX() && to.getBlockZ() == from.getBlockZ()) {
+            return;
+        }
+        Player player = event.getPlayer();
+        if (!GardenWorlds.isGarden(to.getWorld()) || player.hasPermission(BYPASS)) {
+            return;
+        }
+        int px = GardenLayout.plotAt(to.getBlockX());
+        int pz = GardenLayout.plotAt(to.getBlockZ());
+        if (!GardenLayout.inGrid(px, pz)) {
+            return;                        // off the board entirely — the world border has that
+        }
+        GardenState state = worlds.stateOf(to.getWorld());
+        if (state == null || state.isUnlocked(px, pz)) {
+            return;
+        }
+        event.setCancelled(true);
+        deny(player, "Plot " + GardenLayout.plotName(px, pz) + " is locked.");
+        border.flashRed(player);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -59,6 +103,31 @@ public final class GardenProtection implements Listener {
             event.setCancelled(true);
             deny(event.getPlayer(), refusal);
         }
+    }
+
+    /**
+     * Nothing spawns in a Garden unless a plugin asked for it.
+     *
+     * <p>No animals, no hostiles, no wandering traders, no chunk-generation herds — a farming world
+     * should contain what the farmer put there. The gamerule already stops natural spawning, but that
+     * is only the natural path: breeding, spawn eggs, village mechanics and jockeys all arrive by other
+     * routes, and this closes them.
+     *
+     * <p>{@code CUSTOM} is allowed through, and that is the whole point of doing it this way rather
+     * than blanket-cancelling. It is the reason a plugin-spawned entity uses, so EcoMobs (and Sam, who
+     * is spawned the same way) keep working while vanilla spawning stays shut. {@code COMMAND} is
+     * allowed too, so {@code /summon} still works for an admin testing something.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onSpawn(CreatureSpawnEvent event) {
+        if (!GardenWorlds.isGarden(event.getLocation().getWorld())) {
+            return;
+        }
+        SpawnReason reason = event.getSpawnReason();
+        if (reason == SpawnReason.CUSTOM || reason == SpawnReason.COMMAND) {
+            return;
+        }
+        event.setCancelled(true);
     }
 
     /** Buckets place blocks without a BlockPlaceEvent, so water would otherwise flood a locked plot. */

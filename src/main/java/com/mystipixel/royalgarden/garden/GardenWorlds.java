@@ -94,10 +94,6 @@ public final class GardenWorlds {
             return false;
         }
         store.save(state);
-        World world = Bukkit.getWorld(worldName(owner));
-        if (world != null) {
-            applyBorder(world, state);
-        }
         return true;
     }
 
@@ -177,10 +173,13 @@ public final class GardenWorlds {
      * added.
      */
     public void prepare(World world) {
-        applyBorder(world, stateOf(world));
+        applyBorder(world);
 
-        // A farm, not a survival world: no hostiles, and nothing that rearranges what you planted.
+        // A farm, not a survival world: nothing spawns that the farmer did not put there, and nothing
+        // rearranges what they planted. DO_MOB_SPAWNING closes the natural path cheaply, without an
+        // event per attempt; GardenProtection closes the rest and lets plugin spawns (EcoMobs) through.
         world.setDifficulty(Difficulty.PEACEFUL);
+        world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
         world.setGameRule(GameRule.MOB_GRIEFING, false);
         world.setGameRule(GameRule.DO_FIRE_TICK, false);
         world.setGameRule(GameRule.DO_INSOMNIA, false);
@@ -193,24 +192,18 @@ public final class GardenWorlds {
     }
 
     /**
-     * The border: a square centred on the farmhouse, one plot wider each way per ring you have reached.
+     * The world's own border, parked at the edge of the board.
      *
-     * <p>The world's own border rather than blocks. Per-player borders are left alone, and that is what
-     * makes the two systems agree: RoyalSkyblock's {@code BorderService} clears the per-player border
-     * for any non-island world, and a cleared per-player border falls the player back to exactly this
-     * one.
-     *
-     * <p>A world border is a centred square and cannot be anything else, so it is sized to
-     * {@link GardenState#ring()}. Buying one plot in a new ring therefore opens the border across that
-     * whole ring — you can walk it, but protection is still per plot, so you cannot farm what you have
-     * not bought.
+     * <p>This is a backstop, not the border a player sees. The visible one is per-player, coloured, and
+     * drawn around what they own — see {@link GardenBorder}. This one exists so that a player who
+     * somehow has no per-player border still cannot walk off the board, and so the two never disagree
+     * about where the world ends.
      */
-    public void applyBorder(World world, GardenState state) {
-        int ring = state == null ? GardenLayout.CENTRE : state.ring();
+    public void applyBorder(World world) {
         WorldBorder border = world.getWorldBorder();
         border.setCenter(0.0, 0.0);
-        border.setSize((2L * ring + 1) * GardenLayout.PLOT_SIZE);
-        border.setWarningDistance(3);
+        border.setSize(GardenLayout.SPAN);
+        border.setWarningDistance(0);
         border.setDamageAmount(0.0);
         border.setDamageBuffer(0.0);
     }
