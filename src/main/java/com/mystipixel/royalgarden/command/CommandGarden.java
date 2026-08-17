@@ -22,11 +22,22 @@ import java.util.List;
  */
 public final class CommandGarden extends PluginCommand {
 
+    /**
+     * The node this command needs.
+     *
+     * <p>Not the empty string. eco checks {@code sender.hasPermission(getPermission())} with no
+     * special case for a blank one, and Bukkit resolves an <em>unregistered</em> permission — which
+     * {@code ""} is — through {@code PermissionDefault.OP}. An empty permission therefore reads as
+     * "operators only", silently, which is the exact opposite of what it looks like it means. The node
+     * is registered with {@code default: true} on enable, matching the host's own player-facing nodes.
+     */
+    public static final String PERMISSION = "royalgarden.garden";
+
     private final GardenWorlds worlds;
     private final Sam sam;
 
     public CommandGarden(EcoPlugin plugin, GardenWorlds worlds, Sam sam) {
-        super(plugin, "garden", "", true);
+        super(plugin, "garden", PERMISSION, true);
         this.worlds = worlds;
         this.sam = sam;
     }

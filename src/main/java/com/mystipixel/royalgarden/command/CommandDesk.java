@@ -16,8 +16,11 @@ import java.util.List;
  */
 public final class CommandDesk extends PluginCommand {
 
+    /** The node this command needs. See {@link CommandGarden#PERMISSION} for why it is not blank. */
+    public static final String PERMISSION = "royalgarden.desk";
+
     public CommandDesk(EcoPlugin plugin) {
-        super(plugin, "desk", "", true);
+        super(plugin, "desk", PERMISSION, true);
     }
 
     @Override

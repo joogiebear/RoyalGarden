@@ -13,6 +13,9 @@ import com.willfp.eco.core.command.impl.PluginCommand;
 import com.willfp.eco.core.extensions.Extension;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
+import org.bukkit.permissions.Permission;
+import org.bukkit.permissions.PermissionDefault;
+import org.bukkit.plugin.PluginManager;
 
 import java.util.function.Supplier;
 
@@ -99,12 +102,32 @@ public final class RoyalGardenExtension extends Extension {
         this.sam = new Sam(getPlugin());
         Bukkit.getPluginManager().registerEvents(sam, getPlugin());
 
+        declare(CommandGarden.PERMISSION, "Go to your Garden.");
+        declare(CommandDesk.PERMISSION, "Open the Garden desk.");
+
         this.gardenCommand = new CommandGarden(getPlugin(), gardens, sam);
         this.deskCommand = new CommandDesk(getPlugin());
         gardenCommand.register();
         deskCommand.register();
 
         getLogger().info("Phase 1 ready: /garden, /desk, Sam at the desk.");
+    }
+
+    /**
+     * Register a permission node that every player has by default.
+     *
+     * <p>An extension has no {@code plugin.yml}, so there is nowhere to declare a node the way the host
+     * declares its own — and an <em>undeclared</em> node is not simply ungated. Bukkit resolves one it
+     * has never seen through {@code PermissionDefault.OP}, so leaving these undeclared makes both
+     * commands operators-only without a word in the log about it. Declaring them here is what makes
+     * {@code default: true} mean anything.
+     */
+    private void declare(String node, String description) {
+        PluginManager plugins = Bukkit.getPluginManager();
+        if (plugins.getPermission(node) != null) {
+            return;                          // a reload re-runs start(); adding twice throws
+        }
+        plugins.addPermission(new Permission(node, description, PermissionDefault.TRUE));
     }
 
     /** Reads one host service, treating an absent one as a fact to report rather than a crash. */
@@ -144,6 +167,8 @@ public final class RoyalGardenExtension extends Extension {
             HandlerList.unregisterAll(sam);
             sam = null;
         }
+        Bukkit.getPluginManager().removePermission(CommandGarden.PERMISSION);
+        Bukkit.getPluginManager().removePermission(CommandDesk.PERMISSION);
         this.gardens = null;
         this.islands = null;
         this.worlds = null;
