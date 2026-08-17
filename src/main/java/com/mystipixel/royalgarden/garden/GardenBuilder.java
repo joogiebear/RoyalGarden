@@ -72,13 +72,61 @@ public final class GardenBuilder {
      */
     public static void generatePlot(World world, int px, int pz) {
         for (int row = 0; row < GardenLayout.PLOT_SIZE; row++) {
-            generatePlotRow(world, px, pz, row);
+            generatePlotRow(world, px, pz, row, Base.FLAT);
         }
+    }
+
+    /**
+     * The two plots that are generated rather than captured.
+     *
+     * <p>They are not presets and deliberately do not live in the preset library: they need no file,
+     * cannot be deleted, and are the two states a plot can always be returned to.
+     */
+    public enum Base {
+        /** Grass over dirt over bedrock, with a path around the rim — somewhere to start. */
+        FLAT,
+        /** The bedrock course and nothing else — a bare slab to build on from scratch. */
+        BEDROCK
     }
 
     /** Blocks written by one call to {@link #generatePlotRow} — four courses across the plot. */
     public static int rowCost() {
         return GardenLayout.PLOT_SIZE * 4;
+    }
+
+    /** The first Y above a generated base, i.e. where clearing starts. */
+    public static int baseTop() {
+        return GardenLayout.GROUND_Y + 1;
+    }
+
+    /** The highest Y a plot owns, so clearing knows where to stop. */
+    public static int ceiling() {
+        return GardenLayout.GROUND_Y - 3 + PlotTemplate.MAX_HEIGHT;
+    }
+
+    /**
+     * Clear one x-row of a plot from {@code fromY} up to the plot ceiling.
+     *
+     * <p>Applying anything to a plot has to erase what was there, and neither a preset nor a base
+     * writes above its own height — so without this, stamping a short preset over a tall build leaves
+     * the top of the old build floating above the new one. Only done when applying: during world
+     * generation everything above is already air, and clearing it would be a million wasted writes.
+     */
+    public static int clearRowAbove(World world, int px, int pz, int row, int fromY) {
+        int x = GardenLayout.plotMin(px) + row;
+        int zMin = GardenLayout.plotMin(pz);
+        int top = ceiling();
+        int cleared = 0;
+        for (int y = fromY; y <= top; y++) {
+            for (int z = zMin; z < zMin + GardenLayout.PLOT_SIZE; z++) {
+                Block block = world.getBlockAt(x, y, z);
+                if (!block.getType().isAir()) {
+                    block.setType(Material.AIR, false);
+                }
+                cleared++;
+            }
+        }
+        return cleared;
     }
 
     /**
@@ -90,7 +138,7 @@ public final class GardenBuilder {
      * <p>The bottom course is bedrock: a plot floats over the void, and the floor is the only thing
      * between a player with a shovel and a fall out of their own Garden.
      */
-    public static int generatePlotRow(World world, int px, int pz, int row) {
+    public static int generatePlotRow(World world, int px, int pz, int row, Base base) {
         int y = GardenLayout.GROUND_Y;
         int x = GardenLayout.plotMin(px) + row;
         int zMin = GardenLayout.plotMin(pz);
@@ -98,10 +146,16 @@ public final class GardenBuilder {
         boolean edgeRow = row == 0 || row == GardenLayout.PLOT_SIZE - 1;
 
         for (int z = zMin; z <= zMax; z++) {
-            boolean rim = edgeRow || z == zMin || z == zMax;
-            world.getBlockAt(x, y, z).setType(rim ? Material.DIRT_PATH : Material.GRASS_BLOCK, false);
-            world.getBlockAt(x, y - 1, z).setType(Material.DIRT, false);
-            world.getBlockAt(x, y - 2, z).setType(Material.DIRT, false);
+            if (base == Base.BEDROCK) {
+                world.getBlockAt(x, y, z).setType(Material.AIR, false);
+                world.getBlockAt(x, y - 1, z).setType(Material.AIR, false);
+                world.getBlockAt(x, y - 2, z).setType(Material.AIR, false);
+            } else {
+                boolean rim = edgeRow || z == zMin || z == zMax;
+                world.getBlockAt(x, y, z).setType(rim ? Material.DIRT_PATH : Material.GRASS_BLOCK, false);
+                world.getBlockAt(x, y - 1, z).setType(Material.DIRT, false);
+                world.getBlockAt(x, y - 2, z).setType(Material.DIRT, false);
+            }
             world.getBlockAt(x, y - 3, z).setType(Material.BEDROCK, false);
         }
         return rowCost();

@@ -83,7 +83,8 @@ public final class CommandGarden extends PluginCommand {
         switch (verb) {
             case "capture" -> capture(player, world, name);
             case "apply" -> apply(player, world, name);
-            case "flat" -> apply(player, world, null);
+            case "flat" -> apply(player, world, "flat");
+            case "bedrock" -> apply(player, world, "bedrock");
             case "default" -> {
                 if (name != null && !presets.exists(name)) {
                     player.sendMessage(Component.text("No preset called '" + name + "'.", NamedTextColor.RED));
@@ -163,8 +164,9 @@ public final class CommandGarden extends PluginCommand {
             player.sendMessage(Component.text("The farmhouse plot cannot be replaced.", NamedTextColor.RED));
             return;
         }
-        if (name != null && !worlds.presets().exists(name)) {
-            player.sendMessage(Component.text("No preset called '" + name + "'.", NamedTextColor.RED));
+        if (!GardenWorlds.isBuiltIn(name) && !worlds.presets().exists(name)) {
+            player.sendMessage(Component.text("No preset called '" + name + "'. Try flat, bedrock, "
+                    + "or /garden presets.", NamedTextColor.RED));
             return;
         }
         if (!worlds.applyPreset(world, px, pz, name)) {
@@ -172,10 +174,8 @@ public final class CommandGarden extends PluginCommand {
                     NamedTextColor.RED));
             return;
         }
-        player.sendMessage(Component.text(name == null
-                ? "Flattening plot " + GardenLayout.plotName(px, pz) + "…"
-                : "Building '" + name + "' on plot " + GardenLayout.plotName(px, pz) + "…",
-                NamedTextColor.GREEN)
+        player.sendMessage(Component.text("Building '" + (name == null ? "flat" : name)
+                + "' on plot " + GardenLayout.plotName(px, pz) + "…", NamedTextColor.GREEN)
                 .append(Component.text(" This takes about a minute.", NamedTextColor.GRAY)));
     }
 

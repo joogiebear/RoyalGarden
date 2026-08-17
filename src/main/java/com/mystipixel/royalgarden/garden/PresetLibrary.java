@@ -53,9 +53,19 @@ public final class PresetLibrary {
         }
     }
 
-    /** Whether a string is usable as a preset id. */
+    /**
+     * Whether a string is usable as a preset id.
+     *
+     * <p>{@code flat} and {@code bedrock} are refused: they name plots that are generated rather than
+     * captured, and a captured preset sharing one of those names would shadow a state a plot must
+     * always be able to return to.
+     */
     public static boolean validId(String id) {
-        return id != null && id.toLowerCase(Locale.ROOT).matches(ID_PATTERN);
+        if (id == null) {
+            return false;
+        }
+        String lower = id.toLowerCase(Locale.ROOT);
+        return lower.matches(ID_PATTERN) && !lower.equals("flat") && !lower.equals("bedrock");
     }
 
     private File fileFor(String id) {

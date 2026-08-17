@@ -114,11 +114,24 @@ public final class GardenWorlds {
             // and leave a plot that is half of each, with nothing to say which.
             return false;
         }
-        PlotTemplate preset = id == null ? null : presets.get(id);
-        lay(world, List.of(new int[]{px, pz}),
-                id == null ? "flattening" : "applying '" + id + "' to",
-                preset, PASTE_TICKS_PER_ROW, () -> laying.remove(key));
+        GardenBuilder.Base base = GardenBuilder.Base.BEDROCK.name().equalsIgnoreCase(id)
+                ? GardenBuilder.Base.BEDROCK
+                : GardenBuilder.Base.FLAT;
+        PlotTemplate preset = isBuiltIn(id) ? null : presets.get(id);
+        lay(world, List.of(new int[]{px, pz}), "applying '" + label(id) + "' to",
+                preset, base, true, PASTE_TICKS_PER_ROW, () -> laying.remove(key));
         return true;
+    }
+
+    /** Whether an id names a generated plot rather than a captured one. */
+    public static boolean isBuiltIn(String id) {
+        return id == null
+                || id.equalsIgnoreCase(GardenBuilder.Base.FLAT.name())
+                || id.equalsIgnoreCase(GardenBuilder.Base.BEDROCK.name());
+    }
+
+    private static String label(String id) {
+        return id == null ? "flat" : id.toLowerCase(java.util.Locale.ROOT);
     }
 
     /** Whether a plot is mid-paste right now. */
@@ -348,7 +361,8 @@ public final class GardenWorlds {
         }
         // Board generation runs at full speed. The slow pace exists to make choosing a farm feel
         // deliberate; nobody chose to wait through the world being created in the first place.
-        lay(world, missing, "generating", presets.defaultPreset(), 0L, null);
+        lay(world, missing, "generating", presets.defaultPreset(),
+                GardenBuilder.Base.FLAT, false, 0L, null);
     }
 
     /**
@@ -360,6 +374,7 @@ public final class GardenWorlds {
      * finds them missing and lays them again.
      */
     private void lay(World world, List<int[]> plots, String verb, PlotTemplate preset,
+                     GardenBuilder.Base base, boolean clearAbove,
                      long ticksPerRow, Runnable whenDone) {
         String name = world.getName();
         logger.info("Garden '" + name + "': " + verb + " " + plots.size() + " plot(s)"
@@ -385,7 +400,7 @@ public final class GardenWorlds {
 
                 while (plot < plots.size() && blocks > 0 && !(paced && rowsThisRun >= 1)) {
                     int[] at = plots.get(plot);
-                    blocks -= writeRow(world, at[0], at[1], row, preset);
+                    blocks -= writeRow(world, at[0], at[1], row, preset, base, clearAbove);
                     rowsThisRun++;
                     if (++row >= GardenLayout.PLOT_SIZE) {
                         row = 0;
@@ -415,11 +430,21 @@ public final class GardenWorlds {
      * <p>The farmhouse plot is never templated. It carries the barn, the desk and Sam, and stamping a
      * captured farm over it would delete all three.
      */
-    private int writeRow(World world, int px, int pz, int row, PlotTemplate preset) {
+    private int writeRow(World world, int px, int pz, int row, PlotTemplate preset,
+                         GardenBuilder.Base base, boolean clearAbove) {
+        int written;
+        int contentTop;
         if (preset != null && !GardenLayout.isCentre(px, pz)) {
-            return preset.pasteRow(world, px, pz, row);
+            written = preset.pasteRow(world, px, pz, row);
+            contentTop = GardenLayout.GROUND_Y - 3 + preset.height();
+        } else {
+            written = GardenBuilder.generatePlotRow(world, px, pz, row, base);
+            contentTop = GardenBuilder.baseTop();
         }
-        return GardenBuilder.generatePlotRow(world, px, pz, row);
+        if (clearAbove) {
+            written += GardenBuilder.clearRowAbove(world, px, pz, row, contentTop);
+        }
+        return written;
     }
 
     /** Walk an async failure's cause chain looking for ASP's "no such world" signal. */
