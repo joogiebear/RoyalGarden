@@ -14,7 +14,9 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -49,11 +51,23 @@ public final class GardenWorlds {
      */
     private static final int BLOCKS_PER_TICK = 24_000;
 
+    /**
+     * Ticks between rows when a player applies a preset — 96 rows, so about 58 seconds a plot.
+     *
+     * <p>Deliberately slow, and not for performance: the budget above could lay the same plot in about
+     * a second. Choosing a farm should look like the farm being built, and taking a minute is also what
+     * stops a preset being something you flip between casually.
+     */
+    private static final long PASTE_TICKS_PER_ROW = 12L;
+
     private final EcoPlugin plugin;
     private final IslandWorldService worlds;
     private final GardenStore store;
     private final PresetLibrary presets;
     private final Logger logger;
+
+    /** Plots currently being written, as {@code world:px,pz}, so two pastes cannot interleave. */
+    private final Set<String> laying = new HashSet<>();
 
     public GardenWorlds(EcoPlugin plugin, IslandWorldService worlds, GardenStore store,
                         PresetLibrary presets, Logger logger) {
@@ -93,10 +107,23 @@ public final class GardenWorlds {
      * reached from a deliberate action: a plot someone has farmed for a week and a plot they just
      * unlocked look the same to this method.
      */
-    public void applyPreset(World world, int px, int pz, String id) {
+    public boolean applyPreset(World world, int px, int pz, String id) {
+        String key = world.getName() + ":" + px + "," + pz;
+        if (!laying.add(key)) {
+            // A second paste over a plot already being written would interleave rows with the first
+            // and leave a plot that is half of each, with nothing to say which.
+            return false;
+        }
         PlotTemplate preset = id == null ? null : presets.get(id);
-        lay(world, List.of(new int[]{px, pz}), id == null ? "flattening" : "applying '" + id + "' to",
-                preset);
+        lay(world, List.of(new int[]{px, pz}),
+                id == null ? "flattening" : "applying '" + id + "' to",
+                preset, PASTE_TICKS_PER_ROW, () -> laying.remove(key));
+        return true;
+    }
+
+    /** Whether a plot is mid-paste right now. */
+    public boolean isLaying(World world, int px, int pz) {
+        return laying.contains(world.getName() + ":" + px + "," + pz);
     }
 
     /** The world name for a player's Garden. */
@@ -319,7 +346,9 @@ public final class GardenWorlds {
         if (missing.isEmpty()) {
             return;
         }
-        lay(world, missing, "generating", presets.defaultPreset());
+        // Board generation runs at full speed. The slow pace exists to make choosing a farm feel
+        // deliberate; nobody chose to wait through the world being created in the first place.
+        lay(world, missing, "generating", presets.defaultPreset(), 0L, null);
     }
 
     /**
@@ -330,11 +359,13 @@ public final class GardenWorlds {
      * persisted once at the end — an interrupted run simply leaves plots ungenerated, and the next load
      * finds them missing and lays them again.
      */
-    private void lay(World world, List<int[]> plots, String verb, PlotTemplate preset) {
+    private void lay(World world, List<int[]> plots, String verb, PlotTemplate preset,
+                     long ticksPerRow, Runnable whenDone) {
         String name = world.getName();
         logger.info("Garden '" + name + "': " + verb + " " + plots.size() + " plot(s)"
                 + (preset != null ? " (" + preset.height() + " layers)" : " (flat)") + ".");
         long started = System.nanoTime();
+        long period = Math.max(1L, ticksPerRow);
 
         new BukkitRunnable() {
             private int plot = 0;
@@ -345,26 +376,37 @@ public final class GardenWorlds {
                 // The world can be unloaded under us — the host unloads an empty Garden after its
                 // grace period, and writing blocks into a world nobody holds would throw every tick.
                 if (Bukkit.getWorld(name) == null) {
-                    cancel();
+                    finish();
                     return;
                 }
-                int budget = BLOCKS_PER_TICK;
-                while (budget > 0 && plot < plots.size()) {
+                int blocks = BLOCKS_PER_TICK;
+                boolean paced = ticksPerRow > 0;
+                int rowsThisRun = 0;
+
+                while (plot < plots.size() && blocks > 0 && !(paced && rowsThisRun >= 1)) {
                     int[] at = plots.get(plot);
-                    budget -= writeRow(world, at[0], at[1], row, preset);
+                    blocks -= writeRow(world, at[0], at[1], row, preset);
+                    rowsThisRun++;
                     if (++row >= GardenLayout.PLOT_SIZE) {
                         row = 0;
                         plot++;
                     }
                 }
                 if (plot >= plots.size()) {
-                    cancel();
                     worlds.saveIsland(name);
-                    logger.info("Garden '" + name + "': board complete in "
+                    logger.info("Garden '" + name + "': " + verb + " done in "
                             + (System.nanoTime() - started) / 1_000_000 + "ms.");
+                    finish();
                 }
             }
-        }.runTaskTimer(plugin, 1L, 1L);
+
+            private void finish() {
+                cancel();
+                if (whenDone != null) {
+                    whenDone.run();
+                }
+            }
+        }.runTaskTimer(plugin, 1L, period);
     }
 
     /**

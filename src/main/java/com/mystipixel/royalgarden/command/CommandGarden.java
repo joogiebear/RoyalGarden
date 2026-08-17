@@ -167,11 +167,16 @@ public final class CommandGarden extends PluginCommand {
             player.sendMessage(Component.text("No preset called '" + name + "'.", NamedTextColor.RED));
             return;
         }
-        worlds.applyPreset(world, px, pz, name);
+        if (!worlds.applyPreset(world, px, pz, name)) {
+            player.sendMessage(Component.text("That plot is already being built. Wait for it to finish.",
+                    NamedTextColor.RED));
+            return;
+        }
         player.sendMessage(Component.text(name == null
                 ? "Flattening plot " + GardenLayout.plotName(px, pz) + "…"
-                : "Applying '" + name + "' to plot " + GardenLayout.plotName(px, pz) + "…",
-                NamedTextColor.GREEN));
+                : "Building '" + name + "' on plot " + GardenLayout.plotName(px, pz) + "…",
+                NamedTextColor.GREEN)
+                .append(Component.text(" This takes about a minute.", NamedTextColor.GRAY)));
     }
 
     private void visit(Player player) {
