@@ -54,11 +54,17 @@ plugin, so it cannot be installed alongside. Without it RoyalSkyblock logs
 non-null, so reaching for one throws. On plain Paper the host aborts before `onAfterLoad`
 ever runs, which is why service resolution is still unverified at runtime.
 
-**libreforge is not bundled in a local build.** It lives in `plugins/libreforge/versions/`
-and is bootstrapped by an Auxilor addon; the shading that `plugin.yml` describes happens in
-CI. A locally-built `RoyalSkyblock.jar` on a bare server fails with
-`ClassNotFoundException: com.willfp.libreforge.Plugins` until some eco addon is present to
-load libreforge first.
+**libreforge must already be on the server as a plugin.** RoyalSkyblock's `plugin.yml` says
+it "ships bundled inside this jar", but it does not — neither the local build (272 entries)
+nor the published `2026.32.0` release asset (197 entries) contains a single
+`com/willfp/libreforge/` class. It lives in `plugins/libreforge/versions/` and is
+bootstrapped by an Auxilor eco addon.
+
+So RoyalSkyblock alone on a bare server fails with
+`ClassNotFoundException: com.willfp.libreforge.Plugins`, and stays failing even with the
+version jars present, until some eco addon is installed to load libreforge first. That is
+not a broken build — it is a real deployment requirement, and it applies to production
+equally. Any eco addon satisfies it; this repo's test instance uses EcoItems.
 
 ## What is still unproven
 
