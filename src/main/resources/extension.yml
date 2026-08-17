@@ -1,0 +1,7 @@
+# eco reads this from the jar root to load the extension. Missing or malformed
+# and the loader logs "No extension.yml found in ..." and skips the jar - it does
+# not fail loudly, so check the console after dropping a build in.
+main: com.mystipixel.royalgarden.RoyalGardenExtension
+name: RoyalGarden
+version: ${project.version}
+author: Mystipixel
