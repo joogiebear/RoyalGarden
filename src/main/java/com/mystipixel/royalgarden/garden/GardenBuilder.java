@@ -29,6 +29,15 @@ public final class GardenBuilder {
     /** Wall height between the floor and the eaves. */
     private static final int WALL = 5;
 
+    /**
+     * The block a plot boundary is drawn in.
+     *
+     * <p>A wall block rather than a fence or a slab: it stands 1.5 blocks tall, which is above jump
+     * height, so a single course keeps a player on their own plots without needing to be two blocks of
+     * eyesore.
+     */
+    private static final Material BOUNDARY = Material.STONE_BRICK_WALL;
+
     private GardenBuilder() {
     }
 
@@ -55,17 +64,41 @@ public final class GardenBuilder {
 
     /** Build the centre plot and its farmhouse into a freshly created world. */
     public static void build(World world) {
-        groundPlot(world, GardenLayout.CENTRE, GardenLayout.CENTRE);
-        plotEdging(world, GardenLayout.CENTRE, GardenLayout.CENTRE);
+        generatePlot(world, GardenLayout.CENTRE, GardenLayout.CENTRE);
         barn(world);
         approach(world);
     }
 
     /**
-     * Lay one plot's ground: grass over dirt over stone.
+     * Generate one plot: its ground, and the path around its rim.
      *
-     * <p>Three courses deep so the surface can be tilled, dug and replaced without opening a hole into
-     * the void underneath.
+     * <p>This is what unlocking a plot <em>means</em> — a locked plot is not a fenced-off area, it is
+     * an area that does not exist yet. Idempotent, so it can be re-run to repair a plot whose blocks
+     * were lost, and cheap enough (9,216 columns) to run inside a click handler.
+     */
+    public static void generatePlot(World world, int px, int pz) {
+        groundPlot(world, px, pz);
+        plotEdging(world, px, pz);
+    }
+
+    /**
+     * Whether a plot has been generated, judged by the block under its centre.
+     *
+     * <p>Sampling one column rather than tracking a "built" flag alongside the unlock set: the world is
+     * the authority on what exists in it, and two records of the same fact would eventually disagree.
+     */
+    public static boolean isGenerated(World world, int px, int pz) {
+        return !world.getBlockAt((int) GardenLayout.plotCentre(world, px, pz).getX(),
+                GardenLayout.GROUND_Y, (int) GardenLayout.plotCentre(world, px, pz).getZ())
+                .getType().isAir();
+    }
+
+    /**
+     * Lay one plot's ground: grass over dirt over bedrock.
+     *
+     * <p>Bedrock on the bottom course, not stone. A farming plot floats over the void, and the floor is
+     * the only thing between a player with a shovel and a fall out of their own Garden — so it is the
+     * one block in the build that must not be removable.
      */
     private static void groundPlot(World world, int px, int pz) {
         int y = GardenLayout.GROUND_Y;
@@ -74,9 +107,76 @@ public final class GardenBuilder {
                 world.getBlockAt(x, y, z).setType(Material.GRASS_BLOCK, false);
                 world.getBlockAt(x, y - 1, z).setType(Material.DIRT, false);
                 world.getBlockAt(x, y - 2, z).setType(Material.DIRT, false);
-                world.getBlockAt(x, y - 3, z).setType(Material.STONE, false);
+                world.getBlockAt(x, y - 3, z).setType(Material.BEDROCK, false);
             }
         }
+    }
+
+    /**
+     * Put a wall along every edge of every unlocked plot that faces somewhere you do not own, and take
+     * one away everywhere that is now interior.
+     *
+     * <p>This is the border that moves. Unlocking a plot does not redraw a boundary somewhere else — it
+     * removes the wall between the two plots and puts one around the new plot's far side, which is the
+     * same operation applied to a larger set. Running it over the whole board each time keeps that
+     * true even if unlock state is repaired or edited by hand.
+     *
+     * <p>A single wall block is 1.5 blocks tall, which is above jump height, so one course is enough to
+     * stop someone walking off a plot into the void.
+     */
+    public static void applyWalls(World world, GardenState state) {
+        for (int px = 0; px < GardenLayout.GRID; px++) {
+            for (int pz = 0; pz < GardenLayout.GRID; pz++) {
+                if (!state.isUnlocked(px, pz)) {
+                    continue;
+                }
+                edge(world, px, pz, 0, -1, !state.isUnlocked(px, pz - 1));
+                edge(world, px, pz, 0, 1, !state.isUnlocked(px, pz + 1));
+                edge(world, px, pz, -1, 0, !state.isUnlocked(px - 1, pz));
+                edge(world, px, pz, 1, 0, !state.isUnlocked(px + 1, pz));
+            }
+        }
+    }
+
+    /** Wall or clear one edge of one plot. {@code dx}/{@code dz} pick which of the four it is. */
+    private static void edge(World world, int px, int pz, int dx, int dz, boolean wall) {
+        int y = GardenLayout.GROUND_Y + 1;
+        int xMin = GardenLayout.plotMin(px);
+        int xMax = GardenLayout.plotMax(px);
+        int zMin = GardenLayout.plotMin(pz);
+        int zMax = GardenLayout.plotMax(pz);
+
+        int fixedX = dx < 0 ? xMin : xMax;
+        int fixedZ = dz < 0 ? zMin : zMax;
+
+        if (dx != 0) {
+            for (int z = zMin; z <= zMax; z++) {
+                setWall(world, fixedX, y, z, wall);
+            }
+        } else {
+            for (int x = xMin; x <= xMax; x++) {
+                setWall(world, x, y, fixedZ, wall);
+            }
+        }
+    }
+
+    /** Place or remove a boundary wall block, touching nothing else that happens to be standing there. */
+    private static void setWall(World world, int x, int y, int z, boolean wall) {
+        Block block = world.getBlockAt(x, y, z);
+        if (wall) {
+            if (block.getType().isAir() || isWall(block.getType())) {
+                block.setType(BOUNDARY, false);
+            }
+            return;
+        }
+        if (isWall(block.getType())) {
+            block.setType(Material.AIR, false);   // only ever remove our own wall
+        }
+    }
+
+    /** Whether a material is one of ours to remove. */
+    public static boolean isWall(Material material) {
+        return material == BOUNDARY;
     }
 
     /**

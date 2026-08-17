@@ -1,6 +1,6 @@
 package com.mystipixel.royalgarden.command;
 
-import com.mystipixel.royalgarden.garden.Desk;
+import com.mystipixel.royalgarden.garden.GardenMenu;
 import com.willfp.eco.core.EcoPlugin;
 import com.willfp.eco.core.command.impl.PluginCommand;
 import org.bukkit.entity.Player;
@@ -19,12 +19,15 @@ public final class CommandDesk extends PluginCommand {
     /** The node this command needs. See {@link CommandGarden#PERMISSION} for why it is not blank. */
     public static final String PERMISSION = "royalgarden.desk";
 
-    public CommandDesk(EcoPlugin plugin) {
+    private final GardenMenu menu;
+
+    public CommandDesk(EcoPlugin plugin, GardenMenu menu) {
         super(plugin, "desk", PERMISSION, true);
+        this.menu = menu;
     }
 
     @Override
     public void onExecute(Player player, List<String> args) {
-        Desk.open(player);
+        menu.open(player);
     }
 }

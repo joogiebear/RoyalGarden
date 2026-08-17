@@ -35,11 +35,13 @@ public final class GardenWorlds {
 
     private final EcoPlugin plugin;
     private final IslandWorldService worlds;
+    private final GardenStore store;
     private final Logger logger;
 
-    public GardenWorlds(EcoPlugin plugin, IslandWorldService worlds, Logger logger) {
+    public GardenWorlds(EcoPlugin plugin, IslandWorldService worlds, GardenStore store, Logger logger) {
         this.plugin = plugin;
         this.worlds = worlds;
+        this.store = store;
         this.logger = logger;
     }
 
@@ -51,6 +53,50 @@ public final class GardenWorlds {
     /** Whether a world name is a Garden at all. */
     public static boolean isGarden(World world) {
         return world != null && world.getName().startsWith(PREFIX);
+    }
+
+    /** Whose Garden this world is, or null if it is not a Garden. */
+    public static UUID ownerOf(World world) {
+        if (!isGarden(world)) {
+            return null;
+        }
+        try {
+            return UUID.fromString(world.getName().substring(PREFIX.length()));
+        } catch (IllegalArgumentException notAUuid) {
+            return null;
+        }
+    }
+
+    /** Unlock state for a Garden world, or null if it is not one. */
+    public GardenState stateOf(World world) {
+        UUID owner = ownerOf(world);
+        return owner == null ? null : store.get(owner);
+    }
+
+    /** Unlock state for a player. */
+    public GardenState state(UUID owner) {
+        return store.get(owner);
+    }
+
+    /**
+     * Unlock a plot: record it, persist it, generate it and redraw the walls.
+     *
+     * <p>Returns false if the plot was not a legal purchase. Generation is skipped when the world is
+     * not loaded — {@link #prepare} regenerates anything missing on the next visit, so the unlock is
+     * never lost for want of a loaded world.
+     */
+    public boolean unlock(UUID owner, int px, int pz) {
+        GardenState state = store.get(owner);
+        if (!state.unlock(px, pz)) {
+            return false;
+        }
+        store.save(state);
+        World world = Bukkit.getWorld(worldName(owner));
+        if (world != null) {
+            GardenBuilder.generatePlot(world, px, pz);
+            GardenBuilder.applyWalls(world, state);
+        }
+        return true;
     }
 
     /** Whether this player's Garden is loaded right now. */
@@ -107,8 +153,10 @@ public final class GardenWorlds {
         return worlds.createIsland(name)
                 .thenCompose(world -> onMain(() -> {
                     long started = System.nanoTime();
-                    prepare(world);
+                    // Build before prepare: prepare reconciles the world against the unlock state, and
+                    // it should find the centre plot already there rather than generate it twice.
                     GardenBuilder.build(world);
+                    prepare(world);
                     logger.info("Built Garden '" + name + "' in "
                             + (System.nanoTime() - started) / 1_000_000 + "ms.");
                     return world;
@@ -147,6 +195,31 @@ public final class GardenWorlds {
         world.setGameRule(GameRule.KEEP_INVENTORY, true);
 
         world.setSpawnLocation(GardenBuilder.spawn(world));
+        sync(world);
+    }
+
+    /**
+     * Make the world match the unlock state: generate any unlocked plot that isn't there, then redraw
+     * the walls.
+     *
+     * <p>Run on every load, not just after an unlock. A plot can be unlocked while the world is
+     * unloaded (from the menu, standing anywhere), and a world can come back from a rollback missing
+     * blocks it should have. Reconciling on load means the unlock file is the record and the world is
+     * brought to agree with it, rather than the two drifting apart with no way back.
+     */
+    public void sync(World world) {
+        GardenState state = stateOf(world);
+        if (state == null) {
+            return;
+        }
+        for (int[] plot : state.plots()) {
+            if (!GardenBuilder.isGenerated(world, plot[0], plot[1])) {
+                logger.info("Garden '" + world.getName() + "': generating plot "
+                        + GardenLayout.plotName(plot[0], plot[1]) + ".");
+                GardenBuilder.generatePlot(world, plot[0], plot[1]);
+            }
+        }
+        GardenBuilder.applyWalls(world, state);
     }
 
     /** Walk an async failure's cause chain looking for ASP's "no such world" signal. */

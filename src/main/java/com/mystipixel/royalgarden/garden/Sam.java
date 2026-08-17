@@ -31,9 +31,11 @@ public final class Sam implements Listener {
     private static final String TAG = "garden_sam";
 
     private final NamespacedKey key;
+    private final GardenMenu menu;
 
-    public Sam(Plugin plugin) {
+    public Sam(Plugin plugin, GardenMenu menu) {
         this.key = new NamespacedKey(plugin, TAG);
+        this.menu = menu;
     }
 
     /** The name shown above him. */
@@ -109,6 +111,6 @@ public final class Sam implements Listener {
             return;
         }
         event.setCancelled(true);
-        Desk.open(event.getPlayer());
+        menu.open(event.getPlayer());
     }
 }

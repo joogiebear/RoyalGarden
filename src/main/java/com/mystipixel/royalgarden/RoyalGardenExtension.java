@@ -2,6 +2,10 @@ package com.mystipixel.royalgarden;
 
 import com.mystipixel.royalgarden.command.CommandDesk;
 import com.mystipixel.royalgarden.command.CommandGarden;
+import com.mystipixel.royalgarden.garden.GardenLayout;
+import com.mystipixel.royalgarden.garden.GardenMenu;
+import com.mystipixel.royalgarden.garden.GardenProtection;
+import com.mystipixel.royalgarden.garden.GardenStore;
 import com.mystipixel.royalgarden.garden.GardenWorlds;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.mystipixel.royalskyblock.RoyalSkyblockPlugin;
@@ -46,6 +50,7 @@ public final class RoyalGardenExtension extends Extension {
 
     private GardenWorlds gardens;
     private Sam sam;
+    private GardenProtection protection;
     private PluginCommand gardenCommand;
     private PluginCommand deskCommand;
 
@@ -98,19 +103,27 @@ public final class RoyalGardenExtension extends Extension {
 
     /** Stand everything up. Only reached once the host's services are known to exist. */
     private void start() {
-        this.gardens = new GardenWorlds(getPlugin(), worlds, getLogger());
-        this.sam = new Sam(getPlugin());
-        Bukkit.getPluginManager().registerEvents(sam, getPlugin());
+        GardenStore store = new GardenStore(getDataFolder(), getLogger());
+        this.gardens = new GardenWorlds(getPlugin(), worlds, store, getLogger());
 
-        declare(CommandGarden.PERMISSION, "Go to your Garden.");
-        declare(CommandDesk.PERMISSION, "Open the Garden desk.");
+        GardenMenu menu = new GardenMenu(gardens);
+        this.sam = new Sam(getPlugin(), menu);
+        this.protection = new GardenProtection(gardens);
+        Bukkit.getPluginManager().registerEvents(sam, getPlugin());
+        Bukkit.getPluginManager().registerEvents(protection, getPlugin());
+
+        declare(CommandGarden.PERMISSION, PermissionDefault.TRUE, "Go to your Garden.");
+        declare(CommandDesk.PERMISSION, PermissionDefault.TRUE, "Open the Garden desk.");
+        declare(GardenProtection.BYPASS, PermissionDefault.OP, "Edit a Garden's protected blocks.");
 
         this.gardenCommand = new CommandGarden(getPlugin(), gardens, sam);
-        this.deskCommand = new CommandDesk(getPlugin());
+        this.deskCommand = new CommandDesk(getPlugin(), menu);
         gardenCommand.register();
         deskCommand.register();
 
-        getLogger().info("Phase 1 ready: /garden, /desk, Sam at the desk.");
+        getLogger().info("Ready: /garden, /desk, Sam at the desk, "
+                + GardenLayout.GRID + "×" + GardenLayout.GRID + " plots of "
+                + GardenLayout.PLOT_SIZE + ".");
     }
 
     /**
@@ -122,12 +135,12 @@ public final class RoyalGardenExtension extends Extension {
      * commands operators-only without a word in the log about it. Declaring them here is what makes
      * {@code default: true} mean anything.
      */
-    private void declare(String node, String description) {
+    private void declare(String node, PermissionDefault fallback, String description) {
         PluginManager plugins = Bukkit.getPluginManager();
         if (plugins.getPermission(node) != null) {
             return;                          // a reload re-runs start(); adding twice throws
         }
-        plugins.addPermission(new Permission(node, description, PermissionDefault.TRUE));
+        plugins.addPermission(new Permission(node, description, fallback));
     }
 
     /** Reads one host service, treating an absent one as a fact to report rather than a crash. */
@@ -167,8 +180,13 @@ public final class RoyalGardenExtension extends Extension {
             HandlerList.unregisterAll(sam);
             sam = null;
         }
+        if (protection != null) {
+            HandlerList.unregisterAll(protection);
+            protection = null;
+        }
         Bukkit.getPluginManager().removePermission(CommandGarden.PERMISSION);
         Bukkit.getPluginManager().removePermission(CommandDesk.PERMISSION);
+        Bukkit.getPluginManager().removePermission(GardenProtection.BYPASS);
         this.gardens = null;
         this.islands = null;
         this.worlds = null;
