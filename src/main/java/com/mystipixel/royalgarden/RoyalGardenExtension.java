@@ -1,11 +1,18 @@
 package com.mystipixel.royalgarden;
 
+import com.mystipixel.royalgarden.command.CommandDesk;
+import com.mystipixel.royalgarden.command.CommandGarden;
+import com.mystipixel.royalgarden.garden.GardenWorlds;
+import com.mystipixel.royalgarden.garden.Sam;
 import com.mystipixel.royalskyblock.RoyalSkyblockPlugin;
 import com.mystipixel.royalskyblock.data.Storage;
 import com.mystipixel.royalskyblock.island.IslandManager;
 import com.mystipixel.royalskyblock.world.IslandWorldService;
 import com.willfp.eco.core.EcoPlugin;
+import com.willfp.eco.core.command.impl.PluginCommand;
 import com.willfp.eco.core.extensions.Extension;
+import org.bukkit.Bukkit;
+import org.bukkit.event.HandlerList;
 
 import java.util.function.Supplier;
 
@@ -21,17 +28,23 @@ import java.util.function.Supplier;
  * {@code extension.yml}. It does so quietly: a jar with no manifest is skipped with a log line and
  * no error, so the console is the only confirmation a build actually took.
  *
- * <h2>Phase 0</h2>
+ * <h2>Phase 1</h2>
  *
- * <p>This does nothing yet on purpose. It exists to prove the two assumptions the whole design rests
- * on — that an extension loads at all, and that it can reach the host's services — before any Garden
- * behaviour is written on top of them. Both are cheap to check now and expensive to discover later.
+ * <p>A player gets a Garden world of their own, built on first visit: the middle plot of a 5&times;5
+ * board, a farmhouse on it, Sam at the desk, and a border at the board's edge. The remaining
+ * twenty-four plots are deliberately empty sky — generating one is what unlocking it will mean, and
+ * unlock state is the first thing Phase 2 needs to persist.
  */
 public final class RoyalGardenExtension extends Extension {
 
     private IslandManager islands;
     private IslandWorldService worlds;
     private Storage storage;
+
+    private GardenWorlds gardens;
+    private Sam sam;
+    private PluginCommand gardenCommand;
+    private PluginCommand deskCommand;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -68,17 +81,30 @@ public final class RoyalGardenExtension extends Extension {
         this.worlds = resolve("world service", host::worlds);
         this.storage = resolve("storage", host::storage);
 
-        if (isReady()) {
-            getLogger().info("Host services resolved — RoyalGarden can build on:");
-            getLogger().info("  island manager: " + this.islands.getClass().getSimpleName());
-            getLogger().info("  world service:  " + this.worlds.getClass().getSimpleName());
-            getLogger().info("  storage:        " + this.storage.getClass().getSimpleName());
-        } else {
+        if (!isReady()) {
             getLogger().warning("RoyalGarden is loaded but idle: the host has no island services. "
                     + "Advanced Slime Paper is required for island worlds; on plain Paper "
                     + "RoyalSkyblock aborts before creating them.");
+            return;
         }
-        getLogger().info("Phase 0: no Garden behaviour registered yet.");
+
+        getLogger().info("Host services resolved — world backend is "
+                + this.worlds.getClass().getSimpleName() + ".");
+        start();
+    }
+
+    /** Stand everything up. Only reached once the host's services are known to exist. */
+    private void start() {
+        this.gardens = new GardenWorlds(getPlugin(), worlds, getLogger());
+        this.sam = new Sam(getPlugin());
+        Bukkit.getPluginManager().registerEvents(sam, getPlugin());
+
+        this.gardenCommand = new CommandGarden(getPlugin(), gardens, sam);
+        this.deskCommand = new CommandDesk(getPlugin());
+        gardenCommand.register();
+        deskCommand.register();
+
+        getLogger().info("Phase 1 ready: /garden, /desk, Sam at the desk.");
     }
 
     /** Reads one host service, treating an absent one as a fact to report rather than a crash. */
@@ -96,8 +122,29 @@ public final class RoyalGardenExtension extends Extension {
         return islands != null && worlds != null && storage != null;
     }
 
+    /**
+     * Tear down what {@link #start()} put up.
+     *
+     * <p>Commands and listeners are registered against the <em>host</em> plugin, so nothing here is
+     * cleaned up for us on an extension reload — leaving them would stack a second copy of both on the
+     * next load. Garden worlds are not unloaded: the host's world service owns their lifecycle and
+     * saves them on shutdown, and racing it would be the one way to actually lose someone's farm.
+     */
     @Override
     protected void onDisable() {
+        if (gardenCommand != null) {
+            gardenCommand.unregister();
+            gardenCommand = null;
+        }
+        if (deskCommand != null) {
+            deskCommand.unregister();
+            deskCommand = null;
+        }
+        if (sam != null) {
+            HandlerList.unregisterAll(sam);
+            sam = null;
+        }
+        this.gardens = null;
         this.islands = null;
         this.worlds = null;
         this.storage = null;
@@ -108,13 +155,18 @@ public final class RoyalGardenExtension extends Extension {
         return islands;
     }
 
-    /** The host's world service — how a Garden world will be created and unloaded. */
+    /** The host's world service — how a Garden world is created and unloaded. */
     public IslandWorldService worlds() {
         return worlds;
     }
 
-    /** The host's storage. Garden state is expected to live in the island upgrade map instead. */
+    /** The host's storage. Garden unlock state is expected to live here from Phase 2. */
     public Storage storage() {
         return storage;
+    }
+
+    /** Garden worlds, once the extension is running. Null when the host had no island services. */
+    public GardenWorlds gardens() {
+        return gardens;
     }
 }
