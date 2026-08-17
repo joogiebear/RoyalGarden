@@ -22,6 +22,7 @@ import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.PluginManager;
 
+import java.io.File;
 import java.util.function.Supplier;
 
 /**
@@ -102,10 +103,52 @@ public final class RoyalGardenExtension extends Extension {
         start();
     }
 
+    /**
+     * This extension's own folder: {@code plugins/RoyalSkyblock/extensions/<name>/}.
+     *
+     * <p>Not {@link #getDataFolder()}, which returns the <em>host's</em> folder — every extension
+     * calling it writes into {@code plugins/RoyalSkyblock/} directly, mixed in with the host's own
+     * {@code gui/}, {@code perks/} and {@code upgrades/}. With one extension that is untidy; with
+     * several it is a folder nobody can read, and no way to tell which files an extension owns when
+     * removing it.
+     */
+    private File dataDir() {
+        return new File(new File(getPlugin().getDataFolder(), "extensions"), getName());
+    }
+
+    /**
+     * Move data written by an earlier version out of the host's folder and into ours.
+     *
+     * <p>One-time and conditional: it only moves a name if we do not already own one, so it cannot
+     * overwrite current data, and it does nothing at all on a clean install.
+     */
+    private void migrateStrayData(File target) {
+        File host = getPlugin().getDataFolder();
+        for (String name : new String[]{"gardens", "presets", "presets.yml"}) {
+            File stray = new File(host, name);
+            File proper = new File(target, name);
+            if (!stray.exists() || proper.exists()) {
+                continue;
+            }
+            if (stray.renameTo(proper)) {
+                getLogger().info("Moved " + name + " out of the host's folder into " + target.getName() + "/.");
+            } else {
+                getLogger().warning("Could not move " + stray + " into " + target
+                        + " — it will be read from neither. Move it by hand.");
+            }
+        }
+    }
+
     /** Stand everything up. Only reached once the host's services are known to exist. */
     private void start() {
-        GardenStore store = new GardenStore(getDataFolder(), getLogger());
-        PresetLibrary presets = new PresetLibrary(getDataFolder(), getLogger());
+        File data = dataDir();
+        if (!data.exists() && !data.mkdirs()) {
+            getLogger().warning("Could not create " + data + " — Garden data will not persist.");
+        }
+        migrateStrayData(data);
+
+        GardenStore store = new GardenStore(data, getLogger());
+        PresetLibrary presets = new PresetLibrary(data, getLogger());
         this.gardens = new GardenWorlds(getPlugin(), worlds, store, presets, getLogger());
 
         GardenMenu menu = new GardenMenu(gardens);
