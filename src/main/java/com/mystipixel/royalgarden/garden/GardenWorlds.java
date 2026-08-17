@@ -7,6 +7,8 @@ import org.bukkit.Difficulty;
 import org.bukkit.GameRule;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Mob;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
@@ -188,7 +190,41 @@ public final class GardenWorlds {
         world.setGameRule(GameRule.KEEP_INVENTORY, true);
 
         world.setSpawnLocation(GardenBuilder.spawn(world));
+        sweepMobs(world);
         sync(world);
+    }
+
+    /**
+     * Remove vanilla mobs that are already in the world.
+     *
+     * <p>Blocking spawns only stops new ones. A Garden built before that rule existed had twenty-five
+     * plots of plains grass and no restriction, so it grew horses and sheep — and they were saved into
+     * the slime file, which means they come back on every load until something takes them out.
+     *
+     * <p>The test is an <b>empty persistent data container</b>. Every plugin that spawns a mob and
+     * intends to keep it tags it: Sam carries this extension's key, and EcoMobs tags its own, so both
+     * survive while anything vanilla spawned does not. That is why this can run on every load without
+     * eventually deleting the content it is meant to protect — and why it keeps working when EcoMobs
+     * arrives, without knowing anything about EcoMobs.
+     *
+     * <p>Only {@code Mob}s are considered. Dropped items, armour stands, item frames and paintings are
+     * not mobs and are left exactly where they are.
+     */
+    public void sweepMobs(World world) {
+        int removed = 0;
+        for (Entity entity : world.getEntities()) {
+            if (!(entity instanceof Mob mob)) {
+                continue;
+            }
+            if (!mob.getPersistentDataContainer().isEmpty()) {
+                continue;                    // a plugin owns this one
+            }
+            mob.remove();
+            removed++;
+        }
+        if (removed > 0) {
+            logger.info("Garden '" + world.getName() + "': removed " + removed + " vanilla mob(s).");
+        }
     }
 
     /**
