@@ -22,6 +22,17 @@
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
+        <!--
+          eco comes from here, NOT from the jar on the server. The shipped jar is shaded, with its
+          Kotlin relocated to com.willfp.eco.libs.kotlin, and installing it into the local repository
+          silently shadows the published artifact - the local repo wins over remote ones, so the
+          failure then looks like the published artifact being broken. Only RoyalSkyblock is
+          hand-installed, because only RoyalSkyblock is genuinely unpublished.
+        -->
+        <repository>
+            <id>auxilor</id>
+            <url>https://repo.auxilor.io/repository/maven-public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
