@@ -1,0 +1,62 @@
+name: Build
+
+# Compile on every push/PR to main, so an unresolved dependency or a broken build
+# is caught here rather than on the next deploy.
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # RoyalSkyblock is not published to any Maven repository, so the host this extension
+      # compiles against has to be built from source. It is a public repo, so the default token
+      # is enough and no secret is involved.
+      #
+      # eco and paper-api are NOT handled this way: they come from repo.auxilor.io and
+      # repo.papermc.io as published artifacts. Installing the shipped, shaded jars instead would
+      # shadow the published ones — the local repository wins over remote — and the failure then
+      # looks like the published artifact being broken.
+      - name: Check out RoyalSkyblock
+        uses: actions/checkout@v4
+        with:
+          repository: joogiebear/RoyalSkyblock
+          path: royalskyblock
+
+      - name: Build and install RoyalSkyblock
+        working-directory: royalskyblock
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build --no-daemon
+          mvn -q -B install:install-file \
+            -Dfile=build/libs/RoyalSkyblock.jar \
+            -DgroupId=com.mystipixel \
+            -DartifactId=royalskyblock \
+            -Dversion="$(grep '^version=' gradle.properties | cut -d= -f2)" \
+            -Dpackaging=jar
+
+      - name: Build
+        run: mvn -B clean package
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoyalGarden
+          path: target/RoyalGarden.jar
+          if-no-files-found: error
