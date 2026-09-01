@@ -111,6 +111,10 @@ public final class Sam implements Listener {
             return;
         }
         event.setCancelled(true);
-        menu.open(event.getPlayer());
+        // The event fires once per hand; opening on both would open the desk twice per click. The
+        // off-hand copy is still cancelled above so it can never reach the trading screen.
+        if (event.getHand() == org.bukkit.inventory.EquipmentSlot.HAND) {
+            menu.open(event.getPlayer());
+        }
     }
 }
