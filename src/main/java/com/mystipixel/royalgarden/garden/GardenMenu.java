@@ -109,9 +109,9 @@ public final class GardenMenu {
                 List.of(grey(state.unlockedCount() + " of " + total + " plots unlocked"),
                         grey("Each plot is " + GardenLayout.PLOT_SIZE + "×" + GardenLayout.PLOT_SIZE),
                         Component.empty(),
-                        grey("The border sits at the edge of what"),
-                        grey("you have reached, and moves out as"),
-                        grey("you unlock further from the farmhouse.")));
+                        grey("Locked plots are sealed off until"),
+                        grey("you unlock them — each new plot must"),
+                        grey("touch one you already own.")));
     }
 
     // ── clicking ───────────────────────────────────────────────────────────────

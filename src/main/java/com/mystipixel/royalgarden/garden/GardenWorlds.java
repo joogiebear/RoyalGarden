@@ -173,11 +173,11 @@ public final class GardenWorlds {
     }
 
     /**
-     * Unlock a plot: record it, persist it, and move the border out if it reached further.
+     * Unlock a plot: record it and persist it.
      *
      * <p>Nothing is generated here — every plot is built when the Garden is created, locked or not, so
-     * unlocking is purely a change of what you are allowed onto. Returns false if the plot was not a
-     * legal purchase.
+     * unlocking is purely a change of what you are allowed onto (enforced by
+     * {@link GardenProtection}). Returns false if the plot was not a legal purchase.
      */
     public boolean unlock(UUID owner, int px, int pz) {
         GardenState state = store.get(owner);
@@ -319,10 +319,9 @@ public final class GardenWorlds {
     /**
      * The world's own border, parked at the edge of the board.
      *
-     * <p>This is a backstop, not the border a player sees. The visible one is per-player, coloured, and
-     * drawn around what they own — see {@link GardenBorder}. This one exists so that a player who
-     * somehow has no per-player border still cannot walk off the board, and so the two never disagree
-     * about where the world ends.
+     * <p>This is the hard edge of the world; which plots inside it a player may enter is enforced
+     * per-plot by {@link GardenProtection}, since a world border is a centred square and cannot cut a
+     * locked plot out of the middle of the board.
      */
     public void applyBorder(World world) {
         WorldBorder border = world.getWorldBorder();

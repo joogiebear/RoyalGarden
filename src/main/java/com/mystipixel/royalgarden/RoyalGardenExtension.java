@@ -39,10 +39,10 @@ import java.util.function.Supplier;
  *
  * <h2>Phase 1</h2>
  *
- * <p>A player gets a Garden world of their own, built on first visit: the middle plot of a 5&times;5
- * board, a farmhouse on it, Sam at the desk, and a border at the board's edge. The remaining
- * twenty-four plots are deliberately empty sky — generating one is what unlocking it will mean, and
- * unlock state is the first thing Phase 2 needs to persist.
+ * <p>A player gets a Garden world of their own, built on first visit: a 5&times;5 board of plots with
+ * the farmhouse on the middle one, Sam at the desk, and a border at the board's edge. Every plot is
+ * generated up front — locked ones included, so the board reads as land to earn rather than holes —
+ * and unlocking is a change of what you may walk onto and edit, persisted per player.
  */
 public final class RoyalGardenExtension extends Extension {
 
