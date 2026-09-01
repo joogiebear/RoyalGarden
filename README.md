@@ -28,7 +28,7 @@ mvn clean package            # -> target/RoyalGarden.jar
 
 Then drop the jar in `plugins/RoyalSkyblock/extensions/` and restart.
 
-Requires JDK 25 — paper-api 26.2 ships Java 25 bytecode.
+Requires an Advanced Slime Paper host on 26.2 or newer, and JDK 25 to build — paper-api 26.2 ships Java 25 bytecode.
 
 ---
 
