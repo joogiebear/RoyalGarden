@@ -9,10 +9,10 @@ import org.bukkit.block.Block;
 /**
  * Generates a brand-new Garden: the centre plot and the farmhouse standing on it.
  *
- * <p><b>Only the centre plot is built.</b> The other twenty-four stay void until they are unlocked,
- * which is both the design (a plot you have not bought should look unbought, not merely fenced off)
- * and the cheap option — one plot is 9,216 columns, the whole board would be 230,400. Generating a
- * plot is what unlocking it will mean.
+ * <p>Only the centre plot is built <em>here</em>, synchronously, so the player has somewhere to stand
+ * the moment the world exists. The other twenty-four are laid in behind them by
+ * {@link GardenWorlds#sync}, spread across ticks — locked plots included, because ground you will one
+ * day own should look like ground, not a hole in the board.
  *
  * <p>Everything here writes blocks, so it must run on the server thread. It is also deterministic:
  * every Garden is identical, which keeps "is this world already built?" a question about the world
@@ -162,14 +162,19 @@ public final class GardenBuilder {
     }
 
     /**
-     * Whether a plot has been generated, judged by the block under its centre.
+     * Whether a plot has been generated, judged by the bedrock course under its centre.
      *
      * <p>Sampling one column rather than tracking a "built" flag alongside the unlock set: the world is
      * the authority on what exists in it, and two records of the same fact would eventually disagree.
+     *
+     * <p>The <em>floor</em>, not the surface: every generated form of a plot lays the bedrock course —
+     * flat, templated, and the bare {@code bedrock} slab alike — while the surface is legitimately air
+     * on a slab plot. Sampling the surface made {@link GardenWorlds#sync} read a slab as ungenerated
+     * and stamp the default preset back over it on the next load.
      */
     public static boolean isGenerated(World world, int px, int pz) {
         return !world.getBlockAt((int) GardenLayout.plotCentre(world, px, pz).getX(),
-                GardenLayout.GROUND_Y, (int) GardenLayout.plotCentre(world, px, pz).getZ())
+                GardenLayout.GROUND_Y - 3, (int) GardenLayout.plotCentre(world, px, pz).getZ())
                 .getType().isAir();
     }
 
