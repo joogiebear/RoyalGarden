@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
@@ -34,7 +34,7 @@ jobs:
       # shadow the published ones — the local repository wins over remote — and the failure then
       # looks like the published artifact being broken.
       - name: Check out RoyalSkyblock
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: joogiebear/RoyalSkyblock
           path: royalskyblock
@@ -55,7 +55,7 @@ jobs:
         run: mvn -B clean package
 
       - name: Upload jar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: RoyalGarden
           path: target/RoyalGarden.jar
