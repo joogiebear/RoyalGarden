@@ -15,6 +15,15 @@
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
+          A default for local builds only. CI overrides it with -Droyalskyblock.version, read from
+          the host source it builds and installs, so this value never decides what CI compiles
+          against. It used to be written inline on the dependency, where a host release left it
+          stale and the Maven cache hid the consequence: the restored ~/.m2 still held the old
+          artifact, so the build stayed green while compiling against an API the running host no
+          longer has.
+        -->
+        <royalskyblock.version>2026.36.1</royalskyblock.version>
     </properties>
 
     <repositories>
@@ -52,7 +61,7 @@
         <dependency>
             <groupId>com.mystipixel</groupId>
             <artifactId>royalskyblock</artifactId>
-            <version>2026.32.0</version>
+            <version>${royalskyblock.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

@@ -39,20 +39,31 @@ jobs:
           repository: joogiebear/RoyalSkyblock
           path: royalskyblock
 
+      # The installed version is the host's own, and it is handed to the build below as
+      # -Droyalskyblock.version so the pom's default never decides what CI compiles against.
+      # This matters more than it looks: setup-java's Maven cache restores ~/.m2, so a version
+      # left behind by an older run stays resolvable long after the host has moved on. A stale
+      # pin therefore did not fail — it quietly compiled against the previous host's API and
+      # went green, which surfaces as NoSuchMethodError on a server rather than as a red build.
       - name: Build and install RoyalSkyblock
+        id: host
         working-directory: royalskyblock
         run: |
+          set -euo pipefail
           chmod +x ./gradlew
           ./gradlew build --no-daemon
+          HOST_VERSION=$(grep '^version=' gradle.properties | cut -d= -f2)
+          echo "Host version: $HOST_VERSION"
+          echo "version=$HOST_VERSION" >> "$GITHUB_OUTPUT"
           mvn -q -B install:install-file \
             -Dfile=build/libs/RoyalSkyblock.jar \
             -DgroupId=com.mystipixel \
             -DartifactId=royalskyblock \
-            -Dversion="$(grep '^version=' gradle.properties | cut -d= -f2)" \
+            -Dversion="$HOST_VERSION" \
             -Dpackaging=jar
 
       - name: Build
-        run: mvn -B clean package
+        run: mvn -B clean package -Droyalskyblock.version=${{ steps.host.outputs.version }}
 
       - name: Upload jar
         uses: actions/upload-artifact@v7
