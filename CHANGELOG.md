@@ -1,3 +1,11 @@
+## 2026.39.0 — 2026-09-23
+
+### 📝 Documentation
+- replace stale release-slot comment (`987653f`)
+
+### 🔧 Other
+- paper-api 26.2.build.121-stable -> 26.2.build.123-stable (`9d8d89b`)
+
 ## 2026.37.0 — 2026-09-13
 
 _Maintenance release._
