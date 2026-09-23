@@ -84,7 +84,7 @@ jobs:
       # would otherwise be stale — the host had to move for there to be anything to release — and
       # the Maven cache would hide it, keeping the old artifact resolvable and the build green.
       # Release consumers against a published host tag, never a moving default-branch checkout.
-      # The 11 a.m. slot follows the host's 10 a.m. slot. A failed/new host build cannot silently
+      # Release the host first so this resolves its new tag. A failed/new host build cannot silently
       # become an extension's runtime dependency; compilation against the pinned release must pass.
       - name: Resolve published RoyalSkyblock release
         if: steps.prep.outputs.release == 'true'
