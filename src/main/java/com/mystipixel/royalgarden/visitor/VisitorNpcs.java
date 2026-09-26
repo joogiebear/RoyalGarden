@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -122,40 +121,36 @@ public final class VisitorNpcs implements Listener {
         if (entrance != null) {
             watched.add(entrance);
         }
-        Set<Chunk> chunks = new LinkedHashSet<>();
         for (Location spot : watched) {
             int cx = spot.getBlockX() >> 4;
             int cz = spot.getBlockZ() >> 4;
-            if (!world.isChunkLoaded(cx, cz)) {
+            if (!world.isChunkLoaded(cx, cz) || !world.getChunkAt(cx, cz).isEntitiesLoaded()) {
                 return;                              // EntitiesLoadEvent will bring us back
             }
-            Chunk chunk = world.getChunkAt(cx, cz);
-            if (!chunk.isEntitiesLoaded()) {
-                return;
-            }
-            chunks.add(chunk);
         }
 
         Map<String, Integer> wanted = wanted(owner, spots.size());
         List<Offer> queue = service.store().get(owner).queue();
         Set<String> present = new HashSet<>();
-        for (Chunk chunk : chunks) {
-            for (Entity entity : chunk.getEntities()) {
-                String id = tagOf(entity);
-                if (id == null) {
-                    continue;
-                }
-                Integer index = wanted.get(id);
-                Offer offer = index == null ? null : queue.get(index);
-                VisitorType type = offer == null ? null : service.config().visitor(offer.visitor());
-                if (index == null || present.contains(id) || entity.getType() != entityType(type)) {
-                    entity.remove();
-                    continue;
-                }
-                present.add(id);
-                walk(entity, spots.get(index));
-                dress(entity, owner, offer, type);
+        // Every visitor loaded anywhere in the Garden, not just those in the spots' chunks: a visitor left
+        // standing where the spots used to be — before the line, say — is in some other chunk, and looking
+        // only at the spots' chunks left them there, never walked in and never removed when served.
+        for (Entity entity : world.getEntities()) {
+            String id = tagOf(entity);
+            if (id == null) {
+                continue;
             }
+            Integer index = wanted.get(id);
+            Offer offer = index == null ? null : queue.get(index);
+            VisitorType type = offer == null ? null : service.config().visitor(offer.visitor());
+            if (index == null || present.contains(id) || entity.getType() != entityType(type)) {
+                walking.remove(entity.getUniqueId());
+                entity.remove();
+                continue;
+            }
+            present.add(id);
+            walk(entity, spots.get(index));
+            dress(entity, owner, offer, type);
         }
         for (Map.Entry<String, Integer> entry : wanted.entrySet()) {
             if (present.contains(entry.getKey())) {
