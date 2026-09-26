@@ -25,6 +25,12 @@ class GardenLayoutTest {
     }
 
     @Test
+    void theFarmhouseIsNotAFarmablePlot() {
+        assertEquals(25, GardenLayout.plotCount());
+        assertEquals(24, GardenLayout.farmableCount());
+    }
+
+    @Test
     void plotAtRoundsTowardNegativeInfinity() {
         assertEquals(2, GardenLayout.plotAt(0));
         assertEquals(2, GardenLayout.plotAt(-48));

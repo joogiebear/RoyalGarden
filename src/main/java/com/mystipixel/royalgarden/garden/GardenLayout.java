@@ -86,6 +86,11 @@ public final class GardenLayout {
     }
 
     /** How many plots the board has, farmhouse included. */
+    /** Plots that can be farmed: every plot but the farmhouse. What players are shown as the board's size. */
+    public static int farmableCount() {
+        return plotCount() - 1;
+    }
+
     public static int plotCount() {
         return grid * grid;
     }

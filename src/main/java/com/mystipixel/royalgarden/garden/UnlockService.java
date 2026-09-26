@@ -181,6 +181,11 @@ public final class UnlockService {
         return Math.min(limit, GardenLayout.plotCount());
     }
 
+    /** {@link #limit} without the farmhouse: how many plots this player may buy, as players are shown it. */
+    public int farmableLimit(Player player) {
+        return Math.max(0, limit(player) - 1);
+    }
+
     /** The first requirement this player does not meet, or null if they meet them all. */
     public Requirement unmet(Player player, Terms terms) {
         for (Requirement requirement : terms.requirements()) {
@@ -216,7 +221,7 @@ public final class UnlockService {
         }
         int limit = limit(player);
         if (state.unlockedCount() >= limit) {
-            messages.send(player, "unlock-limit-reached", "%limit%", String.valueOf(limit));
+            messages.send(player, "unlock-limit-reached", "%limit%", String.valueOf(Math.max(0, limit - 1)));
             return false;
         }
 
@@ -254,7 +259,7 @@ public final class UnlockService {
             return false;
         }
 
-        String count = String.valueOf(state.unlockedCount());
+        String count = String.valueOf(state.purchasedCount());     // farmable plots owned, farmhouse not counted
         messages.send(player, "unlocked", "%plot%", plot, "%cost%", display(cost), "%count%", count);
         if (config.clearing().enabled() && state.isClearing(px, pz)) {
             messages.send(player, "unlocked-needs-clearing", "%plot%", plot,
