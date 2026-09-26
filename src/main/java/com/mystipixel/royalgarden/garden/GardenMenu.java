@@ -39,6 +39,7 @@ public final class GardenMenu {
     private final PresetService presetService;
     private Consumer<Player> milestones;
     private Consumer<Player> visitors;
+    private Consumer<Player> upgrades;
     private java.util.function.Function<java.util.UUID, String[]> levelPlaceholders = owner -> new String[0];
     private Menu menu;
 
@@ -71,6 +72,12 @@ public final class GardenMenu {
     /** Add the Visitors button, opening this page when clicked. */
     public void setVisitors(Consumer<Player> open) {
         this.visitors = open;
+        this.menu = build();
+    }
+
+    /** Add the Crop Upgrades button, opening this page when clicked. */
+    public void setUpgrades(Consumer<Player> open) {
+        this.upgrades = open;
         this.menu = build();
     }
 
@@ -110,6 +117,7 @@ public final class GardenMenu {
 
         button(builder, used, rows, "milestones", 3, Material.GOLDEN_HOE, milestones);
         button(builder, used, rows, "visitors", 7, Material.VILLAGER_SPAWN_EGG, visitors);
+        button(builder, used, rows, "upgrades", 4, Material.ANVIL, upgrades);
 
         ItemStack filler = filler();
         if (filler != null) {

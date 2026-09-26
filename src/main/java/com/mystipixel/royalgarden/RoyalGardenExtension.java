@@ -23,6 +23,11 @@ import com.mystipixel.royalgarden.milestone.MilestoneMenu;
 import com.mystipixel.royalgarden.milestone.MilestoneService;
 import com.mystipixel.royalgarden.milestone.MilestoneStore;
 import com.mystipixel.royalgarden.milestone.PlacedBlocks;
+import com.mystipixel.royalgarden.upgrade.UpgradeConfig;
+import com.mystipixel.royalgarden.upgrade.UpgradeHolders;
+import com.mystipixel.royalgarden.upgrade.UpgradeMenu;
+import com.mystipixel.royalgarden.upgrade.UpgradeService;
+import com.mystipixel.royalgarden.upgrade.UpgradeStore;
 import com.mystipixel.royalgarden.visitor.VisitorConfig;
 import com.mystipixel.royalgarden.visitor.VisitorMenu;
 import com.mystipixel.royalgarden.visitor.VisitorNpcs;
@@ -95,6 +100,9 @@ public final class RoyalGardenExtension extends Extension {
     private VisitorNpcs visitorNpcs;
     private BukkitTask visitorTicker;
     private Object expansion;
+    private UpgradeConfig upgradeConfig;
+    private UpgradeService upgrades;
+    private UpgradeHolders upgradeHolders;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -170,11 +178,15 @@ public final class RoyalGardenExtension extends Extension {
         milestoneConfig.reload();
         levelConfig.reload();
         visitorConfig.reload();
+        upgradeConfig.reload();
         menu.reload();
         scheduleMilestoneSaves();
         scheduleVisitorArrivals();
         visitorNpcs.syncAll();
-        getLogger().info("Reloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml and visitors.yml.");
+        upgradeHolders.compile();                      // after milestones.yml too: crops come from there
+        UpgradeHolders.refreshAll();
+        getLogger().info("Reloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, "
+                + "visitors.yml and upgrades.yml.");
     }
 
     /**
@@ -302,13 +314,31 @@ public final class RoyalGardenExtension extends Extension {
         }
         scheduleVisitorArrivals();
         visitorNpcs.syncAll();
-        registerExpansion(new VisitorPlaceholders(visitors));
+        // Crop upgrades: levels bought with Copper at the desk, each granting libreforge effects.
+        this.upgradeConfig = new UpgradeConfig(data, getLogger());
+        this.upgrades = new UpgradeService(upgradeConfig, new UpgradeStore(data, getLogger()), milestoneConfig,
+                messages, currency);
+        upgrades.setXp((owner, amount) -> levels.give(owner, amount, "level-source-upgrade"));
+        upgrades.onChange(UpgradeHolders::refresh);
+        UpgradeMenu upgradeMenu = new UpgradeMenu(upgrades, messages, menu::open);
+        menu.setUpgrades(upgradeMenu::open);
+        Bukkit.getPluginManager().registerEvents(upgrades, getPlugin());
+        this.upgradeHolders = new UpgradeHolders(getPlugin(), upgrades);
+        upgradeHolders.register();
+
+        VisitorPlaceholders visitorPlaceholders = new VisitorPlaceholders(visitors);
+        UpgradeService upgradeLookup = upgrades;
+        registerExpansion((player, key) -> {
+            String value = visitorPlaceholders.resolve(player, key);
+            return value != null ? value : upgradeLookup.resolve(player, key);
+        });
 
         CommandGarden garden = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
                 messages, this::reloadFiles, () -> evacuationPoint(host));
         garden.setMilestones(milestones, milestoneMenu);
         garden.setLevels(levels);
         garden.setVisitors(visitors, visitorMenu);
+        garden.setUpgrades(upgrades, upgradeMenu);
         this.gardenCommand = garden;
         this.deskCommand = new CommandDesk(getPlugin(), config.commandName("desk", "desk"), menu);
         gardenCommand.register();
@@ -335,13 +365,13 @@ public final class RoyalGardenExtension extends Extension {
      * check, and held as an {@code Object} so this class never needs PlaceholderAPI to load. A failure
      * costs the placeholders, never the extension.
      */
-    private void registerExpansion(VisitorPlaceholders visitorPlaceholders) {
+    private void registerExpansion(java.util.function.BiFunction<org.bukkit.OfflinePlayer, String, String> resolver) {
         if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
             getLogger().info("PlaceholderAPI not found — %royalgarden_...% placeholders are off.");
             return;
         }
         try {
-            RoyalGardenExpansion created = new RoyalGardenExpansion(getVersion(), visitorPlaceholders::resolve);
+            RoyalGardenExpansion created = new RoyalGardenExpansion(getVersion(), resolver);
             if (created.register()) {
                 this.expansion = created;
             } else {
@@ -452,6 +482,14 @@ public final class RoyalGardenExtension extends Extension {
         if (visitorTicker != null) {
             visitorTicker.cancel();
             visitorTicker = null;
+        }
+        if (upgradeHolders != null) {
+            upgradeHolders.disable();
+            upgradeHolders = null;
+        }
+        if (upgrades != null) {
+            HandlerList.unregisterAll(upgrades);
+            upgrades = null;
         }
         if (expansion != null) {
             // persist() keeps it across PlaceholderAPI reloads, so it must be removed by hand here or an

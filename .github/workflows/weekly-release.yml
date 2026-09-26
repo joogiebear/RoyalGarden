@@ -115,8 +115,10 @@ jobs:
           chmod +x ./gradlew
           ./gradlew build --no-daemon
           HOST_VERSION=$(grep '^version=' gradle.properties | cut -d= -f2)
-          echo "Host version: $HOST_VERSION"
+          LIBREFORGE_VERSION=$(grep '^libreforge-version=' gradle.properties | cut -d= -f2)
+          echo "Host version: $HOST_VERSION, libreforge $LIBREFORGE_VERSION"
           echo "version=$HOST_VERSION" >> "$GITHUB_OUTPUT"
+          echo "libreforge=$LIBREFORGE_VERSION" >> "$GITHUB_OUTPUT"
           mvn -q -B install:install-file \
             -Dfile=build/libs/RoyalSkyblock.jar \
             -DgroupId=com.mystipixel \
@@ -126,7 +128,10 @@ jobs:
 
       - name: Build
         if: steps.prep.outputs.release == 'true'
-        run: mvn -B verify -Droyalskyblock.version=${{ steps.host.outputs.version }}
+        run: >-
+          mvn -B verify
+          -Droyalskyblock.version=${{ steps.host.outputs.version }}
+          -Dlibreforge.version=${{ steps.host.outputs.libreforge }}
 
       - name: Locate and name jar
         if: steps.prep.outputs.release == 'true'

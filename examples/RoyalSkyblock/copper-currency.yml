@@ -1,0 +1,11 @@
+# Copper as a RoyalSkyblock currency, so RoyalGarden can charge it (crop upgrades,
+# or any `cost:` written "50 copper"). Add this entry under `currencies:` in
+# plugins/RoyalSkyblock/config.yml. Needs EcoBits (examples/EcoBits/copper.yml)
+# and PlaceholderAPI.
+currencies:
+  copper:
+    type: command
+    display-name: "Copper"
+    balance-placeholder: "%ecobits_copper%"
+    take-command: "ecobits takesilent %player% copper %amount%"
+    give-command: "ecobits givesilent %player% copper %amount%"

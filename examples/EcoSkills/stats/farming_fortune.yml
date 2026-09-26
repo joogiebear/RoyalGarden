@@ -1,0 +1,35 @@
+# Farming Fortune — an EcoSkills stat. Copy to plugins/EcoSkills/stats/farming_fortune.yml.
+# Every point is +1% chance of double crop drops. Anything can add to it with the
+# add_stat effect: RoyalGarden's crop upgrades (see upgrades.yml), EcoSkills skill
+# rewards, EcoPets, EcoItems gear. Player-placed crops never count.
+name: "&6☘ Farming Fortune"
+placeholder: "%level%"
+description: "&8Gives a &a%placeholder%%&8 chance of double crop drops"
+
+gui:
+  enabled: false
+
+effects:
+  - id: multiply_drops
+    args:
+      multiplier: 2
+      chance: "%level%"
+      on_items:
+        - wheat
+        - carrot
+        - potato
+        - beetroot
+        - nether_wart
+        - melon_slice
+        - pumpkin
+        - sugar_cane
+        - cactus
+        - cocoa_beans
+        - red_mushroom
+        - brown_mushroom
+    triggers:
+      - block_item_drop
+    filters:
+      player_placed: false
+
+conditions: []

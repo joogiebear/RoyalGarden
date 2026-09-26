@@ -24,6 +24,8 @@
           longer has.
         -->
         <royalskyblock.version>2026.36.1</royalskyblock.version>
+        <!-- As royalskyblock.version: a local default; CI passes the host's own libreforge-version. -->
+        <libreforge.version>2026.35.1</libreforge.version>
     </properties>
 
     <repositories>
@@ -79,6 +81,18 @@
           Provided, never required: the expansion that uses it is only constructed once PlaceholderAPI is
           enabled, and resolves at runtime because RoyalSkyblock soft-depends on PlaceholderAPI.
         -->
+        <!--
+          libreforge, for crop upgrades' effect holders. The host runs on it, so it is always present at
+          runtime and our classes resolve it through the host's class loader. The shadow classifier is the
+          artifact the host's own build compiles against.
+        -->
+        <dependency>
+            <groupId>com.willfp</groupId>
+            <artifactId>libreforge</artifactId>
+            <version>${libreforge.version}</version>
+            <classifier>shadow</classifier>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>

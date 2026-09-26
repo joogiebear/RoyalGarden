@@ -148,6 +148,7 @@ reloaded with `/garden reload` (or RoyalSkyblock's own reload):
 | `config.yml` | board shape, generation speed, plot costs / requirements / rewards, preset rules, world rules, protection switches, Sam, command names, menu icons |
 | `levels.yml` | Garden Levels: XP curve, XP sources, level rewards |
 | `milestones.yml` | Crop Milestones: crops, tier curves, rewards, the milestones menu |
+| `upgrades.yml` | Crop Upgrades: level costs, the libreforge effects each level grants, rewards, the menu |
 | `visitors.yml` | Visitors: arrival timing, rarities, visitors and their requests, rewards, Copper, SkyMart, where they stand, the menus |
 | `messages.yml` | every player-facing line (`&` codes, `&#rrggbb` hex; `""` switches a message off) |
 | `presets.yml` | which captured presets players may choose, with name, icon, cost, cooldown and permission; and the default preset new Gardens generate from |
@@ -196,7 +197,7 @@ things: `garden-level:` on a plot's unlock terms (`default`, `by-count`, `by-plo
 run `/garden level <player>` and `/garden xp <player> give|take|set <amount>` (`take` and `set` pay
 nothing). XP is saved with the Garden, so `/garden reset` clears it too.
 
-The console can also run `/garden xp`, `level`, `milestone`, `visitor`, `reset`, `unlock`, `lock`,
+The console can also run `/garden xp`, `level`, `milestone`, `visitor`, `upgrade`, `reset`, `unlock`, `lock`,
 `info` and `reload`.
 
 ### Visitors and Copper
@@ -247,6 +248,35 @@ Admins: `/garden visitor <player> add [visitor]` sends one now (ignoring the clo
 level), `clear` sends everyone waiting away, `stats` shows the counts, `reset-stats` zeroes them. The
 console can run it too. `/garden reset` also sends a Garden's waiting visitors away.
 
+### Crop Upgrades
+
+`upgrades.yml` lets players upgrade every crop from `milestones.yml` at the desk (**Crop Upgrades**,
+or `/garden upgrades`). Each level costs the next entry of `costs`, in any of RoyalSkyblock's
+currencies — Copper by default, which has to be added to the host's `currencies:` first
+(`examples/RoyalSkyblock/copper-currency.yml`).
+
+What a level *does* is not implemented here: it gives the player **libreforge effects**, the same way
+RoyalSkyblock's island upgrades and every eco plugin do. `effects:` and `conditions:` are a template
+filled per crop and level with `%level%`, `%crop%`, `%value%`, `%blocks%` and `%drops%` (the last two
+from `milestones.yml`), compiled through the host's own holder compiler. Only the current level's
+effects apply, while the player is where `apply-in` says (their own Garden by default). So yield, stats
+and skill XP come from libreforge and EcoSkills, and stack with whatever EcoSkills' own skills give:
+
+- the default is Hypixel-like: +5% per level chance of double drops for that crop (`multiply_drops`),
+  never on player-placed blocks;
+- or have upgrades feed an EcoSkills stat with `add_stat` — `examples/EcoSkills/stats/farming_fortune.yml`
+  is a Farming Fortune stat (double-drop chance) that skills, pets and gear can raise too;
+- or `skill_xp_multiplier` for faster Farming XP, or anything else in the eco library.
+
+Any crop can have its own `costs`, `effects`, `conditions` and `value-per-level` under `crops.<id>`, or
+be left out with `enabled: false`. Buying a level pays Garden XP (`garden-xp`) and stacked rewards
+(`rewards.every-level`, `rewards.by-level.<n>`). Levels are per player, like milestones, so
+`/garden reset` keeps them. Note: libreforge's `multiply_drops.prevent-duplication` skips solid
+blocks such as pumpkins unless they are on its whitelist.
+
+Placeholders: `%royalgarden_upgrade_<crop>_level%` and `%royalgarden_upgrade_<crop>_value%`. Admins:
+`/garden upgrade <player> <crop> <level>` or `/garden upgrade <player> reset` (nothing is charged).
+
 ### Permissions
 
 | Node | Default | |
@@ -264,7 +294,7 @@ console can run it too. `/garden reset` also sends a Garden's waiting visitors a
 `reload` · `reset <player> [world]` · `unlock <player> <plot>` · `lock <player> <plot>` ·
 `visit <player>` · `info <player>` · `milestones <player>` · `milestone <player> <crop> <amount>|reset` ·
 `level <player>` · `xp <player> give|take|set <amount>` ·
-`visitor <player> add [visitor]|clear|stats|reset-stats`
+`visitor <player> add [visitor]|clear|stats|reset-stats` · `upgrade <player> <crop> <level>|reset`
 
 `reset` forgets a player's unlocks and presets (the state file is moved aside, not deleted); with
 `world` it also deletes their Garden world so the next `/garden` builds a fresh one — the contest reset.
