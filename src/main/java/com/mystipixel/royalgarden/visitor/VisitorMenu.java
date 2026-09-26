@@ -228,14 +228,16 @@ public final class VisitorMenu {
                 type == null ? Material.VILLAGER_SPAWN_EGG : type.icon(), withDialogue)).build());
         used[1][5] = true;
 
-        List<Offer.Wanted> items = offer.items();
-        int count = Math.min(7, items.size());
-        int start = 5 - count / 2;
-        for (int i = 0; i < count; i++) {
-            Offer.Wanted wanted = items.get(i);
+        List<Icon> icons = layout(offer.items());
+        int start = 5 - (icons.size() - 1) / 2;
+        for (int i = 0; i < icons.size(); i++) {
+            Icon icon = icons.get(i);
             int column = start + i;
-            builder.setSlot(2, column, Slot.builder((viewer, shown) -> wantedIcon(viewer, wanted)).build());
-            used[2][column] = true;
+            if (icon.wanted() != null) {
+                builder.setSlot(2, column, Slot.builder((viewer, shown) ->
+                        wantedIcon(viewer, icon.wanted(), icon.amount())).build());
+                used[2][column] = true;
+            }
         }
 
         String[] full = append(base, "%rewards%", rewardLines(offer));
@@ -268,8 +270,59 @@ public final class VisitorMenu {
         builder.build().open(player);
     }
 
-    /** A requested item as itself, with how many are wanted and how many the viewer has. */
-    private ItemStack wantedIcon(Player viewer, Offer.Wanted wanted) {
+    /**
+     * One slot of the requested-items row: part of a wanted item, shown as {@code amount}, or a gap
+     * between two items when {@code wanted} is null.
+     */
+    private record Icon(Offer.Wanted wanted, int amount) {
+    }
+
+    /** The row is nine slots wide. */
+    private static final int ROW = 9;
+
+    /** The highest count a single icon can show once its stack size is raised. */
+    private static final int MOST_ON_ONE_ICON = 99;
+
+    /**
+     * How the requested items fill the row, so the amount can be read without hovering.
+     *
+     * <p>Where they fit, each item is laid out as the stacks it actually takes — 160 wheat is 64, 64 and 32 —
+     * with a gap between one item and the next. An order too big for the row falls back to one icon per
+     * item, its stack size raised so the count can read up to 99; past that the tooltip has the total.
+     */
+    private static List<Icon> layout(List<Offer.Wanted> items) {
+        List<Offer.Wanted> shown = items.subList(0, Math.min(7, items.size()));
+        List<Icon> stacks = new ArrayList<>();
+        for (Offer.Wanted wanted : shown) {
+            if (!stacks.isEmpty()) {
+                stacks.add(new Icon(null, 0));
+            }
+            int per = maxStack(wanted);
+            for (long left = Math.max(1, wanted.amount()); left > 0; left -= per) {
+                stacks.add(new Icon(wanted, (int) Math.min(per, left)));
+                if (stacks.size() > ROW) {
+                    break;
+                }
+            }
+        }
+        if (stacks.size() <= ROW) {
+            return stacks;
+        }
+        List<Icon> single = new ArrayList<>();
+        for (Offer.Wanted wanted : shown) {
+            single.add(new Icon(wanted, (int) Math.clamp(wanted.amount(), 1, MOST_ON_ONE_ICON)));
+        }
+        return single;
+    }
+
+    /** How many of an item make one stack; 64 if it cannot be looked up. */
+    private static int maxStack(Offer.Wanted wanted) {
+        TestableItem item = VisitorService.lookup(wanted.item());
+        return item == null ? 64 : Math.max(1, item.getItem().getMaxStackSize());
+    }
+
+    /** A requested item as itself, showing {@code shown} of it, with how many are wanted and how many the viewer has. */
+    private ItemStack wantedIcon(Player viewer, Offer.Wanted wanted, int shown) {
         TestableItem item = VisitorService.lookup(wanted.item());
         ItemStack stack = item == null ? new ItemStack(Material.BARRIER) : item.getItem().clone();
         long have = item == null ? 0 : VisitorService.count(viewer.getInventory(), item);
@@ -279,10 +332,13 @@ public final class VisitorMenu {
                 "%have%", String.format("%,d", have),
                 "%status%", messages.raw(have >= wanted.amount() ? "visitor-item-have" : "visitor-item-missing",
                         "%have%", String.format("%,d", have), "%amount%", String.format("%,d", wanted.amount()))};
-        stack.setAmount((int) Math.clamp(wanted.amount(), 1, stack.getMaxStackSize()));
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) {
+            stack.setAmount(Math.clamp(shown, 1, stack.getMaxStackSize()));
             return stack;
+        }
+        if (shown > stack.getMaxStackSize()) {
+            meta.setMaxStackSize(Math.min(shown, MOST_ON_ONE_ICON));   // lets the count on the icon read past 64
         }
         String name = string("offer.item.name", "");
         if (!name.isBlank()) {
@@ -300,6 +356,7 @@ public final class VisitorMenu {
         meta.lore(lore);
         meta.addItemFlags(ItemFlag.values());
         stack.setItemMeta(meta);
+        stack.setAmount(Math.clamp(shown, 1, stack.getMaxStackSize()));
         return stack;
     }
 
