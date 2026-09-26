@@ -2,6 +2,11 @@ package com.mystipixel.royalgarden;
 
 import com.mystipixel.royalgarden.command.CommandDesk;
 import com.mystipixel.royalgarden.command.CommandGarden;
+import com.mystipixel.royalgarden.composter.ComposterBlock;
+import com.mystipixel.royalgarden.composter.ComposterConfig;
+import com.mystipixel.royalgarden.composter.ComposterMenu;
+import com.mystipixel.royalgarden.composter.ComposterService;
+import com.mystipixel.royalgarden.composter.ComposterStore;
 import com.mystipixel.royalgarden.config.GardenConfig;
 import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalgarden.garden.BuildQueue;
@@ -68,7 +73,8 @@ import java.util.function.Supplier;
  *
  * <p>Everything tunable lives in {@code plugins/RoyalSkyblock/extensions/RoyalGarden/}:
  * {@code config.yml} (the board, costs, rewards, rules, menus), {@code messages.yml},
- * {@code presets.yml}, {@code milestones.yml}, {@code levels.yml} and {@code visitors.yml}. The host's
+ * {@code presets.yml}, {@code milestones.yml}, {@code levels.yml}, {@code visitors.yml},
+ * {@code upgrades.yml} and {@code composter.yml}. The host's
  * reload reloads them too.
  */
 public final class RoyalGardenExtension extends Extension {
@@ -103,6 +109,10 @@ public final class RoyalGardenExtension extends Extension {
     private UpgradeConfig upgradeConfig;
     private UpgradeService upgrades;
     private UpgradeHolders upgradeHolders;
+    private ComposterConfig composterConfig;
+    private ComposterService composter;
+    private ComposterBlock composterBlock;
+    private BukkitTask composterTicker;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -179,14 +189,17 @@ public final class RoyalGardenExtension extends Extension {
         levelConfig.reload();
         visitorConfig.reload();
         upgradeConfig.reload();
+        composterConfig.reload();                      // after milestones.yml: its crops are organic matter
         menu.reload();
         scheduleMilestoneSaves();
         scheduleVisitorArrivals();
         visitorNpcs.syncAll();
         upgradeHolders.compile();                      // after milestones.yml too: crops come from there
         UpgradeHolders.refreshAll();
+        scheduleComposter();
+        composterBlock.ensureAll();
         getLogger().info("Reloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, "
-                + "visitors.yml and upgrades.yml.");
+                + "visitors.yml, upgrades.yml and composter.yml.");
     }
 
     /**
@@ -303,10 +316,6 @@ public final class RoyalGardenExtension extends Extension {
         menu.setVisitors(visitorMenu::open);
         Sam desk = sam;
         VisitorNpcs outside = visitorNpcs;
-        gardens.onPrepared(world -> {
-            desk.ensureWhenLoaded(world);
-            outside.sync(world);
-        });
         Bukkit.getPluginManager().registerEvents(visitors, getPlugin());
         Bukkit.getPluginManager().registerEvents(visitorNpcs, getPlugin());
         for (org.bukkit.entity.Player online : Bukkit.getOnlinePlayers()) {
@@ -326,11 +335,36 @@ public final class RoyalGardenExtension extends Extension {
         this.upgradeHolders = new UpgradeHolders(getPlugin(), upgrades);
         upgradeHolders.register();
 
+        // The Composter: organic matter and fuel in, Compost out over time, with machine upgrades bought
+        // with Copper. It runs while its owner is away and catches up when next touched.
+        this.composterConfig = new ComposterConfig(data, getLogger(), milestoneConfig);
+        this.composter = new ComposterService(composterConfig, new ComposterStore(data, getLogger()), messages,
+                currency, getLogger());
+        composter.setXp((owner, amount) -> levels.give(owner, amount, "level-source-composter"));
+        ComposterMenu composterMenu = new ComposterMenu(composter, messages, menu::open);
+        menu.setComposter(composterMenu::open);
+        this.composterBlock = new ComposterBlock(getPlugin(), composterConfig, messages, composterMenu::open);
+        protection.setMachines(composterBlock::isComposter);
+        ComposterBlock barnComposter = composterBlock;
+        gardens.onPrepared(world -> {
+            desk.ensureWhenLoaded(world);
+            outside.sync(world);
+            barnComposter.ensure(world);
+        });
+        Bukkit.getPluginManager().registerEvents(composter, getPlugin());
+        Bukkit.getPluginManager().registerEvents(composterBlock, getPlugin());
+        composterBlock.ensureAll();
+        scheduleComposter();
+
         VisitorPlaceholders visitorPlaceholders = new VisitorPlaceholders(visitors);
         UpgradeService upgradeLookup = upgrades;
+        ComposterService composterLookup = composter;
         registerExpansion((player, key) -> {
             String value = visitorPlaceholders.resolve(player, key);
-            return value != null ? value : upgradeLookup.resolve(player, key);
+            if (value == null) {
+                value = upgradeLookup.resolve(player, key);
+            }
+            return value != null ? value : composterLookup.resolve(player, key);
         });
 
         CommandGarden garden = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
@@ -339,6 +373,7 @@ public final class RoyalGardenExtension extends Extension {
         garden.setLevels(levels);
         garden.setVisitors(visitors, visitorMenu);
         garden.setUpgrades(upgrades, upgradeMenu);
+        garden.setComposter(composter, composterMenu);
         this.gardenCommand = garden;
         this.deskCommand = new CommandDesk(getPlugin(), config.commandName("desk", "desk"), menu);
         gardenCommand.register();
@@ -356,6 +391,15 @@ public final class RoyalGardenExtension extends Extension {
         }
         long period = milestoneConfig.saveIntervalSeconds() * 20L;
         milestoneSaver = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneStore::saveAll, period, period);
+    }
+
+    /** Catch online players' Composters up every {@code compost.check-every-seconds}. */
+    private void scheduleComposter() {
+        if (composterTicker != null) {
+            composterTicker.cancel();
+        }
+        long period = composterConfig.checkTicks();
+        composterTicker = Bukkit.getScheduler().runTaskTimer(getPlugin(), composter::tickAll, period, period);
     }
 
     /**
@@ -490,6 +534,19 @@ public final class RoyalGardenExtension extends Extension {
         if (upgrades != null) {
             HandlerList.unregisterAll(upgrades);
             upgrades = null;
+        }
+        if (composterTicker != null) {
+            composterTicker.cancel();
+            composterTicker = null;
+        }
+        if (composter != null) {
+            composter.store().saveAll();
+            HandlerList.unregisterAll(composter);
+            composter = null;
+        }
+        if (composterBlock != null) {
+            HandlerList.unregisterAll(composterBlock);
+            composterBlock = null;
         }
         if (expansion != null) {
             // persist() keeps it across PlaceholderAPI reloads, so it must be removed by hand here or an

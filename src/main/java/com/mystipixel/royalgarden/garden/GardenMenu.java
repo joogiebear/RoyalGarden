@@ -40,6 +40,7 @@ public final class GardenMenu {
     private Consumer<Player> milestones;
     private Consumer<Player> visitors;
     private Consumer<Player> upgrades;
+    private Consumer<Player> composter;
     private java.util.function.Function<java.util.UUID, String[]> levelPlaceholders = owner -> new String[0];
     private Menu menu;
 
@@ -81,6 +82,12 @@ public final class GardenMenu {
         this.menu = build();
     }
 
+    /** Add the Composter button, opening this page when clicked. */
+    public void setComposter(Consumer<Player> open) {
+        this.composter = open;
+        this.menu = build();
+    }
+
     public void open(Player player) {
         menu.open(player);
     }
@@ -118,6 +125,7 @@ public final class GardenMenu {
         button(builder, used, rows, "milestones", 3, Material.GOLDEN_HOE, milestones);
         button(builder, used, rows, "visitors", 7, Material.VILLAGER_SPAWN_EGG, visitors);
         button(builder, used, rows, "upgrades", 4, Material.ANVIL, upgrades);
+        button(builder, used, rows, "composter", 6, Material.COMPOSTER, composter);
 
         ItemStack filler = filler();
         if (filler != null) {

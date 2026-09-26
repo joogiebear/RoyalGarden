@@ -1,0 +1,55 @@
+# Compost for RoyalGarden's Composter — an EcoItems item.
+# Copy to plugins/EcoItems/items/compost.yml, then set `output.item:
+# ecoitems:compost` in RoyalGarden's composter.yml.
+#
+# A fertiliser: right-click a crop that is still growing, with Compost in your
+# main hand, to grow it two stages. One Compost is used per crop.
+# Brown dye rather than bone meal, so the vanilla bone meal use never fires
+# alongside it.
+
+item:
+  item: brown_dye
+  name: "&6Compost"
+  lore:
+    - "&7Made in the Composter at your barn."
+    - ""
+    - "&eRight-click a growing crop"
+    - "&eto grow it two stages."
+
+slot: mainhand
+
+effects:
+  - id: age_crop
+    args:
+      age: 2
+    triggers:
+      - click_block
+    filters:
+      blocks:
+        - wheat
+        - carrots
+        - potatoes
+        - beetroots
+        - nether_wart
+        - cocoa
+        - melon_stem
+        - pumpkin_stem
+      fully_grown: false
+  - id: consume_held_item
+    args:
+      amount: 1
+    triggers:
+      - click_block
+    filters:
+      blocks:
+        - wheat
+        - carrots
+        - potatoes
+        - beetroots
+        - nether_wart
+        - cocoa
+        - melon_stem
+        - pumpkin_stem
+      fully_grown: false
+
+conditions: []
