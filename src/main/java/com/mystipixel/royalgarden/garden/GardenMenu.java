@@ -74,7 +74,7 @@ public final class GardenMenu {
                 int plotX = px;
                 int plotZ = pz;
                 // North is up: plot z maps to the row.
-                builder.setSlot(pz + 1, px + columnOffset, Slot.builder(player -> icon(player, plotX, plotZ))
+                builder.setSlot(pz + 1, px + columnOffset, Slot.builder((player, shown) -> icon(player, plotX, plotZ))
                         .onLeftClick((event, slot, clicked) ->
                                 leftClick((Player) event.getWhoClicked(), clicked, plotX, plotZ))
                         .onRightClick((event, slot, clicked) ->
@@ -84,7 +84,7 @@ public final class GardenMenu {
             }
         }
 
-        builder.setSlot(rows, 5, Slot.builder(this::summary).build());
+        builder.setSlot(rows, 5, Slot.builder((player, shown) -> summary(player)).build());
         used[rows][5] = true;
 
         ItemStack filler = filler();
@@ -235,7 +235,7 @@ public final class GardenMenu {
 
         for (int i = 0; i < shown; i++) {
             PresetLibrary.Entry entry = entries.get(i);
-            builder.setSlot(i / 9 + 1, i % 9 + 1, Slot.builder(viewer -> presetIcon(viewer, entry, px, pz))
+            builder.setSlot(i / 9 + 1, i % 9 + 1, Slot.builder((viewer, shown) -> presetIcon(viewer, entry, px, pz))
                     .onLeftClick((event, slot, clicked) -> {
                         Player who = (Player) event.getWhoClicked();
                         if (presetService.choose(who, px, pz, entry)) {
