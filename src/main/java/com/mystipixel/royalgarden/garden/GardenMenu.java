@@ -235,7 +235,7 @@ public final class GardenMenu {
 
         for (int i = 0; i < shown; i++) {
             PresetLibrary.Entry entry = entries.get(i);
-            builder.setSlot(i / 9 + 1, i % 9 + 1, Slot.builder((viewer, shown) -> presetIcon(viewer, entry, px, pz))
+            builder.setSlot(i / 9 + 1, i % 9 + 1, Slot.builder((viewer, picker) -> presetIcon(viewer, entry, px, pz))
                     .onLeftClick((event, slot, clicked) -> {
                         Player who = (Player) event.getWhoClicked();
                         if (presetService.choose(who, px, pz, entry)) {
