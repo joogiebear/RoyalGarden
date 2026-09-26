@@ -84,15 +84,16 @@ equally. Any eco addon satisfies it; this repo's test instance uses EcoItems.
 `/garden` gives you a Garden world of your own, created on first use and loaded on every visit
 after. `/desk` — and right-clicking Sam in the farmhouse — opens the desk.
 
-**The board.** 5×5 plots of 96×96, so 480 blocks square, centred on the world origin. The centre
+**The board.** By default 5×5 plots of 96×96 (`layout:` in `config.yml`), so 480 blocks square, centred on the world origin. The centre
 plot is *centred* on `(0, 0)` rather than starting there, which puts the farmhouse at the origin
 and makes every plot index read as an offset from the middle. All of that arithmetic lives in
 `GardenLayout`, alone, and is plain static maths so it can be reasoned about without a server.
 
-**Only the centre plot is generated.** The other twenty-four are empty sky. That is the design —
-an unbought plot should look unbought, not merely fenced — and it is also the cheap option: one
-plot is 9,216 columns against 230,400 for the board. **Generating a plot is what unlocking one
-will mean.**
+**Every plot is generated up front**, locked ones included, so the board reads as land to earn rather
+than holes. Generation goes through one shared build queue with a server-wide block budget per tick
+(`generation.blocks-per-tick`), so fifty Gardens created at a contest opening cost the server the same
+per tick as one — they just take longer. Unlocking a plot changes where you may go and build, not
+whether the ground exists.
 
 **Worlds come from the host.** `GardenWorlds` calls RoyalSkyblock's `IslandWorldService`, which is
 name-based rather than island-based — hand it a name, get back a Bukkit `World`. So Gardens get
@@ -114,7 +115,9 @@ Two things that fell out of building it:
 **Sam is a plain villager with its AI off, not a Citizens NPC.** Citizens would mean a hard
 dependency bought for skins and pathing. He is identified by persistent data rather than by name or
 position, so he cannot be orphaned into a second Sam, and `ensure()` runs on every load — an entity
-can be lost to a rollback, and a Garden with no Sam has no other way to get one back.
+can be lost to a rollback, and a Garden with no Sam has no other way to get one back. It runs once
+the desk chunk's *entities* have loaded (Paper loads them after the blocks); checking earlier found
+nobody and spawned a duplicate.
 
 **Commands are registered through eco**, not `plugin.yml` — an extension has no `plugin.yml` to put
 them in. eco registers into the live command map, which is what makes commands possible from an
@@ -135,7 +138,46 @@ Two console errors there are **gaps in that instance, not defects**:
 
 Neither affects the island services, and neither needs fixing to develop against.
 
-## What is still unproven
+## Configuration
 
-Nothing from Phase 0. Phase 1 is the next unknown: creating a Garden SlimeWorld through
-`AspIslandWorldService` rather than reading it.
+Everything tunable is in `plugins/RoyalSkyblock/extensions/RoyalGarden/`, written on first start and
+reloaded with `/garden reload` (or RoyalSkyblock's own reload):
+
+| File | What it holds |
+|---|---|
+| `config.yml` | board shape, generation speed, plot costs / requirements / rewards, preset rules, world rules, protection switches, Sam, command names, menu icons |
+| `messages.yml` | every player-facing line (`&` codes, `&#rrggbb` hex; `""` switches a message off) |
+| `presets.yml` | which captured presets players may choose, with name, icon, cost, cooldown and permission; and the default preset new Gardens generate from |
+
+Costs use RoyalSkyblock's own `currencies:` (Vault coins, EcoBits gems, any placeholder + command
+currency), written as `5000 coins`. Requirements are PlaceholderAPI placeholders with a minimum.
+Rewards are console commands and messages.
+
+**Buying plots** resolves each setting from the most specific layer: `unlock.by-plot.<A1…E5>`, then
+`unlock.by-count.<n>` (the n-th purchase), then `unlock.default` with optional `cost-scaling`.
+Rewards from every matching layer are all given.
+
+**Presets for players:** capture a plot with `/garden capture <id>`, then set `selectable: true` on its
+entry in `presets.yml`. Players right-click a plot at the desk to choose one; it costs what the entry
+says, has a per-plot cooldown and needs a confirming second click. By default crops paste at age 0
+and melons/pumpkins are never pasted, so a preset is a planted farm rather than a free harvest.
+
+### Permissions
+
+| Node | Default | |
+|---|---|---|
+| `royalgarden.garden` | everyone | `/garden` |
+| `royalgarden.desk` | everyone | `/desk` |
+| `royalgarden.limit.<n>` | — | own up to `n` plots (highest wins) |
+| `royalgarden.admin` | op | admin subcommands |
+| `royalgarden.bypass` | op | ignore Garden protection |
+| `royalgarden.bypass.cooldown` | op | ignore the preset cooldown |
+
+### Admin commands
+
+`/garden capture <id>` · `apply <id>` · `flat` · `bedrock` · `default [id]` · `delete <id>` · `presets` ·
+`reload` · `reset <player> [world]` · `unlock <player> <plot>` · `lock <player> <plot>` ·
+`visit <player>` · `info <player>`
+
+`reset` forgets a player's unlocks and presets (the state file is moved aside, not deleted); with
+`world` it also deletes their Garden world so the next `/garden` builds a fresh one — the contest reset.
