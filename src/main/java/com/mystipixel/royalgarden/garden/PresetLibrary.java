@@ -43,7 +43,7 @@ public final class PresetLibrary {
 
     /** One preset as players see it at the desk. */
     public record Entry(String id, String displayName, Material icon, List<String> lore, Cost cost,
-                        long cooldownMillis, String permission, boolean selectable) {
+                        long cooldownMillis, String permission, boolean selectable, int gardenLevel) {
     }
 
     private final File dir;
@@ -220,7 +220,8 @@ public final class PresetLibrary {
                 GardenConfig.parseCost(section, "cost", logger),
                 cooldown == null ? -1L : Durations.parseMillis(cooldown),
                 section.getString("permission", ""),
-                section.getBoolean("selectable", true));
+                section.getBoolean("selectable", true),
+                Math.max(0, section.getInt("garden-level", 0)));
     }
 
     /** The presets players may pick at the desk, in the order {@code presets.yml} lists them. */

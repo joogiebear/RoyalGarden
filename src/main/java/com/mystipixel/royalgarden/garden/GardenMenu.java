@@ -38,6 +38,7 @@ public final class GardenMenu {
     private final UnlockService unlocks;
     private final PresetService presetService;
     private Consumer<Player> milestones;
+    private java.util.function.Function<java.util.UUID, String[]> levelPlaceholders = owner -> new String[0];
     private Menu menu;
 
     public GardenMenu(GardenConfig config, Messages messages, GardenWorlds worlds, UnlockService unlocks,
@@ -53,6 +54,11 @@ public final class GardenMenu {
     /** Rebuild the menu from the current config. */
     public void reload() {
         this.menu = build();
+    }
+
+    /** Give the summary item the Garden's level placeholders ({@code %level%}, {@code %xp%}, …). */
+    public void setLevelPlaceholders(java.util.function.Function<java.util.UUID, String[]> placeholders) {
+        this.levelPlaceholders = placeholders;
     }
 
     /** Add the Crop Milestones button, opening this page when clicked. */
@@ -157,12 +163,16 @@ public final class GardenMenu {
             }
             UnlockService.Terms terms = unlocks.terms(px, pz, purchase);
             UnlockService.Requirement unmet = unlocks.unmet(player, terms);
+            int levelNeeded = unlocks.levelShortfall(player, terms);
+            String requirement = levelNeeded > 0
+                    ? messages.raw("menu-level-required", "%required%", String.valueOf(levelNeeded))
+                    : unmet == null ? "" : Messages.fill(
+                            unmet.message().isEmpty() ? messages.raw("unlock-requirement") : unmet.message(),
+                            "%required%", String.valueOf(unmet.min()), "%current%", "?", "%plot%", plot);
             return ItemSpec.build(section(items, "unlockable"), Material.LIME_STAINED_GLASS_PANE,
                     "%plot%", plot, "%cost%", unlocks.display(terms.cost()),
                     "%purchase%", String.valueOf(purchase),
-                    "%requirement%", unmet == null ? "" : Messages.fill(
-                            unmet.message().isEmpty() ? messages.raw("unlock-requirement") : unmet.message(),
-                            "%required%", String.valueOf(unmet.min()), "%current%", "?", "%plot%", plot));
+                    "%requirement%", requirement);
         }
         return ItemSpec.build(section(items, "locked"), Material.GRAY_STAINED_GLASS_PANE, "%plot%", plot);
     }
@@ -170,11 +180,16 @@ public final class GardenMenu {
     /** The counter at the bottom of the menu. */
     private ItemStack summary(Player player) {
         GardenState state = worlds.state(player.getUniqueId());
-        return ItemSpec.build(section(items(), "summary"), Material.WHEAT,
+        String[] base = {
                 "%unlocked%", String.valueOf(state.unlockedCount()),
                 "%total%", String.valueOf(GardenLayout.plotCount()),
                 "%limit%", String.valueOf(unlocks.limit(player)),
-                "%size%", String.valueOf(GardenLayout.plotSize()));
+                "%size%", String.valueOf(GardenLayout.plotSize())};
+        String[] level = levelPlaceholders.apply(player.getUniqueId());
+        String[] all = new String[base.length + level.length];
+        System.arraycopy(base, 0, all, 0, base.length);
+        System.arraycopy(level, 0, all, base.length, level.length);
+        return ItemSpec.build(section(items(), "summary"), Material.WHEAT, all);
     }
 
     private static ConfigurationSection section(ConfigurationSection parent, String key) {
@@ -280,6 +295,8 @@ public final class GardenMenu {
         String status;
         if (!entry.permission().isBlank() && !player.hasPermission(entry.permission())) {
             status = messages.raw("preset-status-no-permission");
+        } else if (entry.gardenLevel() > 0 && presetService.level(player) < entry.gardenLevel()) {
+            status = messages.raw("preset-status-level", "%required%", String.valueOf(entry.gardenLevel()));
         } else if (wait > 0) {
             status = messages.raw("preset-status-cooldown", "%time%", Durations.format(wait));
         } else {

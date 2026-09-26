@@ -32,6 +32,7 @@ public final class GardenState {
     private final Map<Integer, Long> lastApplied = new HashMap<>();
     private final Map<Integer, String> pending = new HashMap<>();
     private boolean legacyWallsCleared;
+    private long xp;
     private boolean readOnly;
 
     public GardenState(UUID owner) {
@@ -148,6 +149,15 @@ public final class GardenState {
         Map<int[], String> out = new HashMap<>();
         pending.forEach((k, id) -> out.put(unkey(k), id));
         return out;
+    }
+
+    /** Garden XP earned in total. The level is worked out from it; it is never spent. */
+    public long xp() {
+        return xp;
+    }
+
+    public void setXp(long xp) {
+        this.xp = Math.max(0, xp);
     }
 
     public boolean legacyWallsCleared() {

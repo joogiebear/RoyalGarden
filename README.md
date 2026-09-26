@@ -146,6 +146,7 @@ reloaded with `/garden reload` (or RoyalSkyblock's own reload):
 | File | What it holds |
 |---|---|
 | `config.yml` | board shape, generation speed, plot costs / requirements / rewards, preset rules, world rules, protection switches, Sam, command names, menu icons |
+| `levels.yml` | Garden Levels: XP curve, XP sources, level rewards |
 | `milestones.yml` | Crop Milestones: crops, tier curves, rewards, the milestones menu |
 | `messages.yml` | every player-facing line (`&` codes, `&#rrggbb` hex; `""` switches a message off) |
 | `presets.yml` | which captured presets players may choose, with name, icon, cost, cooldown and permission; and the default preset new Gardens generate from |
@@ -181,6 +182,22 @@ can use `/garden milestones <player>` to view someone's progress, and
 (no rewards are given). Progress saves every `save-interval-seconds`, when a player leaves, and on
 shutdown.
 
+### Garden Levels
+
+`levels.yml` gives every Garden XP that adds up to levels (15 by default, on a growth curve or an
+explicit list). XP comes from crop milestone tiers and plot purchases, both configurable under
+`sources:`. Other plugins can award it from the console with `garden xp <player> give <amount>
+[silent]`, which is how quests, skills, crates or visitors can pay Garden XP.
+
+Reaching a level pays `rewards.every-level` plus `rewards.by-level.<n>`, once each. Levels gate
+things: `garden-level:` on a plot's unlock terms (`default`, `by-count`, `by-plot`) or on a preset in
+`presets.yml`. The desk summary shows the level and progress. Players run `/garden level`; admins
+run `/garden level <player>` and `/garden xp <player> give|take|set <amount>` (`take` and `set` pay
+nothing). XP is saved with the Garden, so `/garden reset` clears it too.
+
+The console can also run `/garden xp`, `level`, `milestone`, `reset`, `unlock`, `lock`, `info` and
+`reload`.
+
 ### Permissions
 
 | Node | Default | |
@@ -196,7 +213,8 @@ shutdown.
 
 `/garden capture <id>` · `apply <id>` · `flat` · `bedrock` · `default [id]` · `delete <id>` · `presets` ·
 `reload` · `reset <player> [world]` · `unlock <player> <plot>` · `lock <player> <plot>` ·
-`visit <player>` · `info <player>` · `milestones <player>` · `milestone <player> <crop> <amount>|reset`
+`visit <player>` · `info <player>` · `milestones <player>` · `milestone <player> <crop> <amount>|reset` ·
+`level <player>` · `xp <player> give|take|set <amount>`
 
 `reset` forgets a player's unlocks and presets (the state file is moved aside, not deleted); with
 `world` it also deletes their Garden world so the next `/garden` builds a fresh one — the contest reset.

@@ -21,14 +21,24 @@ import java.util.UUID;
  */
 public final class MilestoneService {
 
+    /** Told about every tier reached — this is how milestones pay Garden XP. */
+    public interface TierListener {
+        void reached(Player player, MilestoneCrop crop, int tier);
+    }
+
     private final MilestoneConfig config;
     private final MilestoneStore store;
     private final Messages messages;
+    private TierListener tierListener = (player, crop, tier) -> { };
 
     public MilestoneService(MilestoneConfig config, MilestoneStore store, Messages messages) {
         this.config = config;
         this.store = store;
         this.messages = messages;
+    }
+
+    public void onTier(TierListener listener) {
+        this.tierListener = listener == null ? (player, crop, tier) -> { } : listener;
     }
 
     public MilestoneConfig config() {
@@ -91,6 +101,7 @@ public final class MilestoneService {
         for (String line : lines) {
             player.sendMessage(Text.color(Messages.fill(line, withPlayer)));
         }
+        tierListener.reached(player, crop, tier);
     }
 
     /** The placeholders every milestone message and reward can use. */

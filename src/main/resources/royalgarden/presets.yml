@@ -20,6 +20,7 @@
 #    cooldown     : wait before the same plot can be rebuilt again
 #                   (leave out to use presets.players.cooldown in config.yml)
 #    permission   : needed to choose it ("" = anyone)
+#    garden-level : Garden level needed to choose it (levels.yml; 0 = none)
 #    selectable   : false hides it from players (admins can still apply it)
 #
 #  Entries are shown in the order written here.

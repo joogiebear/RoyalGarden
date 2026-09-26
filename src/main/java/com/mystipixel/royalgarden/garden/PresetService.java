@@ -42,12 +42,23 @@ public final class PresetService {
     private final CurrencyService currency;
     private final GardenWorlds worlds;
     private final Map<UUID, Armed> armed = new HashMap<>();
+    private java.util.function.ToIntFunction<UUID> levels;
 
     public PresetService(GardenConfig config, Messages messages, CurrencyService currency, GardenWorlds worlds) {
         this.config = config;
         this.messages = messages;
         this.currency = currency;
         this.worlds = worlds;
+    }
+
+    /** Where presets read Garden levels from, for their {@code garden-level:} gate. */
+    public void setLevels(java.util.function.ToIntFunction<UUID> levels) {
+        this.levels = levels;
+    }
+
+    /** The Garden level a player has, or the highest possible without levels. */
+    public int level(Player player) {
+        return levels == null ? Integer.MAX_VALUE : levels.applyAsInt(player.getUniqueId());
     }
 
     /** The cooldown that applies to a preset: its own, or the configured default. */
@@ -101,6 +112,11 @@ public final class PresetService {
         }
         if (!entry.permission().isBlank() && !player.hasPermission(entry.permission())) {
             messages.send(player, "presets-no-permission", "%preset%", name);
+            return false;
+        }
+        if (entry.gardenLevel() > 0 && level(player) < entry.gardenLevel()) {
+            messages.send(player, "presets-garden-level", "%preset%", name,
+                    "%required%", String.valueOf(entry.gardenLevel()));
             return false;
         }
         if (worlds.isBuilding(world, px, pz)) {

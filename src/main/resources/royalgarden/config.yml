@@ -53,6 +53,9 @@ unlock:
     # Multiplies the default cost for each plot already bought:
     # 1.0 = flat price; 1.25 = 10000, 12500, 15625, ...
     cost-scaling: 1.25
+    # Garden level needed (levels.yml). 0 = none. Usually set per plot or per count:
+    #   by-count: { 10: { garden-level: 3 } }   by-plot: { A1: { garden-level: 10 } }
+    garden-level: 0
     # Checked with PlaceholderAPI. All must pass. Leave empty for none.
     #   - placeholder: "%ecoskills_farming%"
     #     min: 10
@@ -232,11 +235,16 @@ menu:
         - "&7and the tiers it has earned."
         - ""
         - "&eClick to view."
-    # %unlocked% %total% %limit% %size%
+    # %unlocked% %total% %limit% %size% and the Garden level ones from levels.yml:
+    # %level% %level_roman% %max_level% %xp% %next% %remaining% %percent% %bar%
     summary:
       material: wheat
       name: "&aYour Garden"
       lore:
+        - "&fGarden Level &a%level%&7/%max_level%"
+        - "%bar% &7%percent%%"
+        - "&7%xp% XP &8· &7next at %next%"
+        - ""
         - "&7%unlocked% of %total% plots unlocked"
         - "&7Each plot is %size%×%size%"
         - ""
