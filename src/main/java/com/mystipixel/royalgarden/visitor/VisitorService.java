@@ -3,7 +3,6 @@ package com.mystipixel.royalgarden.visitor;
 import com.mystipixel.royalgarden.config.Durations;
 import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalskyblock.util.Text;
-import com.willfp.eco.core.items.EmptyTestableItem;
 import com.willfp.eco.core.items.Items;
 import com.willfp.eco.core.items.TestableItem;
 import net.kyori.adventure.text.Component;
@@ -451,10 +450,17 @@ public final class VisitorService implements Listener {
 
     // ── items ──────────────────────────────────────────────────────────────────
 
-    /** An eco item lookup ({@code wheat}, {@code ecoitems:enchanted_wheat}), or null if there is none. */
+    /**
+     * An eco item lookup ({@code wheat}, {@code ecoitems:enchanted_wheat}), or null if there is none. A
+     * lookup that matches nothing comes back as an empty item that is air.
+     */
     public static TestableItem lookup(String id) {
         TestableItem item = Items.lookup(id);
-        return item == null || item instanceof EmptyTestableItem ? null : item;
+        if (item == null) {
+            return null;
+        }
+        ItemStack stack = item.getItem();
+        return stack == null || stack.getType().isAir() ? null : item;
     }
 
     /** How many matching items the inventory holds. */
