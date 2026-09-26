@@ -28,6 +28,11 @@ import com.mystipixel.royalgarden.milestone.MilestoneMenu;
 import com.mystipixel.royalgarden.milestone.MilestoneService;
 import com.mystipixel.royalgarden.milestone.MilestoneStore;
 import com.mystipixel.royalgarden.milestone.PlacedBlocks;
+import com.mystipixel.royalgarden.pest.PestConfig;
+import com.mystipixel.royalgarden.pest.PestHolders;
+import com.mystipixel.royalgarden.pest.PestMenu;
+import com.mystipixel.royalgarden.pest.PestService;
+import com.mystipixel.royalgarden.pest.PestStore;
 import com.mystipixel.royalgarden.upgrade.UpgradeConfig;
 import com.mystipixel.royalgarden.upgrade.UpgradeHolders;
 import com.mystipixel.royalgarden.upgrade.UpgradeMenu;
@@ -74,7 +79,7 @@ import java.util.function.Supplier;
  * <p>Everything tunable lives in {@code plugins/RoyalSkyblock/extensions/RoyalGarden/}:
  * {@code config.yml} (the board, costs, rewards, rules, menus), {@code messages.yml},
  * {@code presets.yml}, {@code milestones.yml}, {@code levels.yml}, {@code visitors.yml},
- * {@code upgrades.yml} and {@code composter.yml}. The host's
+ * {@code upgrades.yml}, {@code composter.yml} and {@code pests.yml}. The host's
  * reload reloads them too.
  */
 public final class RoyalGardenExtension extends Extension {
@@ -113,6 +118,10 @@ public final class RoyalGardenExtension extends Extension {
     private ComposterService composter;
     private ComposterBlock composterBlock;
     private BukkitTask composterTicker;
+    private PestConfig pestConfig;
+    private PestService pests;
+    private PestHolders pestHolders;
+    private BukkitTask pestConfiner;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -198,8 +207,12 @@ public final class RoyalGardenExtension extends Extension {
         UpgradeHolders.refreshAll();
         scheduleComposter();
         composterBlock.ensureAll();
+        pestConfig.reload();
+        pestHolders.compile();                         // after milestones.yml: %blocks% and %drops% come from there
+        PestHolders.refreshAll();
+        schedulePests();
         getLogger().info("Reloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, "
-                + "visitors.yml, upgrades.yml and composter.yml.");
+                + "visitors.yml, upgrades.yml, composter.yml and pests.yml.");
     }
 
     /**
@@ -356,15 +369,38 @@ public final class RoyalGardenExtension extends Extension {
         composterBlock.ensureAll();
         scheduleComposter();
 
+        // Pests: EcoMobs mobs brought onto plots by farming, held to their plot, paying Copper and Garden XP
+        // when killed. An infested plot's slowdown is libreforge effects, like crop upgrades.
+        this.pestConfig = new PestConfig(data, getLogger());
+        this.pests = new PestService(getPlugin(), pestConfig, new PestStore(data, getLogger()), messages, gardens,
+                getLogger());
+        VisitorService copperPayer = visitors;
+        pests.setPayment(levels::level, (player, amount) -> levels.give(player, amount, "level-source-pest"),
+                copperPayer::payCopper, visitorConfig::copperCurrency);
+        pests.setCrops(milestoneConfig::crop);
+        pests.onChange(PestHolders::refreshGarden);
+        milestoneListener.onHarvest(pests::harvested);
+        PestMenu pestMenu = new PestMenu(pests, gardens, messages, menu::open);
+        menu.setPests(pestMenu::open);
+        Bukkit.getPluginManager().registerEvents(pests, getPlugin());
+        this.pestHolders = new PestHolders(getPlugin(), pests, milestoneConfig);
+        Bukkit.getPluginManager().registerEvents(pestHolders, getPlugin());
+        pestHolders.register();
+        schedulePests();
+
         VisitorPlaceholders visitorPlaceholders = new VisitorPlaceholders(visitors);
         UpgradeService upgradeLookup = upgrades;
         ComposterService composterLookup = composter;
+        PestService pestLookup = pests;
         registerExpansion((player, key) -> {
             String value = visitorPlaceholders.resolve(player, key);
             if (value == null) {
                 value = upgradeLookup.resolve(player, key);
             }
-            return value != null ? value : composterLookup.resolve(player, key);
+            if (value == null) {
+                value = composterLookup.resolve(player, key);
+            }
+            return value != null ? value : pestLookup.resolve(player, key);
         });
 
         CommandGarden garden = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
@@ -374,6 +410,7 @@ public final class RoyalGardenExtension extends Extension {
         garden.setVisitors(visitors, visitorMenu);
         garden.setUpgrades(upgrades, upgradeMenu);
         garden.setComposter(composter, composterMenu);
+        garden.setPests(pests, pestMenu);
         this.gardenCommand = garden;
         this.deskCommand = new CommandDesk(getPlugin(), config.commandName("desk", "desk"), menu);
         gardenCommand.register();
@@ -400,6 +437,15 @@ public final class RoyalGardenExtension extends Extension {
         }
         long period = composterConfig.checkTicks();
         composterTicker = Bukkit.getScheduler().runTaskTimer(getPlugin(), composter::tickAll, period, period);
+    }
+
+    /** Hold pests to their plots every {@code confine.check-every-seconds}. */
+    private void schedulePests() {
+        if (pestConfiner != null) {
+            pestConfiner.cancel();
+        }
+        long period = pestConfig.confineTicks();
+        pestConfiner = Bukkit.getScheduler().runTaskTimer(getPlugin(), pests::confineAll, period, period);
     }
 
     /**
@@ -547,6 +593,20 @@ public final class RoyalGardenExtension extends Extension {
         if (composterBlock != null) {
             HandlerList.unregisterAll(composterBlock);
             composterBlock = null;
+        }
+        if (pestConfiner != null) {
+            pestConfiner.cancel();
+            pestConfiner = null;
+        }
+        if (pestHolders != null) {
+            pestHolders.disable();
+            HandlerList.unregisterAll(pestHolders);
+            pestHolders = null;
+        }
+        if (pests != null) {
+            pests.store().saveAll();
+            HandlerList.unregisterAll(pests);
+            pests = null;
         }
         if (expansion != null) {
             // persist() keeps it across PlaceholderAPI reloads, so it must be removed by hand here or an

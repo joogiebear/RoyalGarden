@@ -164,6 +164,23 @@ composter-upgrade-maxed-message: "&7%upgrade_name% is fully upgraded."
 composter-upgrade-maxed: "&6Maxed"
 level-source-composter: "Composter"
 
+# ── Pests ────────────────────────────────────────────────────────────────────
+# Placeholders: %pest% %pest_name% %plot% %pests% %kills% %pest_kills% %alive%
+#               %currency% %player%
+pest-spawned: "&c%pest_name% &7appeared on plot &f%plot%&7! &8(%pests% there)"
+# also %copper% %xp%
+pest-killed: "&aKilled a %pest_name%&a: &c+%copper% Copper&a, &a+%xp% Garden XP."
+pest-status-infested: "&cInfested — farming here is slowed."
+pest-status-below: "&7Not infested yet."
+# %plot%
+pest-located: "&aYou are on plot %plot%. Find the pests!"
+pest-locate-not-in-garden: "&cGo to your Garden first to reach plot %plot%."
+# %plot% %x% %y% %z%
+pest-locate: "&7A pest on plot &f%plot% &7was last seen near &f%x%, %y%, %z%&7."
+pests-disabled: "&cPests are switched off."
+pests-unreadable: "&cThat player's pests could not be read. Nothing was changed."
+level-source-pest: "pest"
+
 # ── Protection (shown in the action bar) ─────────────────────────────────────
 # %plot%
 deny-locked: "&cPlot %plot% is locked. Open the desk to unlock it."
@@ -174,7 +191,7 @@ deny-visitor: "&cThis is not your Garden."
 
 # ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. &7/garden composter&8 — &7your Composter. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset"
+admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. &7/garden composter&8 — &7your Composter. &7/garden pests&8 — &7your pests. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset, pests <player> spawn [pest] [plot]|clear|stats|reset-stats"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -198,7 +215,7 @@ admin-presets-header: "&aPresets:"
 admin-presets-line: "&f  %preset%%flags%"
 admin-presets-default: " &e(default)"
 admin-presets-selectable: " &b(players)"
-admin-reloaded: "&aReloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, visitors.yml, upgrades.yml and composter.yml."
+admin-reloaded: "&aReloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, visitors.yml, upgrades.yml, composter.yml and pests.yml."
 # %player%
 admin-unknown-player: "&cNo player called %player% has played here."
 admin-no-garden: "&c%player% has no Garden yet."
@@ -239,4 +256,21 @@ admin-composter-given: "&a%player%'s Composter now holds %matter%/%matter_cap% o
 admin-composter-collected: "&aCollected %player%'s Composter into their inventory."
 admin-composter-offline: "&c%player% must be online to collect into their inventory."
 admin-composter-reset: "&aEmptied %player%'s Composter and reset its upgrades."
-console-help: "&7From the console: garden xp|level|milestone|visitor|upgrade|composter|reset|unlock|lock|info|reload …"
+admin-pests-usage: "&c/garden pests <player> spawn [pest|random] [plot] | clear | stats | reset-stats"
+# %pest%
+admin-pests-no-such-pest: "&cThere is no pest '%pest%' in pests.yml."
+# %player% %plot% (blank for a random plot)
+admin-pests-spawn-spawned: "&aBrought a pest onto %player%'s Garden."
+admin-pests-spawn-bad-plot: "&cPests cannot go on plot %plot% of %player%'s Garden — it is locked, or the farmhouse."
+admin-pests-spawn-no-room: "&c%player%'s Garden has no room for another pest there (see max-per-plot and max-per-garden)."
+admin-pests-spawn-no-spot: "&cNo loaded spot with room to stand was found. Stand near that plot and try again."
+admin-pests-spawn-no-pest: "&cNo pest in pests.yml can appear at %player%'s Garden level."
+admin-pests-spawn-not-loaded: "&c%player%'s Garden is not loaded."
+admin-pests-spawn-failed: "&cThe pest's command spawned nothing — see the console."
+admin-pests-spawn-unreadable: "&c%player%'s pests could not be read. Nothing was changed."
+# %player% %amount%
+admin-pests-cleared: "&aRemoved %amount% pest(s) from %player%'s Garden."
+# %player% %alive% %infested% %killed% %max_per_garden%
+admin-pests-stats: "&a%player%&7: %alive%/%max_per_garden% pests alive, %infested% plot(s) infested, %killed% killed."
+admin-pests-reset: "&aReset %player%'s pest kills."
+console-help: "&7From the console: garden xp|level|milestone|visitor|upgrade|composter|pests|reset|unlock|lock|info|reload …"

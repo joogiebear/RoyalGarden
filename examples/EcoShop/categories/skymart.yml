@@ -85,3 +85,12 @@ items:
       type: copper
       display: "&c%value% Copper"
       limit: 1
+
+  # Needs examples/EcoItems/items/vacuum.yml.
+  - id: pest_vacuum
+    item: ecoitems:vacuum
+    gui: { column: 2, row: 3, page: 1 }
+    buy:
+      value: 50
+      type: copper
+      display: "&c%value% Copper"

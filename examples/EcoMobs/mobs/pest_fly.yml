@@ -1,0 +1,84 @@
+# Fly — a RoyalGarden pest, as an EcoMobs mob. Copy to plugins/EcoMobs/mobs/pest_fly.yml.
+# RoyalGarden spawns it with `ecomobs spawn pest_fly …` (pests.yml, pests.fly.command),
+# finds it by this id (`mob: pest_fly`), keeps it on its plot and pays for it.
+#
+# It drops nothing and its kill effects are empty on purpose: RoyalGarden pays
+# the Copper, Garden XP and rewards in pests.yml. Pay here instead and set those
+# to 0 there, so nothing is paid twice.
+mob: bat health:4 silent
+
+category: garden_pests
+
+display-name: "&eFly &7| &c%health%♥"
+
+integrations:
+  levelled-mobs:
+    can-level: false
+
+custom-ai:
+  clear: false
+  target-goals: [ ]
+  entity-goals: [ ]
+
+effects:
+  permanent-effects: [ ]
+  spawn:
+    - id: spawn_particle
+      args:
+        particle: cloud
+        amount: 8
+  despawn: [ ]
+  interact: [ ]
+  melee-attack: [ ]
+  ranged-attack: [ ]
+  any-attack: [ ]
+  take-damage: [ ]
+  damage-player: [ ]
+  kill-player: [ ]
+  death:
+    - id: spawn_particle
+      args:
+        particle: poof
+        amount: 10
+  kill: [ ]
+
+# Pests stay until they are killed or cleared.
+lifespan: -1
+
+defence:
+  can-mount: false
+  damage-modifiers:
+    hot_floor: 1
+    fire_tick: 1
+    lava: 1
+    suffocation: 0
+    drowning: 1
+    entity_explosion: 1
+    block_explosion: 1
+
+drops:
+  experience: 0
+  items: [ ]
+
+boss-bar:
+  enabled: false
+  color: white
+  style: progress
+  radius: 32
+
+spawn:
+  totem:
+    enabled: false
+    top: netherite_block
+    middle: iron_block
+    bottom: magma_block
+    conditions: [ ]
+  egg:
+    enabled: false
+    conditions: [ ]
+    item: bat_spawn_egg
+    name: "&eFly&f Spawn Egg"
+    lore: [ ]
+    craftable: false
+    shapeless: false
+    recipe: [ ]

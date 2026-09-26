@@ -150,6 +150,7 @@ reloaded with `/garden reload` (or RoyalSkyblock's own reload):
 | `milestones.yml` | Crop Milestones: crops, tier curves, rewards, the milestones menu |
 | `upgrades.yml` | Crop Upgrades: level costs, the libreforge effects each level grants, rewards, the menu |
 | `composter.yml` | the Composter: organic matter and fuel values, Compost timing and caps, output, upgrades, rewards, the barn block, the menu |
+| `pests.yml` | Pests: spawn chance, cooldown and caps, the libreforge effects of an infested plot, each pest and its EcoMobs spawn command, kill rewards, the menus |
 | `visitors.yml` | Visitors: arrival timing, rarities, visitors and their requests, rewards, Copper, SkyMart, where they stand, the menus |
 | `messages.yml` | every player-facing line (`&` codes, `&#rrggbb` hex; `""` switches a message off) |
 | `presets.yml` | which captured presets players may choose, with name, icon, cost, cooldown and permission; and the default preset new Gardens generate from |
@@ -318,6 +319,53 @@ Composter is actually caught up. Admins: `/garden composter <player> give-matter
 `collect` (into their inventory, so they must be online) and `reset` (empties it and forgets its
 upgrades; the file is moved aside). The console can run it too.
 
+### Pests
+
+`pests.yml` brings **pests** onto plots while players farm, like Hypixel's. A harvest that counts toward
+Crop Milestones, by the Garden's owner in their own Garden, rolls `spawning.chance` percent
+(`spawning.crop-chance.<crop>` per crop) once the Garden is off its `spawning.cooldown`. A hit lands on
+the plot being farmed — or, `other-plot-chance` percent of the time or when that plot is full, on another
+unlocked plot — within `max-per-plot` and `max-per-garden`, never on the farmhouse unless `farmhouse` is
+on. The kind of pest is picked by `weight` from those the Garden's level allows.
+
+The pests are **EcoMobs mobs**. Each entry's `command` is run from the console at a random spot on the
+plot — `ecomobs spawn <mob> %x% %y% %z% %world%` by default, EcoMobs' own syntax — and the entity it
+spawned (matched by its EcoMobs id, `mob`) is tagged in its persistent data with its kind, plot and
+spawn time. `examples/EcoMobs/` has a `garden_pests` category (no natural spawning, persistent) and four
+pests: `pest_fly`, `pest_mite`, `pest_beetle` and `pest_rat`. EcoMobs spawns with the `CUSTOM` reason,
+which `world.allowed-spawn-reasons` keeps, and its tag spares them from the vanilla-mob sweep.
+
+Pests never leave their plot: every `confine.check-every-seconds`, one found outside it is put back where
+it appeared. The Garden keeps its own record of its pests in `pests/<uuid>.yml`, so counts hold while a
+plot's chunks, or the whole Garden, are unloaded. As a chunk's entities load, a pest with no record is
+taken back in if there is room and removed if not (or if it predates a clear, or its plot is locked),
+and a known one is removed if the caps were lowered below what its plot holds.
+
+**Infested plots** are libreforge, not RoyalGarden's own maths. A plot with at least `infested-at` pests
+is infested, and while the Garden's owner (or anyone, with `infested-applies-to: everyone`) stands on it
+they hold the effects under `infested-effects:`, filled with `%pests%`, `%plot%`, `%crop%` (the crop being
+farmed when its newest pest came) and the list variables `%blocks%` and `%drops%`. The default is a
+`%pests% × 5`% chance that a crop broken there drops nothing; `pests.yml` shows lowering EcoSkills'
+`farming_fortune` stat with `add_stat` instead. Effects are refreshed when a player crosses a plot edge
+or teleports within a Garden, and for everyone in a Garden when its pests change.
+
+**Killing** a pest pays its killer — only the Garden's owner, with `kills.owner-only` — the pest's
+`copper` (through `visitors.yml` `copper.give-command`), its `garden-xp`, then every stacked reward:
+`rewards.every-kill`, `rewards.by-type.<pest>`, `rewards.by-kills.<n>` (the n-th kill) and the pest's own
+`rewards`. The example mobs drop nothing so nothing is paid twice; to pay through EcoMobs instead, set
+`copper` and `garden-xp` to 0. `examples/EcoItems/items/vacuum.yml` is a vacuum — right-click pulls in
+the pests around you and hits them as you — and SkyMart sells it for Copper.
+
+The **Pests** button on the desk and `/garden pests` show the board with each plot's pests; clicking a
+plot with pests takes you there (`menu.locate-teleport`). The **Pest Log** (`/garden pests log`) lists
+every kind of pest and how many you have killed. `/garden reset` clears a Garden's pests.
+
+Placeholders: `%royalgarden_pests_alive%`, `_infested` (plots), `_killed`,
+`%royalgarden_pests_<pest>_killed%` and `%royalgarden_pests_plot_<plot>%` (pests on that plot of the
+player's Garden). Admins: `/garden pests <player> spawn [pest|random] [plot]` (off the cooldown and chance
+but within the caps; the Garden must be loaded), `clear`, `stats` and `reset-stats`. The console can run
+it too.
+
 ### Permissions
 
 | Node | Default | |
@@ -336,7 +384,8 @@ upgrades; the file is moved aside). The console can run it too.
 `visit <player>` · `info <player>` · `milestones <player>` · `milestone <player> <crop> <amount>|reset` ·
 `level <player>` · `xp <player> give|take|set <amount>` ·
 `visitor <player> add [visitor]|clear|stats|reset-stats` · `upgrade <player> <crop> <level>|reset` ·
-`composter <player> give-matter|give-fuel <amount>|collect|reset`
+`composter <player> give-matter|give-fuel <amount>|collect|reset` ·
+`pests <player> spawn [pest] [plot]|clear|stats|reset-stats`
 
 `reset` forgets a player's unlocks and presets (the state file is moved aside, not deleted); with
 `world` it also deletes their Garden world so the next `/garden` builds a fresh one — the contest reset.

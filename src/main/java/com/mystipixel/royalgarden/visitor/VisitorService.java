@@ -398,7 +398,8 @@ public final class VisitorService implements Listener {
         return true;
     }
 
-    private void payCopper(Player player, long amount) {
+    /** Pay Copper through {@code copper.give-command} — visitors, and anything else that pays Copper. */
+    public void payCopper(Player player, long amount) {
         if (!config.copperEnabled() || amount <= 0) {
             return;
         }

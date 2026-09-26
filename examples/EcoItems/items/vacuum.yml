@@ -1,0 +1,56 @@
+# The Vacuum — an EcoItems item for clearing RoyalGarden pests.
+# Copy to plugins/EcoItems/items/vacuum.yml. Needs the pest mobs from
+# examples/EcoMobs/ (the whitelist and filters name them by EcoMobs id).
+#
+# Right-click: a vortex that pulls in the pests around you, then hits them.
+# `use_source: true` makes you the killer, which is what RoyalGarden pays for.
+# Hitting a pest with it does triple damage.
+#
+# RoyalGarden only needs pests to be killable — anything that kills them pays.
+# SkyMart sells this for Copper: examples/EcoShop/categories/skymart.yml.
+
+item:
+  item: iron_hoe hide_attributes
+  name: "&bPest Vacuum"
+  lore:
+    - "&7Sucks up the pests"
+    - "&7infesting your plots."
+    - ""
+    - "&eRight-click &7to pull in pests within"
+    - "&78 blocks, then hit them all."
+    - "&eHit a pest &7for triple damage."
+
+slot: mainhand
+
+rarity: uncommon
+
+effects:
+  - id: vortex
+    args:
+      radius: 8
+      duration: 30
+      damage: 4
+      pull_strength: 0.35
+      use_source: true
+      whitelist:
+        - ecomobs:pest_fly
+        - ecomobs:pest_mite
+        - ecomobs:pest_beetle
+        - ecomobs:pest_rat
+      cooldown: 3
+      send_cooldown_message: false
+    triggers:
+      - alt_click
+  - id: damage_multiplier
+    args:
+      multiplier: 3
+    triggers:
+      - melee_attack
+    filters:
+      entities:
+        - ecomobs:pest_fly
+        - ecomobs:pest_mite
+        - ecomobs:pest_beetle
+        - ecomobs:pest_rat
+
+conditions: []

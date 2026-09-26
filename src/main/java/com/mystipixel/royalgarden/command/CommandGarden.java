@@ -12,6 +12,10 @@ import com.mystipixel.royalgarden.level.GardenLevels;
 import com.mystipixel.royalgarden.milestone.MilestoneCrop;
 import com.mystipixel.royalgarden.milestone.MilestoneMenu;
 import com.mystipixel.royalgarden.milestone.MilestoneService;
+import com.mystipixel.royalgarden.pest.PestMenu;
+import com.mystipixel.royalgarden.pest.PestService;
+import com.mystipixel.royalgarden.pest.PestStore;
+import com.mystipixel.royalgarden.pest.PestType;
 import com.mystipixel.royalgarden.upgrade.UpgradeMenu;
 import com.mystipixel.royalgarden.upgrade.UpgradeService;
 import com.mystipixel.royalgarden.visitor.Offer;
@@ -64,7 +68,7 @@ public final class CommandGarden extends PluginCommand {
 
     private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
             "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info", "milestones", "milestone",
-            "xp", "level", "visitors", "visitor", "upgrades", "upgrade", "composter");
+            "xp", "level", "visitors", "visitor", "upgrades", "upgrade", "composter", "pests");
 
     private final GardenWorlds worlds;
     private final Messages messages;
@@ -79,6 +83,8 @@ public final class CommandGarden extends PluginCommand {
     private UpgradeMenu upgradeMenu;
     private ComposterService composter;
     private ComposterMenu composterMenu;
+    private PestService pests;
+    private PestMenu pestMenu;
 
     public CommandGarden(EcoPlugin plugin, String name, GardenWorlds worlds, Messages messages,
                          Runnable reload, Supplier<Location> evacuateTo) {
@@ -119,6 +125,12 @@ public final class CommandGarden extends PluginCommand {
         this.composterMenu = menu;
     }
 
+    /** Give the command its Pests subcommands. */
+    public void setPests(PestService service, PestMenu menu) {
+        this.pests = service;
+        this.pestMenu = menu;
+    }
+
     /**
      * The console's way in. Players are handled by {@link #onExecute(Player, List)}; from the console
      * only the admin tools that need no player to stand anywhere are available — the ones other plugins
@@ -138,6 +150,7 @@ public final class CommandGarden extends PluginCommand {
             case "visitor" -> visitor(sender, args);
             case "upgrade" -> upgrade(sender, args);
             case "composter" -> composter(sender, args);
+            case "pests" -> pests(sender, args);
             case "reset" -> reset(sender, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
             case "unlock", "lock" -> setLock(sender, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
             case "info" -> info(sender, arg);
@@ -176,6 +189,16 @@ public final class CommandGarden extends PluginCommand {
             composterMenu.open(player);
             return;
         }
+        // Their own pests (and the Pest Log); with a name it is the admin tool.
+        if (args.get(0).equalsIgnoreCase("pests") && pestMenu != null && (args.size() == 1
+                || (args.size() == 2 && args.get(1).equalsIgnoreCase("log")) || !player.hasPermission(ADMIN))) {
+            if (args.size() > 1 && args.get(1).equalsIgnoreCase("log")) {
+                pestMenu.openLog(player);
+            } else {
+                pestMenu.open(player);
+            }
+            return;
+        }
         if (args.get(0).equalsIgnoreCase("visitors") && visitorMenu != null) {
             if (args.size() > 1 && args.get(1).equalsIgnoreCase("log")) {
                 visitorMenu.openLog(player, 1);
@@ -190,14 +213,14 @@ public final class CommandGarden extends PluginCommand {
     @Override
     public List<String> tabComplete(Player player, List<String> args) {
         if (!player.hasPermission(ADMIN)) {
-            if (args.size() == 2 && args.get(0).equalsIgnoreCase("visitors")) {
+            if (args.size() == 2 && (args.get(0).equalsIgnoreCase("visitors") || args.get(0).equalsIgnoreCase("pests"))) {
                 return "log".startsWith(args.get(1).toLowerCase(Locale.ROOT)) ? List.of("log") : List.of();
             }
             if (args.size() > 1) {
                 return List.of();
             }
             String typed = args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT);
-            List<String> own = new ArrayList<>(List.of("milestones", "level", "visitors", "upgrades", "composter"));
+            List<String> own = new ArrayList<>(List.of("milestones", "level", "visitors", "upgrades", "composter", "pests"));
             own.removeIf(option -> !option.startsWith(typed));
             return own;
         }
@@ -216,7 +239,7 @@ public final class CommandGarden extends PluginCommand {
                         }
                     }
                     case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone", "xp", "level",
-                         "visitor", "upgrade", "composter" -> {
+                         "visitor", "upgrade", "composter", "pests" -> {
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             options.add(online.getName());
                         }
@@ -228,6 +251,17 @@ public final class CommandGarden extends PluginCommand {
                     && visitors != null) {
                 for (VisitorType type : visitors.config().visitors()) {
                     options.add(type.id());
+                }
+            } else if (args.size() == 4 && verb.equals("pests") && args.get(2).equalsIgnoreCase("spawn")
+                    && pests != null) {
+                for (PestType type : pests.config().pests()) {
+                    options.add(type.id());
+                }
+            } else if (args.size() == 5 && verb.equals("pests") && args.get(2).equalsIgnoreCase("spawn")) {
+                for (int pz = 0; pz < GardenLayout.grid(); pz++) {
+                    for (int px = 0; px < GardenLayout.grid(); px++) {
+                        options.add(GardenLayout.plotName(px, pz));
+                    }
                 }
             } else if (args.size() == 3) {
                 if (verb.equals("unlock") || verb.equals("lock")) {
@@ -244,6 +278,8 @@ public final class CommandGarden extends PluginCommand {
                     options.addAll(List.of("add", "clear", "stats", "reset-stats"));
                 } else if (verb.equals("composter")) {
                     options.addAll(List.of("give-matter", "give-fuel", "collect", "reset"));
+                } else if (verb.equals("pests")) {
+                    options.addAll(List.of("spawn", "clear", "stats", "reset-stats"));
                 } else if (verb.equals("upgrade") && upgrades != null) {
                     for (MilestoneCrop crop : upgrades.crops()) {
                         options.add(crop.id());
@@ -316,6 +352,7 @@ public final class CommandGarden extends PluginCommand {
             case "visitor" -> visitor(player, args);
             case "upgrade" -> upgrade(player, args);
             case "composter" -> composter(player, args);
+            case "pests" -> pests(player, args);
             default -> messages.send(player, "admin-help");
         }
     }
@@ -427,6 +464,12 @@ public final class CommandGarden extends PluginCommand {
         String who = target.getName() == null ? name : target.getName();
         if (visitors != null) {
             visitors.clear(target.getUniqueId());       // a reset Garden has nobody waiting at it
+        }
+        if (pests != null) {
+            pests.clear(target.getUniqueId());          // nor any pests
+            if (!target.isOnline()) {
+                pests.store().unload(target.getUniqueId());
+            }
         }
         worlds.reset(target.getUniqueId(), wipeWorld, evacuateTo.get()).whenComplete((ignored, error) -> {
             if (error != null) {
@@ -713,6 +756,67 @@ public final class CommandGarden extends PluginCommand {
         }
         if (!target.isOnline()) {
             composter.store().unload(owner);             // looked up for this command only
+        }
+    }
+
+    /**
+     * {@code /garden pests <player> spawn [pest] [plot]} brings a pest onto their Garden now, off the
+     * cooldown and chance but within the caps (the Garden must be loaded); {@code clear} removes every pest
+     * from it; {@code stats} shows the counts and {@code reset-stats} zeroes the kills. None of them pays.
+     */
+    private void pests(CommandSender sender, List<String> args) {
+        if (pests == null || args.size() < 3) {
+            messages.send(sender, "admin-pests-usage");
+            return;
+        }
+        OfflinePlayer target = target(sender, args.get(1));
+        if (target == null) {
+            return;
+        }
+        UUID owner = target.getUniqueId();
+        String who = target.getName() == null ? args.get(1) : target.getName();
+        switch (args.get(2).toLowerCase(Locale.ROOT)) {
+            case "spawn" -> {
+                PestType type = null;
+                if (args.size() > 3 && !args.get(3).equalsIgnoreCase("random")) {
+                    type = pests.config().pest(args.get(3));
+                    if (type == null) {
+                        messages.send(sender, "admin-pests-no-such-pest", "%pest%", args.get(3));
+                        return;
+                    }
+                }
+                int plot = -1;
+                if (args.size() > 4) {
+                    int[] parsed = GardenLayout.parsePlot(args.get(4));
+                    if (parsed == null) {
+                        messages.send(sender, "admin-bad-plot", "%plot%", args.get(4));
+                        return;
+                    }
+                    plot = PestStore.pack(parsed[0], parsed[1]);
+                }
+                World world = Bukkit.getWorld(GardenWorlds.worldName(owner));
+                PestService.Outcome outcome = world == null ? PestService.Outcome.NOT_LOADED
+                        : pests.spawn(world, type, plot, null, java.util.concurrent.ThreadLocalRandom.current());
+                messages.send(sender, "admin-pests-spawn-" + outcome.name().toLowerCase(Locale.ROOT).replace('_', '-'),
+                        "%player%", who, "%plot%", plot < 0 ? "" : PestStore.plotName(plot));
+            }
+            case "clear" -> {
+                int removed = pests.clear(owner);
+                messages.send(sender, removed < 0 ? "pests-unreadable" : "admin-pests-cleared",
+                        "%player%", who, "%amount%", String.valueOf(Math.max(0, removed)));
+            }
+            case "stats" -> messages.send(sender, "admin-pests-stats", withPlayer(pests.statPlaceholders(owner), who));
+            case "reset-stats" -> {
+                if (!pests.store().readOnly(owner)) {
+                    pests.store().get(owner).resetStats();
+                    pests.store().save(owner);
+                }
+                messages.send(sender, "admin-pests-reset", "%player%", who);
+            }
+            default -> messages.send(sender, "admin-pests-usage");
+        }
+        if (!target.isOnline()) {
+            pests.store().unload(owner);                 // looked up for this command only
         }
     }
 
