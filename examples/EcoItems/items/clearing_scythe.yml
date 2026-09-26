@@ -1,0 +1,69 @@
+# The Clearing Scythe - an EcoItems item for clearing overgrown RoyalGarden plots.
+# Copy to plugins/EcoItems/items/clearing_scythe.yml.
+#
+# Mows undergrowth and bushes in a flat 7x7 sweep facing you. The whitelist
+# matches clearing.undergrowth.blocks and clearing.bushes.blocks in RoyalGarden's
+# config.yml - keep them in step if you change those. The ground itself is never
+# taken: a plot being cleared only lets debris be broken. Sneak to break one block.
+# No recipe: hand it out with /ecoitems give <player> clearing_scythe.
+item:
+  item: netherite_hoe glint
+  name: "<g:#E8D36A>Clearing Scythe</g:#B8860B>"
+  components:
+    tool:
+      default_mining_speed: 1.0
+      damage_per_block: 0
+      rules:
+        - blocks: "#minecraft:leaves"
+          speed: 40.0
+          correct_for_drops: true
+        - blocks: "#minecraft:replaceable"
+          speed: 40.0
+          correct_for_drops: true
+  lore:
+    - "&7For clearing an overgrown Garden plot."
+    - ""
+    - "<g:#E8D36A>WIDE SWEEP</g:#B8860B>"
+    - "&8» &eMows grass, flowers and bushes"
+    - "&8» &ein a 7x7 sweep around the block you hit"
+    - "&8» &eDrops go straight to your inventory"
+    - "&8» &eSneak to break a single block"
+
+slot: mainhand
+rarity: legendary
+
+effects:
+  - id: mine_radius
+    args:
+      radius: 3
+      depth: 1                        # a flat sweep facing the player, not a 7x7x7 cube
+      prevent_trigger: keep_events    # Bukkit break events still fire, so each plant counts towards clearing
+      disable_on_sneak: true
+      check_hardness: false
+      whitelist:
+        - short_grass
+        - fern
+        - dandelion
+        - poppy
+        - cornflower
+        - oak_leaves
+        - azalea_leaves
+        - flowering_azalea_leaves
+    triggers:
+      - mine_block
+    filters:
+      blocks:
+        - short_grass
+        - fern
+        - dandelion
+        - poppy
+        - cornflower
+        - oak_leaves
+        - azalea_leaves
+        - flowering_azalea_leaves
+  - id: telekinesis
+  - id: movement_speed_multiplier
+    args:
+      multiplier: 1.3
+
+conditions: []

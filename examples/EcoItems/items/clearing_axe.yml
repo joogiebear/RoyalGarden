@@ -1,0 +1,88 @@
+# The Clearing Axe - an EcoItems item for clearing overgrown RoyalGarden plots.
+# Copy to plugins/EcoItems/items/clearing_axe.yml.
+#
+# Chop one log and the whole tree falls; break one leaf and the whole crown or
+# bush goes. Sneak to break a single block. Every block it takes still fires a
+# normal break event (prevent_trigger: keep_events), so each one counts towards
+# the plot's clearing % - and the plot's protection still decides what may go.
+# No recipe: hand it out with /ecoitems give <player> clearing_axe.
+item:
+  item: netherite_axe glint
+  name: "<g:#7BD66B>Clearing Axe</g:#2E8B57>"
+  components:
+    tool:
+      default_mining_speed: 1.0
+      damage_per_block: 0
+      rules:
+        - blocks: "#minecraft:logs"
+          speed: 40.0
+          correct_for_drops: true
+        - blocks: "#minecraft:leaves"
+          speed: 40.0
+          correct_for_drops: true
+  lore:
+    - "&7For clearing an overgrown Garden plot."
+    - ""
+    - "<g:#7BD66B>TIMBER</g:#2E8B57>"
+    - "&8» &aChop one log, fell the whole tree"
+    - "&8» &aBreak one leaf, clear the whole crown"
+    - "&8» &aDrops go straight to your inventory"
+    - "&8» &aSneak to break a single block"
+
+slot: mainhand
+rarity: legendary
+
+effects:
+  # Fell the tree: every connected log of the same kind.
+  - id: mine_vein
+    args:
+      limit: 64
+      prevent_trigger: keep_events   # Bukkit break events still fire, so each log counts towards clearing
+      disable_on_sneak: true
+    triggers:
+      - mine_block
+    filters:
+      blocks:
+        - oak_log
+        - birch_log
+        - spruce_log
+        - dark_oak_log
+        - jungle_log
+        - acacia_log
+        - cherry_log
+        - mangrove_log
+  # Clear the crown: every connected leaf of any kind.
+  - id: mine_vein
+    args:
+      limit: 96
+      prevent_trigger: keep_events
+      disable_on_sneak: true
+      blocks:
+        - oak_leaves
+        - birch_leaves
+        - spruce_leaves
+        - dark_oak_leaves
+        - jungle_leaves
+        - acacia_leaves
+        - cherry_leaves
+        - azalea_leaves
+        - flowering_azalea_leaves
+    triggers:
+      - mine_block
+    filters:
+      blocks:
+        - oak_leaves
+        - birch_leaves
+        - spruce_leaves
+        - dark_oak_leaves
+        - jungle_leaves
+        - acacia_leaves
+        - cherry_leaves
+        - azalea_leaves
+        - flowering_azalea_leaves
+  - id: telekinesis
+  - id: mining_speed_multiplier
+    args:
+      multiplier: 1.5
+
+conditions: []

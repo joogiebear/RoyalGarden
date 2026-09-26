@@ -1,0 +1,46 @@
+# A Garden sidebar for TAB (https://github.com/NEZNAMY/TAB), from RoyalGarden's
+# %royalgarden_...% placeholders. Needs PlaceholderAPI.
+#
+# Replace the `scoreboard:` section of plugins/TAB/config.yml with this, then
+# /tab reload. Both boards are Garden-only: outside a Garden there is no sidebar.
+# If you want your own board elsewhere too, add it BELOW these two with its own
+# display-condition - the first board whose condition passes is the one shown.
+#
+# Standing on a plot being cleared it shows "Clearing C4: 12%/90%" and a bar;
+# anywhere else in the Garden, the plot you are on, plots still to clear, and
+# visitors. The clearing line's wording is clearing-status in messages.yml.
+
+scoreboard:
+  enabled: true
+  toggle-command: /sb
+  remember-toggle-choice: false
+  hidden-by-default: false
+  delay-on-join-milliseconds: 0
+  # The first board whose display-condition passes is shown; none passing
+  # means no sidebar. Both below are Garden-only, so outside a Garden there is
+  # no sidebar at all.
+  scoreboards:
+    # Standing on a plot you are still clearing.
+    garden-clearing:
+      title: "&a&lThe Garden"
+      display-condition: "%royalgarden_clearing_status%!="
+      lines:
+        - ""
+        - "%royalgarden_clearing_status%"
+        - "%royalgarden_clearing_bar%"
+        - ""
+        - "&7Plots to clear: &f%royalgarden_clearing_active%"
+        - "&7Visitors waiting: &f%royalgarden_visitors_waiting%"
+        - ""
+    # Anywhere else in a Garden.
+    garden:
+      title: "&a&lThe Garden"
+      display-condition: "%world%|-garden_"
+      lines:
+        - ""
+        - "&7Plot: &f%royalgarden_clearing_plot%"
+        - "&7Plots to clear: &f%royalgarden_clearing_active%"
+        - ""
+        - "&7Visitors waiting: &f%royalgarden_visitors_waiting%"
+        - "&7Next visitor: &f%royalgarden_visitors_next%"
+        - ""

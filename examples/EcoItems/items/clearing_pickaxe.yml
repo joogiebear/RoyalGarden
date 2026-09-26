@@ -1,0 +1,55 @@
+# The Clearing Pickaxe - an EcoItems item for clearing overgrown RoyalGarden plots.
+# Copy to plugins/EcoItems/items/clearing_pickaxe.yml.
+#
+# Break one stone and the whole boulder goes, whatever mix of stones it is made
+# of. The block list matches clearing.boulders.blocks in RoyalGarden's
+# config.yml - keep them in step if you change one. Sneak to break one block.
+# No recipe: hand it out with /ecoitems give <player> clearing_pickaxe.
+item:
+  item: netherite_pickaxe glint
+  name: "<g:#B0B7C3>Clearing Pickaxe</g:#5A6272>"
+  components:
+    tool:
+      default_mining_speed: 1.0
+      damage_per_block: 0
+      rules:
+        - blocks: "#minecraft:mineable/pickaxe"
+          speed: 40.0
+          correct_for_drops: true
+  lore:
+    - "&7For clearing an overgrown Garden plot."
+    - ""
+    - "<g:#B0B7C3>BOULDER BREAKER</g:#5A6272>"
+    - "&8» &7Break one stone, break the whole boulder"
+    - "&8» &7Drops go straight to your inventory"
+    - "&8» &7Sneak to break a single block"
+
+slot: mainhand
+rarity: legendary
+
+effects:
+  # A boulder is a mix of stones, so the vein takes all of them, not just the one hit.
+  - id: mine_vein
+    args:
+      limit: 48
+      prevent_trigger: keep_events   # Bukkit break events still fire, so each stone counts towards clearing
+      disable_on_sneak: true
+      blocks:
+        - stone
+        - cobblestone
+        - andesite
+        - mossy_cobblestone
+    triggers:
+      - mine_block
+    filters:
+      blocks:
+        - stone
+        - cobblestone
+        - andesite
+        - mossy_cobblestone
+  - id: telekinesis
+  - id: mining_speed_multiplier
+    args:
+      multiplier: 1.5
+
+conditions: []

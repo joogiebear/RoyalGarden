@@ -193,6 +193,12 @@ plot, so debris cannot be added from next door and cleared for free.
 
 `/garden clear <player> <plot>` finishes a plot's clearing by hand.
 
+`examples/EcoItems/items/` has three clearing tools — a **Clearing Axe** that fells a whole tree, a
+**Clearing Pickaxe** that breaks a whole boulder, and a **Clearing Scythe** that mows a 7×7 sweep of
+undergrowth. Every block they take fires a normal break event, so it counts towards clearing and stays
+subject to the plot's protection. `examples/TAB/scoreboard.yml` is a Garden sidebar for TAB built from the
+placeholders below.
+
 Placeholders, for tab lists and scoreboards (online players only):
 
 | Placeholder | Value |
