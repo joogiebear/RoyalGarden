@@ -1,3 +1,27 @@
+## 2026.39.1 — 2026-09-26
+
+### ✨ Features
+- pests that spawn while farming, infest plots and pay when killed (`26c287d`)
+- the Composter, turning crops and fuel into Compost over time (`77aadba`)
+- crop upgrades at the desk, granting libreforge effects (`8f81133`)
+- serve visitor placeholders as %royalgarden_...% through a PlaceholderAPI expansion (`9348f4a`)
+- visitor log page and visitor stat placeholders (`c661cc4`)
+- visitors and Copper (`686550c`)
+- garden levels (`1355771`)
+- crop milestones (`467da7d`)
+- configurable costs, rewards and presets; harden protection and saves (`7bdaccb`)
+
+### 🐛 Fixes
+- detect unknown item lookups without eco's internal empty-item class (`731a7d5`)
+- rename a lambda parameter that shadowed a local in the preset picker (`ad4ed22`)
+- use the ISO week-year for release versions (`aa8b15b`)
+
+### ♻️ Refactors
+- use eco's SlotProvider instead of the builder marked for removal (`2ce6f65`)
+
+### 📝 Documentation
+- document config, presets, permissions and admin commands (`79a6f16`)
+
 ## 2026.39.0 — 2026-09-23
 
 ### 📝 Documentation
