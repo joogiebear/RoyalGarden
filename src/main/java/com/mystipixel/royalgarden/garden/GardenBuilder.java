@@ -48,10 +48,15 @@ public final class GardenBuilder {
         return spawn;
     }
 
-    /** Where Sam stands: behind the desk at the back of the barn, facing the doors. */
+    /**
+     * Where Sam stands: behind the desk at the back of the barn, facing over it toward the doors.
+     *
+     * <p>Yaw 0 is +z, the way the doors face. It was 180 once, which stood Sam with his back to the desk
+     * and his face to the wall; he is re-posted on every load, so that corrects itself.
+     */
     public static Location samPost(World world) {
         Location post = new Location(world, 0.5, GardenLayout.groundY() + 1, -BARN_Z + 1.5);
-        post.setYaw(180f);
+        post.setYaw(0f);
         post.setPitch(0f);
         return post;
     }
