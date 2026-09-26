@@ -320,6 +320,7 @@ public final class GardenWorlds {
                         // first prepare does not walk the whole board looking for them.
                         GardenState state = store.get(owner);
                         state.setLegacyWallsCleared(true);
+                        state.setBarnVersion(GardenBuilder.BARN_VERSION);
                         store.save(state);
                     }
                     logger.info("Built Garden '" + name + "' in "
@@ -349,6 +350,14 @@ public final class GardenWorlds {
                 GardenBuilder.clearLegacyWalls(world);
             }
             state.setLegacyWallsCleared(true);
+            store.save(state);
+        }
+
+        if (state != null && !state.readOnly() && state.barnVersion() < GardenBuilder.BARN_VERSION) {
+            GardenBuilder.renovate(world, state.barnVersion());
+            logger.info("Garden '" + world.getName() + "': renovated the barn from version "
+                    + state.barnVersion() + " to " + GardenBuilder.BARN_VERSION + ".");
+            state.setBarnVersion(GardenBuilder.BARN_VERSION);
             store.save(state);
         }
 

@@ -104,6 +104,7 @@ public final class Sam implements Listener {
         }
         // He exists; put him back where he belongs and re-apply anything the config changed.
         kept.teleport(post);
+        kept.setRotation(post.getYaw(), post.getPitch());   // an AI-less mob's head does not follow a teleport
         dress(kept);
     }
 

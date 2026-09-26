@@ -207,7 +207,7 @@ public final class GardenMenu {
             int purchase = state.purchasedCount() + 1;
             if (state.unlockedCount() >= unlocks.limit(player)) {
                 return ItemSpec.build(section(items, "limit-reached"), Material.BARRIER,
-                        "%plot%", plot, "%limit%", String.valueOf(unlocks.limit(player)));
+                        "%plot%", plot, "%limit%", String.valueOf(unlocks.farmableLimit(player)));
             }
             UnlockService.Terms terms = unlocks.terms(px, pz, purchase);
             UnlockService.Requirement unmet = unlocks.unmet(player, terms);
@@ -229,9 +229,11 @@ public final class GardenMenu {
     private ItemStack summary(Player player) {
         GardenState state = worlds.state(player.getUniqueId());
         String[] base = {
-                "%unlocked%", String.valueOf(state.unlockedCount()),
-                "%total%", String.valueOf(GardenLayout.plotCount()),
-                "%limit%", String.valueOf(unlocks.limit(player)),
+                // Farmable plots only: the farmhouse is always there and cannot be farmed, so counting it
+                // made a full board read as 25 of 25 when there are 24 plots to earn.
+                "%unlocked%", String.valueOf(state.purchasedCount()),
+                "%total%", String.valueOf(GardenLayout.farmableCount()),
+                "%limit%", String.valueOf(unlocks.farmableLimit(player)),
                 "%size%", String.valueOf(GardenLayout.plotSize())};
         String[] level = levelPlaceholders.apply(player.getUniqueId());
         String[] all = new String[base.length + level.length];

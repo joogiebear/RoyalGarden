@@ -116,6 +116,7 @@ public final class GardenStore {
             }
         });
         state.setLegacyWallsCleared(yaml.getBoolean("legacy-walls-cleared", false));
+        state.setBarnVersion(yaml.getInt("barn-version", 1));        // none recorded: the original barn
         state.setXp(yaml.getLong("xp", 0));
         return state;
     }
@@ -179,6 +180,7 @@ public final class GardenStore {
             yaml.set(path + ".cleared", entry.getValue()[1]);
         }
         yaml.set("legacy-walls-cleared", state.legacyWallsCleared());
+        yaml.set("barn-version", state.barnVersion());
         yaml.set("xp", state.xp());
         try {
             writeAtomically(fileFor(state.owner()).toPath(), yaml.saveToString());

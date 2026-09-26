@@ -38,6 +38,8 @@ public final class VisitorConfig extends YamlFile {
     private final Map<String, Rarity> rarities = new LinkedHashMap<>();
     private final Map<String, VisitorType> visitors = new LinkedHashMap<>();
     private final List<Spot> spots = new ArrayList<>();
+    private Spot entry;
+    private double walkSpeed;
     private NavigableMap<Integer, Integer> queueByLevel = new TreeMap<>();
 
     public VisitorConfig(File dataFolder, Logger logger) {
@@ -185,6 +187,15 @@ public final class VisitorConfig extends YamlFile {
 
     private void loadSpots() {
         spots.clear();
+        entry = null;
+        walkSpeed = 0;
+        ConfigurationSection line = yaml().getConfigurationSection("line");
+        // No line: section at all means a visitors.yml written before the drive-through existed. This file
+        // has no shipped defaults behind it, so the defaults are here: the line is on unless it is turned off.
+        if (line == null || line.getBoolean("enabled", true)) {
+            loadLine(line);
+            return;
+        }
         for (String raw : yaml().getStringList("spots")) {
             String[] parts = raw.split(",");
             try {
@@ -201,6 +212,64 @@ public final class VisitorConfig extends YamlFile {
                 logger.warning("visitors.yml: spots: '" + raw + "' should be 'x, z, yaw' or 'x, y, z, yaw'.");
             }
         }
+    }
+
+    /**
+     * Spots in single file behind the drive-through window, front first, and the place newcomers walk in
+     * from: as far again behind the last spot as the spacing between two.
+     */
+    private void loadLine(ConfigurationSection line) {
+        String rawFront = line == null ? "6, 6.5, 180" : line.getString("front", "6, 6.5, 180");
+        Spot front = parseSpot(rawFront);
+        if (front == null) {
+            logger.warning("visitors.yml: line.front '" + rawFront + "' should be 'x, z, yaw' or 'x, y, z, yaw'; "
+                    + "using the window.");
+            front = new Spot(6, 0, 6.5, 180f, false);
+        }
+        String direction = line == null ? "south" : line.getString("direction", "south");
+        double dx = 0;
+        double dz = 0;
+        switch (direction.trim().toLowerCase(Locale.ROOT)) {
+            case "north" -> dz = -1;
+            case "east" -> dx = 1;
+            case "west" -> dx = -1;
+            case "south" -> dz = 1;
+            default -> {
+                logger.warning("visitors.yml: line.direction '" + direction + "' is not north, south, east or west; "
+                        + "using south.");
+                dz = 1;
+            }
+        }
+        double spacing = Math.max(0.8, line == null ? 1.5 : line.getDouble("spacing", 1.5));
+        int length = Math.clamp(line == null ? 7 : line.getInt("length", 7), 1, 30);
+        for (int i = 0; i <= length; i++) {
+            Spot spot = new Spot(front.x() + dx * spacing * i, front.y(), front.z() + dz * spacing * i, front.yaw(),
+                    front.hasY());
+            if (i < length) {
+                spots.add(spot);
+            } else {
+                entry = new Spot(front.x() + dx * spacing * (i + 1), front.y(), front.z() + dz * spacing * (i + 1),
+                        front.yaw(), front.hasY());
+            }
+        }
+        walkSpeed = Math.clamp(line == null ? 0.1 : line.getDouble("walk-speed", 0.1), 0.0, 1.0);
+    }
+
+    private static Spot parseSpot(String raw) {
+        String[] parts = raw.split(",");
+        try {
+            if (parts.length == 3) {
+                return new Spot(Double.parseDouble(parts[0].trim()), 0, Double.parseDouble(parts[1].trim()),
+                        Float.parseFloat(parts[2].trim()), false);
+            }
+            if (parts.length == 4) {
+                return new Spot(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()),
+                        Double.parseDouble(parts[2].trim()), Float.parseFloat(parts[3].trim()), true);
+            }
+        } catch (NumberFormatException bad) {
+            return null;
+        }
+        return null;
     }
 
     private NavigableMap<Integer, Integer> levelTable(ConfigurationSection section) {
@@ -348,8 +417,19 @@ public final class VisitorConfig extends YamlFile {
         return id == null ? null : rarities.get(id.toLowerCase(Locale.ROOT));
     }
 
+    /** Where visitors stand, the front of the line first when there is one. */
     public List<Spot> spots() {
         return Collections.unmodifiableList(spots);
+    }
+
+    /** Where a new visitor walks into the line from; null without a line. */
+    public Spot entry() {
+        return entry;
+    }
+
+    /** Blocks per tick visitors walk along the line; 0 to appear in place. */
+    public double walkSpeed() {
+        return walkSpeed;
     }
 
     public ConfigurationSection rewards() {

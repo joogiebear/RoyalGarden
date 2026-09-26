@@ -29,6 +29,18 @@ public final class GardenBuilder {
     /** Wall height between the floor and the eaves. */
     private static final int WALL = 5;
 
+    /**
+     * The barn as {@link #build} makes it now. A Garden built to an older one is brought up to date by
+     * {@link #renovate} on its next load; each version's changes are additions, never a rebuild, so a
+     * renovation cannot disturb anything else standing on the farmhouse plot.
+     *
+     * <ol>
+     *   <li>the original barn;</li>
+     *   <li>the drive-through window and the lane visitors queue along.</li>
+     * </ol>
+     */
+    public static final int BARN_VERSION = 2;
+
     /** What plot boundaries used to be drawn in, kept only so old Gardens can be cleaned up. */
     private static final Material LEGACY_BOUNDARY = Material.STONE_BRICK_WALL;
 
@@ -48,10 +60,15 @@ public final class GardenBuilder {
         return spawn;
     }
 
-    /** Where Sam stands: behind the desk at the back of the barn, facing the doors. */
+    /**
+     * Where Sam stands: behind the desk at the back of the barn, facing over it toward the doors.
+     *
+     * <p>Yaw 0 is +z, the way the doors face. It was 180 once, which stood Sam with his back to the desk
+     * and his face to the wall; he is re-posted on every load, so that corrects itself.
+     */
     public static Location samPost(World world) {
         Location post = new Location(world, 0.5, GardenLayout.groundY() + 1, -BARN_Z + 1.5);
-        post.setYaw(180f);
+        post.setYaw(0f);
         post.setPitch(0f);
         return post;
     }
@@ -63,6 +80,43 @@ public final class GardenBuilder {
         }
         barn(world);
         approach(world);
+        driveThrough(world);
+    }
+
+    /** Bring a barn built to {@code from} up to {@link #BARN_VERSION}. */
+    public static void renovate(World world, int from) {
+        if (from < 2) {
+            driveThrough(world);
+        }
+    }
+
+    /**
+     * The drive-through: a window in the front wall east of the doors, with a counter and an awning, and a
+     * path running south from it for visitors to queue along.
+     *
+     * <p>The window is where the line in {@code visitors.yml} starts — its front spot, {@code 6, 6.5},
+     * stands a visitor square in the opening. Moving one means moving the other.
+     */
+    private static void driveThrough(World world) {
+        int y = GardenLayout.groundY();
+        int wall = BARN_Z;
+        for (int x = 5; x <= 6; x++) {
+            world.getBlockAt(x, y + 1, wall).setType(Material.SPRUCE_PLANKS, false);      // the counter
+            world.getBlockAt(x, y + 2, wall).setType(Material.AIR, false);
+            world.getBlockAt(x, y + 3, wall).setType(Material.AIR, false);
+        }
+        for (int x = 4; x <= 7; x++) {
+            setData(world, x, y + 4, wall + 1, "minecraft:spruce_trapdoor[half=top,open=false,facing=north]");
+        }
+        setData(world, 4, y + 1, wall + 1, "minecraft:spruce_fence");
+        setData(world, 4, y + 2, wall + 1, "minecraft:lantern[hanging=false]");
+
+        // The lane: two wide, south from the window, as long as the default line and a bit.
+        for (int z = wall + 1; z <= wall + 15; z++) {
+            for (int x = 5; x <= 6; x++) {
+                world.getBlockAt(x, y, z).setType(Material.DIRT_PATH, false);
+            }
+        }
     }
 
     /**

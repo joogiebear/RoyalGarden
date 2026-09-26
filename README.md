@@ -287,6 +287,14 @@ Admins: `/garden visitor <player> add [visitor]` sends one now (ignoring the clo
 level), `clear` sends everyone waiting away, `stats` shows the counts, `reset-stats` zeroes them. The
 console can run it too. `/garden reset` also sends a Garden's waiting visitors away.
 
+**The drive-through.** Visitors queue in single file at a window in the front of the barn, east of the
+doors, along a path running south. When the one at the window is served the rest walk up, and a newcomer
+walks in from the back. They have no AI — a villager's AI is a whole brain of beds and workstations — so
+they are moved a step each tick instead, and the client animates their legs from it. `line:` in
+`visitors.yml` sets where the front stands, which way the line runs, its spacing, length and walking speed;
+with `line.enabled: false` the old free-standing `spots:` are used. Barns built before the window existed
+get it added on their next load.
+
 ### Crop Upgrades
 
 `upgrades.yml` lets players upgrade every crop from `milestones.yml` at the desk (**Crop Upgrades**,

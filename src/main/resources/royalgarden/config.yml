@@ -61,7 +61,8 @@ unlock:
     #     min: 10
     #     message: "&cYou need Farming 10 to buy more plots."
     requirements: []
-    # Run on every purchase. Placeholders: %player% %uuid% %plot% %count% %purchase%
+    # Run on every purchase. Placeholders: %player% %uuid% %plot% %purchase%, and
+    # %count% (farmable plots now owned, the farmhouse not counted)
     rewards:
       commands: []
       messages: []
@@ -323,7 +324,8 @@ menu:
         - "&7and your Pest Log."
         - ""
         - "&eClick to view."
-    # %unlocked% %total% %limit% %size% and the Garden level ones from levels.yml:
+    # %unlocked% %total% %limit% count farmable plots — the farmhouse is left out.
+    # Also %size% and the Garden level ones from levels.yml:
     # %level% %level_roman% %max_level% %xp% %next% %remaining% %percent% %bar%
     summary:
       material: wheat

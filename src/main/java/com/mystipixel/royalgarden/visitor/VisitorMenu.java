@@ -224,13 +224,14 @@ public final class VisitorMenu {
 
         List<String> dialogue = type == null ? List.of() : type.dialogue();
         String[] withDialogue = append(base, "%dialogue%", String.join("\n", dialogue));
-        builder.setSlot(1, 5, Slot.builder(ItemSpec.build(section("offer.visitor"),
-                type == null ? Material.VILLAGER_SPAWN_EGG : type.icon(), withDialogue)).build());
+        builder.setSlot(1, 5, Slot.builder(visitorFace(type, withDialogue)).build());
         used[1][5] = true;
 
+        // One plain icon per item: what is wanted, not how much. The amounts are on the accept button, where
+        // they sit next to whether you have them — a row of stacks said the same thing less legibly.
         List<Offer.Wanted> items = offer.items();
         int count = Math.min(7, items.size());
-        int start = 5 - count / 2;
+        int start = 5 - (count - 1) / 2;
         for (int i = 0; i < count; i++) {
             Offer.Wanted wanted = items.get(i);
             int column = start + i;
@@ -240,7 +241,8 @@ public final class VisitorMenu {
 
         String[] full = append(base, "%rewards%", rewardLines(offer));
         builder.setSlot(4, 3, Slot.builder((viewer, shown) -> ItemSpec.build(section("offer.accept"),
-                        Material.LIME_TERRACOTTA, append(full, "%status%", ready(viewer, offer)
+                        Material.LIME_TERRACOTTA, append(append(full, "%items%", itemLines(viewer, offer)),
+                                "%status%", ready(viewer, offer)
                                 ? messages.raw("visitor-status-ready") : messages.raw("visitor-status-missing"))))
                 .onLeftClick((event, slot, clicked) -> {
                     Player who = (Player) event.getWhoClicked();
@@ -268,7 +270,26 @@ public final class VisitorMenu {
         builder.build().open(player);
     }
 
-    /** A requested item as itself, with how many are wanted and how many the viewer has. */
+    /**
+     * The visitor at the top of their offer: their {@code head} if they have one, their icon otherwise.
+     *
+     * <p>A face rather than the icon, because the icon is usually what they farm — Spud's is a potato — and
+     * drawn above the request for potatoes it read as a second, puzzling copy of the request.
+     */
+    private ItemStack visitorFace(VisitorType type, String[] placeholders) {
+        if (type == null || type.head().isBlank()) {
+            return ItemSpec.build(section("offer.visitor"),
+                    type == null ? Material.VILLAGER_SPAWN_EGG : type.icon(), placeholders);
+        }
+        ItemStack head = ItemSpec.build(section("offer.visitor"), Material.PLAYER_HEAD, placeholders);
+        if (head.getItemMeta() instanceof SkullMeta skull) {
+            skull.setPlayerProfile(profile(type));
+            head.setItemMeta(skull);
+        }
+        return head;
+    }
+
+    /** A requested item as a single plain item, with how many are wanted and how many the viewer has. */
     private ItemStack wantedIcon(Player viewer, Offer.Wanted wanted) {
         TestableItem item = VisitorService.lookup(wanted.item());
         ItemStack stack = item == null ? new ItemStack(Material.BARRIER) : item.getItem().clone();
@@ -279,7 +300,7 @@ public final class VisitorMenu {
                 "%have%", String.format("%,d", have),
                 "%status%", messages.raw(have >= wanted.amount() ? "visitor-item-have" : "visitor-item-missing",
                         "%have%", String.format("%,d", have), "%amount%", String.format("%,d", wanted.amount()))};
-        stack.setAmount((int) Math.clamp(wanted.amount(), 1, stack.getMaxStackSize()));
+        stack.setAmount(1);
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) {
             return stack;

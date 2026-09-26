@@ -16,7 +16,7 @@ garden-open-failed: "&cYour Garden could not be opened. The error is in the serv
 garden-unreadable: "&cYour Garden's data could not be read. Please contact staff — nothing has been lost."
 
 # ── Unlocking ────────────────────────────────────────────────────────────────
-# %plot% %cost% %count% (plots now owned)
+# %plot% %cost% %count% (farmable plots now owned — the farmhouse is not counted)
 unlocked: "&aUnlocked plot &f%plot%&a for &e%cost%&a. &7(%count% plots)"
 # %plot% %required%
 unlocked-needs-clearing: "&7It's overgrown: clear &f%required%%&7 of it before you can build there."
