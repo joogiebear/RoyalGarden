@@ -193,6 +193,18 @@ plot, so debris cannot be added from next door and cleared for free.
 
 `/garden clear <player> <plot>` finishes a plot's clearing by hand.
 
+Placeholders, for tab lists and scoreboards (online players only):
+
+| Placeholder | Value |
+|---|---|
+| `%royalgarden_clearing_plot%` | the plot you are standing on |
+| `%royalgarden_clearing_percent%` | how clear it is — its % while being cleared, 100 once clear, blank if locked |
+| `%royalgarden_clearing_bar%` | a progress bar toward the required % |
+| `%royalgarden_clearing_status%` | a ready-made line (`clearing-status` in `messages.yml`), blank unless on a plot being cleared |
+| `%royalgarden_clearing_required%` | the % needed to build |
+| `%royalgarden_clearing_active%` | how many of your plots are being cleared |
+| `%royalgarden_clearing_<plot>%` | one of your plots by name, e.g. `clearing_b2` |
+
 ### Crop Milestones
 
 `milestones.yml` gives every player a lifetime total per crop, climbing through tiers. Each tier

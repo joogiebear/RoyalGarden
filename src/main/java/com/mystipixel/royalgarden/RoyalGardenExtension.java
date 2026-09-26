@@ -10,6 +10,7 @@ import com.mystipixel.royalgarden.composter.ComposterStore;
 import com.mystipixel.royalgarden.config.GardenConfig;
 import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalgarden.garden.BuildQueue;
+import com.mystipixel.royalgarden.garden.ClearingPlaceholders;
 import com.mystipixel.royalgarden.garden.ClearingService;
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenMenu;
@@ -402,6 +403,7 @@ public final class RoyalGardenExtension extends Extension {
         UpgradeService upgradeLookup = upgrades;
         ComposterService composterLookup = composter;
         PestService pestLookup = pests;
+        ClearingPlaceholders clearingLookup = new ClearingPlaceholders(gardens, clearing, messages);
         registerExpansion((player, key) -> {
             String value = visitorPlaceholders.resolve(player, key);
             if (value == null) {
@@ -409,6 +411,9 @@ public final class RoyalGardenExtension extends Extension {
             }
             if (value == null) {
                 value = composterLookup.resolve(player, key);
+            }
+            if (value == null) {
+                value = clearingLookup.resolve(player, key);
             }
             return value != null ? value : pestLookup.resolve(player, key);
         });

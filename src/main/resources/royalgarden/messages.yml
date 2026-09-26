@@ -198,6 +198,8 @@ deny-uncleared: "&cClear plot %plot% first &7(%percent%%/%required%%) &c— brea
 # ── Clearing ─────────────────────────────────────────────────────────────────
 # Action bar while clearing. %plot% %percent% %required% %bar% %cleared% %total%
 clearing-progress: "&aClearing %plot% %bar% &f%percent%%&7/%required%%"
+# %royalgarden_clearing_status%, while standing on a plot being cleared. Same placeholders.
+clearing-status: "&6Clearing %plot%: &f%percent%%&7/%required%%"
 # %plot% %player%
 clearing-done: "&aPlot &f%plot%&a is clear — you can build on it now."
 
