@@ -18,6 +18,8 @@ garden-unreadable: "&cYour Garden's data could not be read. Please contact staff
 # ── Unlocking ────────────────────────────────────────────────────────────────
 # %plot% %cost% %count% (plots now owned)
 unlocked: "&aUnlocked plot &f%plot%&a for &e%cost%&a. &7(%count% plots)"
+# %plot% %required%
+unlocked-needs-clearing: "&7It's overgrown: clear &f%required%%&7 of it before you can build there."
 unlock-not-adjacent: "&cUnlock a plot next to &f%plot%&c first."
 # %limit%
 unlock-limit-reached: "&cYou can own at most &f%limit%&c plots."
@@ -46,6 +48,8 @@ presets-cannot-afford: "&f%preset%&c costs &e%cost%&c."
 presets-failed: "&cThat preset could not be read, so nothing was changed. Please tell staff."
 # %preset% %plot%
 presets-applying: "&aBuilding &f%preset%&a on plot &f%plot%&a… &7Stand back — it takes about a minute."
+# %plot% %percent% %required%
+presets-clear-first: "&cClear plot &f%plot%&c first &7(%percent%%/%required%%)&c."
 plot-busy: "&cPlot &f%plot%&c is already being built. Wait for it to finish."
 
 # Menu fragments
@@ -188,10 +192,18 @@ deny-farmhouse: "&cThe farmhouse plot is protected."
 deny-floor: "&cThat is the floor of your Garden."
 deny-outside: "&cThat is outside your Garden."
 deny-visitor: "&cThis is not your Garden."
+# A plot bought but not yet cleared. %plot% %percent% %required% %bar% %cleared% %total%
+deny-uncleared: "&cClear plot %plot% first &7(%percent%%/%required%%) &c— break the overgrowth."
+
+# ── Clearing ─────────────────────────────────────────────────────────────────
+# Action bar while clearing. %plot% %percent% %required% %bar% %cleared% %total%
+clearing-progress: "&aClearing %plot% %bar% &f%percent%%&7/%required%%"
+# %plot% %player%
+clearing-done: "&aPlot &f%plot%&a is clear — you can build on it now."
 
 # ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. &7/garden composter&8 — &7your Composter. &7/garden pests&8 — &7your pests. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset, pests <player> spawn [pest] [plot]|clear|stats|reset-stats"
+admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. &7/garden composter&8 — &7your Composter. &7/garden pests&8 — &7your pests. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock|clear <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset, pests <player> spawn [pest] [plot]|clear|stats|reset-stats"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -226,6 +238,8 @@ admin-reset-failed: "&cResetting %player%'s Garden failed: %error%"
 # %player% %plot%
 admin-unlocked: "&aUnlocked %plot% for %player%."
 admin-locked: "&aLocked %plot% for %player%."
+admin-cleared: "&aMarked %plot% as cleared for %player%."
+admin-not-clearing: "&7%plot% is not being cleared for %player%."
 admin-unchanged: "&7%plot% was already like that for %player%."
 admin-bad-plot: "&c'%plot%' is not a plot on this board."
 # %player% %unlocked% %total% %plots% %loaded% %readonly% %level% %xp%
@@ -273,4 +287,4 @@ admin-pests-cleared: "&aRemoved %amount% pest(s) from %player%'s Garden."
 # %player% %alive% %infested% %killed% %max_per_garden%
 admin-pests-stats: "&a%player%&7: %alive%/%max_per_garden% pests alive, %infested% plot(s) infested, %killed% killed."
 admin-pests-reset: "&aReset %player%'s pest kills."
-console-help: "&7From the console: garden xp|level|milestone|visitor|upgrade|composter|pests|reset|unlock|lock|info|reload …"
+console-help: "&7From the console: garden xp|level|milestone|visitor|upgrade|composter|pests|reset|unlock|lock|clear|info|reload …"

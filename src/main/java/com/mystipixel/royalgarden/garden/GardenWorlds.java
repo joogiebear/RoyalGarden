@@ -230,6 +230,7 @@ public final class GardenWorlds {
                     now.setPending(px, pz, null);
                     if (outcome == BuildQueue.Outcome.DONE) {
                         now.setPresetOn(px, pz, label);
+                        now.forgetDebris(px, pz);   // a rebuild clears everything above the ground
                     }
                     store.save(now);
                 }));
@@ -452,6 +453,49 @@ public final class GardenWorlds {
         }
         if (queued > 0) {
             logger.info("Garden '" + world.getName() + "': generating " + queued + " plot(s).");
+        }
+        overgrow(world);
+    }
+
+    /**
+     * Grow debris on every locked plot that has none yet — on a new Garden, and on Gardens built before
+     * plots had to be cleared.
+     *
+     * <p>Only locked plots: a plot already bought was bought without debris, and growing a forest over a
+     * farm someone has built would be the opposite of a feature. The debris is written only into air, so
+     * it is safe to queue behind the job still generating the same plot's ground.
+     */
+    private void overgrow(World world) {
+        Overgrowth.Settings settings = config.clearing();
+        UUID owner = ownerOf(world);
+        GardenState state = owner == null ? null : store.get(owner);
+        if (!settings.enabled() || state == null || state.readOnly()) {
+            return;
+        }
+        int queued = 0;
+        for (int px = 0; px < GardenLayout.grid(); px++) {
+            for (int pz = 0; pz < GardenLayout.grid(); pz++) {
+                if (GardenLayout.isCentre(px, pz) || state.isUnlocked(px, pz) || state.isOvergrown(px, pz)
+                        || queue.isGrowing(world.getName(), px, pz)) {
+                    continue;
+                }
+                Overgrowth.Plan plan = Overgrowth.plan(Overgrowth.seed(owner, px, pz), GardenLayout.plotSize(),
+                        GardenLayout.groundY(), settings);
+                int plotX = px;
+                int plotZ = pz;
+                queue.submit(new BuildQueue.Job(world.getName(), px, pz, plan, outcome -> {
+                    if (outcome != BuildQueue.Outcome.DONE) {
+                        return;                     // not recorded, so the next load grows it again
+                    }
+                    GardenState now = store.get(owner);
+                    now.setOvergrowth(plotX, plotZ, plan.present());
+                    store.save(now);
+                }));
+                queued++;
+            }
+        }
+        if (queued > 0) {
+            logger.info("Garden '" + world.getName() + "': growing debris on " + queued + " locked plot(s).");
         }
     }
 

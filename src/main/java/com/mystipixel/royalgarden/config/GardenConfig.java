@@ -1,5 +1,6 @@
 package com.mystipixel.royalgarden.config;
 
+import com.mystipixel.royalgarden.garden.Overgrowth;
 import com.mystipixel.royalskyblock.currency.Cost;
 import org.bukkit.Difficulty;
 import org.bukkit.Material;
@@ -23,8 +24,29 @@ import java.util.logging.Logger;
  */
 public final class GardenConfig extends YamlFile {
 
+    /** {@code clearing:}, parsed once per load: it is asked for on every block broken in a Garden. */
+    private Overgrowth.Settings clearing;
+
     public GardenConfig(File dataFolder, Logger logger) {
         super(dataFolder, "config.yml", logger);
+    }
+
+    @Override
+    public void reload() {
+        super.reload();
+        clearing = null;
+    }
+
+    // ── clearing ───────────────────────────────────────────────────────────────
+
+    /** The debris locked plots grow and how much of it must be cleared, from {@code clearing:}. */
+    public Overgrowth.Settings clearing() {
+        Overgrowth.Settings parsed = clearing;
+        if (parsed == null) {
+            parsed = Overgrowth.Settings.read(yaml().getConfigurationSection("clearing"), logger);
+            clearing = parsed;
+        }
+        return parsed;
     }
 
     // ── layout (startup only) ──────────────────────────────────────────────────

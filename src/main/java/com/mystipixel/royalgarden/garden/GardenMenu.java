@@ -42,6 +42,7 @@ public final class GardenMenu {
     private Consumer<Player> upgrades;
     private Consumer<Player> composter;
     private Consumer<Player> pests;
+    private ClearingService clearing;
     private java.util.function.Function<java.util.UUID, String[]> levelPlaceholders = owner -> new String[0];
     private Menu menu;
 
@@ -93,6 +94,11 @@ public final class GardenMenu {
     public void setPests(Consumer<Player> open) {
         this.pests = open;
         this.menu = build();
+    }
+
+    /** Show plots still being cleared as such, with their progress. */
+    public void setClearing(ClearingService clearing) {
+        this.clearing = clearing;
     }
 
     public void open(Player player) {
@@ -181,6 +187,10 @@ public final class GardenMenu {
         if (GardenLayout.isCentre(px, pz)) {
             return ItemSpec.build(section(items, "farmhouse"), Material.HAY_BLOCK, "%plot%", plot);
         }
+        if (state.isUnlocked(px, pz) && clearing != null && clearing.blocks(state, px, pz)) {
+            return ItemSpec.build(section(items, "clearing"), Material.OAK_SAPLING,
+                    clearing.placeholders(state, px, pz));
+        }
         if (state.isUnlocked(px, pz)) {
             World here = player.getWorld();
             boolean building = player.getUniqueId().equals(GardenWorlds.ownerOf(here))
@@ -254,6 +264,9 @@ public final class GardenMenu {
         }
         if (!config.playerPresetsEnabled()) {
             messages.send(player, "presets-disabled");
+            return;
+        }
+        if (presetService.refuseUncleared(player, state, px, pz)) {
             return;
         }
         openPresets(player, px, pz);

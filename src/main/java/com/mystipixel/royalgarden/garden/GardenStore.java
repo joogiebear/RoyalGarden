@@ -104,6 +104,17 @@ public final class GardenStore {
             }
         });
         readMap(yaml.getConfigurationSection("pending"), (k, v) -> state.pendingByKey().put(k, v.toString()));
+        readMap(yaml.getConfigurationSection("overgrowth"), (k, v) -> {
+            if (v instanceof Number n) {
+                state.overgrowthByKey().put(k, n.intValue());
+            }
+        });
+        readMap(yaml.getConfigurationSection("clearing"), (k, v) -> {
+            if (v instanceof ConfigurationSection progress) {
+                int total = Math.max(0, progress.getInt("total"));
+                state.clearingByKey().put(k, new int[]{total, Math.clamp(progress.getInt("cleared"), 0, total)});
+            }
+        });
         state.setLegacyWallsCleared(yaml.getBoolean("legacy-walls-cleared", false));
         state.setXp(yaml.getLong("xp", 0));
         return state;
@@ -160,6 +171,13 @@ public final class GardenStore {
         writeMap(yaml, "presets", state.presetsByKey());
         writeMap(yaml, "applied", state.appliedByKey());
         writeMap(yaml, "pending", state.pendingByKey());
+        writeMap(yaml, "overgrowth", state.overgrowthByKey());
+        for (Map.Entry<Integer, int[]> entry : state.clearingByKey().entrySet()) {
+            int[] plot = GardenState.plotOf(entry.getKey());
+            String path = "clearing." + GardenLayout.plotName(plot[0], plot[1]);
+            yaml.set(path + ".total", entry.getValue()[0]);
+            yaml.set(path + ".cleared", entry.getValue()[1]);
+        }
         yaml.set("legacy-walls-cleared", state.legacyWallsCleared());
         yaml.set("xp", state.xp());
         try {

@@ -3,6 +3,7 @@ package com.mystipixel.royalgarden.command;
 import com.mystipixel.royalgarden.composter.ComposterMenu;
 import com.mystipixel.royalgarden.composter.ComposterService;
 import com.mystipixel.royalgarden.config.Messages;
+import com.mystipixel.royalgarden.garden.ClearingService;
 import com.mystipixel.royalgarden.garden.GardenBuilder;
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenState;
@@ -67,7 +68,7 @@ public final class CommandGarden extends PluginCommand {
     public static final String ADMIN = "royalgarden.admin";
 
     private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
-            "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info", "milestones", "milestone",
+            "delete", "presets", "reload", "reset", "unlock", "lock", "clear", "visit", "info", "milestones", "milestone",
             "xp", "level", "visitors", "visitor", "upgrades", "upgrade", "composter", "pests");
 
     private final GardenWorlds worlds;
@@ -85,6 +86,7 @@ public final class CommandGarden extends PluginCommand {
     private ComposterMenu composterMenu;
     private PestService pests;
     private PestMenu pestMenu;
+    private ClearingService clearing;
 
     public CommandGarden(EcoPlugin plugin, String name, GardenWorlds worlds, Messages messages,
                          Runnable reload, Supplier<Location> evacuateTo) {
@@ -125,6 +127,11 @@ public final class CommandGarden extends PluginCommand {
         this.composterMenu = menu;
     }
 
+    /** Give the command its plot-clearing subcommand. */
+    public void setClearing(ClearingService clearing) {
+        this.clearing = clearing;
+    }
+
     /** Give the command its Pests subcommands. */
     public void setPests(PestService service, PestMenu menu) {
         this.pests = service;
@@ -153,6 +160,7 @@ public final class CommandGarden extends PluginCommand {
             case "pests" -> pests(sender, args);
             case "reset" -> reset(sender, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
             case "unlock", "lock" -> setLock(sender, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
+            case "clear" -> clear(sender, arg, args.size() > 2 ? args.get(2) : null);
             case "info" -> info(sender, arg);
             case "reload" -> {
                 reload.run();
@@ -238,7 +246,7 @@ public final class CommandGarden extends PluginCommand {
                             options.add("bedrock");
                         }
                     }
-                    case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone", "xp", "level",
+                    case "reset", "unlock", "lock", "clear", "visit", "info", "milestones", "milestone", "xp", "level",
                          "visitor", "upgrade", "composter", "pests" -> {
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             options.add(online.getName());
@@ -264,7 +272,7 @@ public final class CommandGarden extends PluginCommand {
                     }
                 }
             } else if (args.size() == 3) {
-                if (verb.equals("unlock") || verb.equals("lock")) {
+                if (verb.equals("unlock") || verb.equals("lock") || verb.equals("clear")) {
                     for (int pz = 0; pz < GardenLayout.grid(); pz++) {
                         for (int px = 0; px < GardenLayout.grid(); px++) {
                             options.add(GardenLayout.plotName(px, pz));
@@ -343,6 +351,7 @@ public final class CommandGarden extends PluginCommand {
             }
             case "reset" -> reset(player, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
             case "unlock", "lock" -> setLock(player, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
+            case "clear" -> clear(player, arg, args.size() > 2 ? args.get(2) : null);
             case "visit" -> adminVisit(player, arg);
             case "info" -> info(player, arg);
             case "milestones" -> viewMilestones(player, arg);
@@ -497,12 +506,41 @@ public final class CommandGarden extends PluginCommand {
             return;
         }
         boolean changed = unlock ? state.forceUnlock(plot[0], plot[1]) : state.lock(plot[0], plot[1]);
+        if (changed && unlock) {
+            state.beginClearing(plot[0], plot[1]);     // bought or granted, an overgrown plot needs clearing
+        }
         if (changed) {
             worlds.save(state);
         }
         String who = target.getName() == null ? name : target.getName();
         messages.send(sender, changed ? (unlock ? "admin-unlocked" : "admin-locked") : "admin-unchanged",
                 "%player%", who, "%plot%", GardenLayout.plotName(plot[0], plot[1]));
+    }
+
+    /** Mark a plot as cleared of its debris, whatever is left on it. */
+    private void clear(CommandSender sender, String name, String plotName) {
+        OfflinePlayer target = target(sender, name);
+        if (target == null) {
+            return;
+        }
+        int[] plot = GardenLayout.parsePlot(plotName);
+        if (plot == null) {
+            messages.send(sender, "admin-bad-plot", "%plot%", String.valueOf(plotName));
+            return;
+        }
+        GardenState state = worlds.state(target.getUniqueId());
+        if (state.readOnly()) {
+            messages.send(sender, "garden-unreadable");
+            return;
+        }
+        String who = target.getName() == null ? name : target.getName();
+        String plotLabel = GardenLayout.plotName(plot[0], plot[1]);
+        if (clearing == null || !state.isClearing(plot[0], plot[1])) {
+            messages.send(sender, "admin-not-clearing", "%player%", who, "%plot%", plotLabel);
+            return;
+        }
+        clearing.finish(state, plot[0], plot[1], Bukkit.getPlayer(target.getUniqueId()));
+        messages.send(sender, "admin-cleared", "%player%", who, "%plot%", plotLabel);
     }
 
     private void adminVisit(Player sender, String name) {
