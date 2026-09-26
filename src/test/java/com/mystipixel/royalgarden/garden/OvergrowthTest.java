@@ -1,6 +1,7 @@
 package com.mystipixel.royalgarden.garden;
 
 import org.bukkit.Material;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -8,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -107,5 +109,33 @@ class OvergrowthTest {
     @Test
     void nothingIsPlannedWhenThereIsNothingToPlant() {
         assertTrue(Overgrowth.plan(3, SIZE, GROUND, Overgrowth.Settings.OFF).voxels().isEmpty());
+    }
+
+    /**
+     * A config.yml from before clearing existed has no clearing section; the shipped one backs it as
+     * defaults. Reading it once gave every count as 0 and planted nothing on any plot.
+     */
+    @Test       // block lists are left out: checking one is a block needs a running server's registry
+    void anOldConfigReadsTheShippedAmounts() throws Exception {
+        YamlConfiguration shipped = new YamlConfiguration();
+        shipped.loadFromString("""
+                clearing:
+                  required-percent: 90
+                  trees: { count: 14, types: [oak] }
+                  boulders: { count: 10 }
+                  undergrowth: { chance: 0.06 }
+                """);
+        YamlConfiguration onDisk = new YamlConfiguration();
+        onDisk.setDefaults(shipped);
+
+        Overgrowth.Settings read = Overgrowth.Settings.read(onDisk.getConfigurationSection("clearing"),
+                Logger.getAnonymousLogger());
+
+        assertTrue(read.enabled());
+        assertEquals(90, read.required());
+        assertEquals(14, read.trees());
+        assertEquals(10, read.boulders());
+        assertEquals(0.06, read.coverChance(), 1e-9);
+        assertFalse(Overgrowth.plan(5, SIZE, GROUND, read).voxels().isEmpty());
     }
 }

@@ -111,20 +111,32 @@ public final class Overgrowth {
                 }
             }
             return new Settings(
-                    section.getBoolean("enabled", true),
-                    Math.clamp(section.getInt("required-percent", 90), 0, 100),
-                    Math.max(1, section.getInt("margin", 3)),
-                    treeTypes.isEmpty() ? 0 : Math.max(0, section.getInt("trees.count", 0)),
+                    !section.contains("enabled") || section.getBoolean("enabled"),
+                    Math.clamp((int) number(section, "required-percent", 90), 0, 100),
+                    Math.max(1, (int) number(section, "margin", 3)),
+                    treeTypes.isEmpty() ? 0 : Math.max(0, (int) number(section, "trees.count", 0)),
                     List.copyOf(treeTypes),
-                    Math.max(0, section.getInt("boulders.count", 0)),
+                    Math.max(0, (int) number(section, "boulders.count", 0)),
                     blocks(section, "boulders.blocks", logger),
-                    Math.max(0, section.getInt("bushes.count", 0)),
+                    Math.max(0, (int) number(section, "bushes.count", 0)),
                     blocks(section, "bushes.blocks", logger),
-                    treeTypes.isEmpty() ? 0 : Math.max(0, section.getInt("fallen-logs.count", 0)),
-                    Math.clamp(section.getDouble("undergrowth.chance", 0), 0.0, 1.0),
+                    treeTypes.isEmpty() ? 0 : Math.max(0, (int) number(section, "fallen-logs.count", 0)),
+                    Math.clamp(number(section, "undergrowth.chance", 0), 0.0, 1.0),
                     blocks(section, "undergrowth.blocks", logger),
                     section.getStringList("rewards.commands"),
                     section.getStringList("rewards.messages"));
+        }
+
+        /**
+         * A number, falling back to the shipped config before {@code fallback}.
+         *
+         * <p>Not {@code getInt(path, fallback)}: an explicit fallback wins over the shipped defaults. On a
+         * {@code config.yml} written before {@code clearing:} existed, Bukkit hands back an empty section
+         * for it, and every count read that way came out as its fallback of 0 — nothing was ever planted.
+         * {@code contains} and the one-argument getters both consult the defaults.
+         */
+        private static double number(ConfigurationSection section, String path, double fallback) {
+            return section.contains(path) ? section.getDouble(path) : fallback;
         }
 
         private static List<Material> blocks(ConfigurationSection section, String path, Logger logger) {
