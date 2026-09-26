@@ -14,6 +14,8 @@ import com.mystipixel.royalgarden.garden.PresetLibrary;
 import com.mystipixel.royalgarden.garden.PresetService;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.mystipixel.royalgarden.garden.UnlockService;
+import com.mystipixel.royalgarden.level.GardenLevels;
+import com.mystipixel.royalgarden.level.LevelConfig;
 import com.mystipixel.royalgarden.milestone.MilestoneConfig;
 import com.mystipixel.royalgarden.milestone.MilestoneListener;
 import com.mystipixel.royalgarden.milestone.MilestoneMenu;
@@ -73,6 +75,7 @@ public final class RoyalGardenExtension extends Extension {
     private GardenProtection protection;
     private PluginCommand gardenCommand;
     private PluginCommand deskCommand;
+    private LevelConfig levelConfig;
     private MilestoneConfig milestoneConfig;
     private MilestoneStore milestoneStore;
     private MilestoneListener milestoneListener;
@@ -152,6 +155,7 @@ public final class RoyalGardenExtension extends Extension {
         messages.reload();
         presets.reload();
         milestoneConfig.reload();
+        levelConfig.reload();
         menu.reload();
         scheduleMilestoneSaves();
         getLogger().info("Reloaded config.yml, messages.yml, presets.yml and milestones.yml.");
@@ -236,12 +240,33 @@ public final class RoyalGardenExtension extends Extension {
         menu.setMilestones(player -> milestoneMenu.open(player, player.getUniqueId(), player.getName()));
         Bukkit.getPluginManager().registerEvents(placedBlocks, getPlugin());
         Bukkit.getPluginManager().registerEvents(milestoneListener, getPlugin());
+
+        // Garden Levels: XP from milestone tiers and plot purchases (and /garden xp), levels that pay
+        // rewards and gate plots and presets.
+        this.levelConfig = new LevelConfig(data, getLogger());
+        GardenLevels levels = new GardenLevels(levelConfig, gardens, messages);
+        milestones.onTier((player, crop, tier) ->
+                levels.give(player.getUniqueId(), levelConfig.milestoneXp(tier), "level-source-milestone"));
+        unlocks.setLevels(new UnlockService.Levels() {
+            @Override
+            public int level(java.util.UUID owner) {
+                return levels.level(owner);
+            }
+
+            @Override
+            public void unlocked(org.bukkit.entity.Player player, int purchase) {
+                levels.give(player.getUniqueId(), levelConfig.unlockXp(purchase), "level-source-unlock");
+            }
+        });
+        presetService.setLevels(levels::level);
+        menu.setLevelPlaceholders(levels::placeholders);
         scheduleMilestoneSaves();
         this.milestoneSweeper = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneListener::clearStale, 20L, 20L);
 
         CommandGarden garden = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
                 messages, this::reloadFiles, () -> evacuationPoint(host));
         garden.setMilestones(milestones, milestoneMenu);
+        garden.setLevels(levels);
         this.gardenCommand = garden;
         this.deskCommand = new CommandDesk(getPlugin(), config.commandName("desk", "desk"), menu);
         gardenCommand.register();

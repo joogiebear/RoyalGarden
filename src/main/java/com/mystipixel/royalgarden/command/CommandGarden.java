@@ -6,6 +6,7 @@ import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenState;
 import com.mystipixel.royalgarden.garden.GardenWorlds;
 import com.mystipixel.royalgarden.garden.PresetLibrary;
+import com.mystipixel.royalgarden.level.GardenLevels;
 import com.mystipixel.royalgarden.milestone.MilestoneCrop;
 import com.mystipixel.royalgarden.milestone.MilestoneMenu;
 import com.mystipixel.royalgarden.milestone.MilestoneService;
@@ -15,6 +16,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.io.IOException;
@@ -53,7 +55,8 @@ public final class CommandGarden extends PluginCommand {
     public static final String ADMIN = "royalgarden.admin";
 
     private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
-            "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info", "milestones", "milestone");
+            "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info", "milestones", "milestone",
+            "xp", "level");
 
     private final GardenWorlds worlds;
     private final Messages messages;
@@ -61,10 +64,12 @@ public final class CommandGarden extends PluginCommand {
     private final Supplier<Location> evacuateTo;
     private MilestoneService milestones;
     private MilestoneMenu milestoneMenu;
+    private GardenLevels levels;
 
     public CommandGarden(EcoPlugin plugin, String name, GardenWorlds worlds, Messages messages,
                          Runnable reload, Supplier<Location> evacuateTo) {
-        super(plugin, name, PERMISSION, true);
+        // Not players-only: the console needs the admin tools, since other plugins run rewards through it.
+        super(plugin, name, PERMISSION, false);
         this.worlds = worlds;
         this.messages = messages;
         this.reload = reload;
@@ -77,10 +82,47 @@ public final class CommandGarden extends PluginCommand {
         this.milestoneMenu = menu;
     }
 
+    /** Give the command its Garden Level subcommands. */
+    public void setLevels(GardenLevels levels) {
+        this.levels = levels;
+    }
+
+    /**
+     * The console's way in. Players are handled by {@link #onExecute(Player, List)}; from the console
+     * only the admin tools that need no player to stand anywhere are available — the ones other plugins
+     * call in their reward commands.
+     */
+    @Override
+    public void onExecute(CommandSender sender, List<String> args) {
+        if (sender instanceof Player) {
+            return;
+        }
+        String verb = args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT);
+        String arg = args.size() > 1 ? args.get(1) : null;
+        switch (verb) {
+            case "xp" -> xp(sender, args);
+            case "level" -> showLevel(sender, arg);
+            case "milestone" -> setMilestone(sender, args);
+            case "reset" -> reset(sender, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
+            case "unlock", "lock" -> setLock(sender, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
+            case "info" -> info(sender, arg);
+            case "reload" -> {
+                reload.run();
+                messages.send(sender, "admin-reloaded");
+            }
+            default -> messages.send(sender, "console-help");
+        }
+    }
+
     @Override
     public void onExecute(Player player, List<String> args) {
         if (args.isEmpty()) {
             visit(player);
+            return;
+        }
+        // Everyone may see their own Garden level; with a name it is an admin lookup.
+        if (args.get(0).equalsIgnoreCase("level") && (args.size() == 1 || !player.hasPermission(ADMIN))) {
+            showLevel(player, null);
             return;
         }
         // The one subcommand every player has: their own milestones. With a name it is an admin lookup.
@@ -95,8 +137,13 @@ public final class CommandGarden extends PluginCommand {
     @Override
     public List<String> tabComplete(Player player, List<String> args) {
         if (!player.hasPermission(ADMIN)) {
-            return args.size() <= 1 && "milestones".startsWith(args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT))
-                    ? List.of("milestones") : List.of();
+            if (args.size() > 1) {
+                return List.of();
+            }
+            String typed = args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT);
+            List<String> own = new ArrayList<>(List.of("milestones", "level"));
+            own.removeIf(option -> !option.startsWith(typed));
+            return own;
         }
         List<String> options = new ArrayList<>();
         if (args.size() <= 1) {
@@ -112,7 +159,7 @@ public final class CommandGarden extends PluginCommand {
                             options.add("bedrock");
                         }
                     }
-                    case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone" -> {
+                    case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone", "xp", "level" -> {
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             options.add(online.getName());
                         }
@@ -129,6 +176,8 @@ public final class CommandGarden extends PluginCommand {
                     }
                 } else if (verb.equals("reset")) {
                     options.add("world");
+                } else if (verb.equals("xp")) {
+                    options.addAll(List.of("give", "take", "set"));
                 } else if (verb.equals("milestone") && milestones != null) {
                     for (MilestoneCrop crop : milestones.config().crops()) {
                         options.add(crop.id());
@@ -191,6 +240,8 @@ public final class CommandGarden extends PluginCommand {
             case "info" -> info(player, arg);
             case "milestones" -> viewMilestones(player, arg);
             case "milestone" -> setMilestone(player, args);
+            case "xp" -> xp(player, args);
+            case "level" -> showLevel(player, arg);
             default -> messages.send(player, "admin-help");
         }
     }
@@ -279,7 +330,7 @@ public final class CommandGarden extends PluginCommand {
     }
 
     /** A player by name, online or known to the server; null (with a message) if there is none. */
-    private OfflinePlayer target(Player sender, String name) {
+    private OfflinePlayer target(CommandSender sender, String name) {
         if (name == null) {
             messages.send(sender, "admin-help");
             return null;
@@ -294,7 +345,7 @@ public final class CommandGarden extends PluginCommand {
         return found;
     }
 
-    private void reset(Player sender, String name, boolean wipeWorld) {
+    private void reset(CommandSender sender, String name, boolean wipeWorld) {
         OfflinePlayer target = target(sender, name);
         if (target == null) {
             return;
@@ -310,7 +361,7 @@ public final class CommandGarden extends PluginCommand {
         });
     }
 
-    private void setLock(Player sender, boolean unlock, String name, String plotName) {
+    private void setLock(CommandSender sender, boolean unlock, String name, String plotName) {
         OfflinePlayer target = target(sender, name);
         if (target == null) {
             return;
@@ -353,7 +404,7 @@ public final class CommandGarden extends PluginCommand {
         });
     }
 
-    private void info(Player sender, String name) {
+    private void info(CommandSender sender, String name) {
         OfflinePlayer target = target(sender, name);
         if (target == null) {
             return;
@@ -368,7 +419,80 @@ public final class CommandGarden extends PluginCommand {
                 "%total%", String.valueOf(GardenLayout.plotCount()),
                 "%plots%", String.join(", ", plots),
                 "%loaded%", String.valueOf(worlds.isLoaded(target.getUniqueId())),
-                "%readonly%", String.valueOf(state.readOnly()));
+                "%readonly%", String.valueOf(state.readOnly()),
+                "%level%", levels == null ? "-" : String.valueOf(levels.level(target.getUniqueId())),
+                "%xp%", String.valueOf(state.xp()));
+    }
+
+    /** Show a Garden's level: the sender's own, or a named player's. */
+    private void showLevel(CommandSender sender, String name) {
+        if (levels == null) {
+            return;
+        }
+        UUID owner;
+        String who;
+        if (name == null) {
+            if (!(sender instanceof Player player)) {
+                messages.send(sender, "console-help");
+                return;
+            }
+            owner = player.getUniqueId();
+            who = player.getName();
+        } else {
+            OfflinePlayer target = target(sender, name);
+            if (target == null) {
+                return;
+            }
+            owner = target.getUniqueId();
+            who = target.getName() == null ? name : target.getName();
+        }
+        String[] placeholders = levels.placeholders(owner);
+        String[] all = new String[placeholders.length + 2];
+        System.arraycopy(placeholders, 0, all, 0, placeholders.length);
+        all[placeholders.length] = "%player%";
+        all[placeholders.length + 1] = who;
+        messages.send(sender, "level-info", all);
+    }
+
+    /**
+     * {@code /garden xp <player> <give|take|set> <amount> [silent]}. {@code give} pays any levels it
+     * reaches, exactly as earned XP does — it is how other plugins award Garden XP. {@code take} and
+     * {@code set} are corrections and pay nothing.
+     */
+    private void xp(CommandSender sender, List<String> args) {
+        if (levels == null || args.size() < 4) {
+            messages.send(sender, "admin-xp-usage");
+            return;
+        }
+        OfflinePlayer target = target(sender, args.get(1));
+        if (target == null) {
+            return;
+        }
+        long amount;
+        try {
+            amount = Long.parseLong(args.get(3).replace(",", "").replace("_", ""));
+        } catch (NumberFormatException notANumber) {
+            messages.send(sender, "admin-xp-usage");
+            return;
+        }
+        UUID owner = target.getUniqueId();
+        boolean silent = args.size() > 4 && args.get(4).equalsIgnoreCase("silent");
+        switch (args.get(2).toLowerCase(Locale.ROOT)) {
+            case "give" -> levels.give(owner, amount, silent ? null : "level-source-command");
+            case "take" -> levels.set(owner, levels.xp(owner) - amount);
+            case "set" -> levels.set(owner, amount);
+            default -> {
+                messages.send(sender, "admin-xp-usage");
+                return;
+            }
+        }
+        String who = target.getName() == null ? args.get(1) : target.getName();
+        String[] placeholders = levels.placeholders(owner);
+        String[] all = new String[placeholders.length + 2];
+        System.arraycopy(placeholders, 0, all, 0, placeholders.length);
+        all[placeholders.length] = "%player%";
+        all[placeholders.length + 1] = who;
+        messages.send(sender, "admin-xp-done", all);
     }
 
     private void viewMilestones(Player sender, String name) {
@@ -385,7 +509,7 @@ public final class CommandGarden extends PluginCommand {
      * {@code /garden milestone <player> <crop> <amount>} sets a total; {@code /garden milestone <player>
      * reset} clears them all. Neither pays rewards — they are corrections, not harvests.
      */
-    private void setMilestone(Player sender, List<String> args) {
+    private void setMilestone(CommandSender sender, List<String> args) {
         if (milestones == null || args.size() < 3) {
             messages.send(sender, "admin-milestone-usage");
             return;

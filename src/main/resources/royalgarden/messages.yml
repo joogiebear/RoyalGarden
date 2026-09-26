@@ -64,6 +64,26 @@ milestone-tier-up: "&6&lMILESTONE! &f%crop_name% &e%tier_roman% &7— %total% ha
 milestone-broadcast: "&6%player% &freached &6%crop_name% &e%tier_roman%&f!"
 milestone-maxed: "max"
 
+# ── Garden Levels ────────────────────────────────────────────────────────────
+# Placeholders: %level% %level_roman% %max_level% %xp% %next% %remaining% %percent% %bar%
+# Action bar on gaining XP; also %amount% and %reason% (one of the level-source-* below).
+level-xp-gained: "&a+%amount% Garden XP &7(%reason%) &8| &fLevel %level% &7%percent%%"
+level-source-milestone: "milestone"
+level-source-unlock: "new plot"
+level-source-command: "reward"
+# Also %reached% %reached_roman% %player%
+level-up: "&a&lGARDEN LEVEL UP! &fYour Garden is now level &a%reached%&f."
+level-broadcast: "&a%player%&f's Garden reached level &a%reached%&f!"
+level-maxed: "max"
+# /garden level. Also %player%.
+level-info: "&f%player%'s Garden: &alevel %level%&7/%max_level% &8| &f%xp% XP &8| &7next at %next%\n%bar% &7%percent%%"
+# %plot% %required% %level%
+unlock-garden-level: "&cPlot &f%plot%&c needs Garden level &a%required%&c — yours is %level%."
+# %preset% %required%
+presets-garden-level: "&f%preset%&c needs Garden level &a%required%&c."
+preset-status-level: "&cNeeds Garden level %required%"
+menu-level-required: "&cNeeds Garden level %required%"
+
 # ── Protection (shown in the action bar) ─────────────────────────────────────
 # %plot%
 deny-locked: "&cPlot %plot% is locked. Open the desk to unlock it."
@@ -74,7 +94,7 @@ deny-visitor: "&cThis is not your Garden."
 
 # ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset"
+admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -111,9 +131,13 @@ admin-unlocked: "&aUnlocked %plot% for %player%."
 admin-locked: "&aLocked %plot% for %player%."
 admin-unchanged: "&7%plot% was already like that for %player%."
 admin-bad-plot: "&c'%plot%' is not a plot on this board."
-# %player% %unlocked% %total% %plots% %loaded% %readonly%
-admin-info: "&a%player%&7: %unlocked%/%total% plots (%plots%). Loaded: %loaded%. Read-only: %readonly%."
+# %player% %unlocked% %total% %plots% %loaded% %readonly% %level% %xp%
+admin-info: "&a%player%&7: %unlocked%/%total% plots (%plots%). Level %level% (%xp% XP). Loaded: %loaded%. Read-only: %readonly%."
 admin-milestone-usage: "&c/garden milestone <player> <crop> <amount>  — or —  /garden milestone <player> reset"
 # %player% %crop_name% %total% %tier%
 admin-milestone-set: "&aSet %player%'s %crop_name% to %total% (tier %tier%). No rewards were given."
 admin-milestone-reset: "&aReset all of %player%'s milestones."
+admin-xp-usage: "&c/garden xp <player> <give|take|set> <amount> [silent]"
+# level placeholders + %player%
+admin-xp-done: "&a%player%'s Garden: level %level% (%xp% XP)."
+console-help: "&7From the console: garden xp|level|milestone|reset|unlock|lock|info|reload …"

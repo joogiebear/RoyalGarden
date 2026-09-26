@@ -105,6 +105,7 @@ public final class GardenStore {
         });
         readMap(yaml.getConfigurationSection("pending"), (k, v) -> state.pendingByKey().put(k, v.toString()));
         state.setLegacyWallsCleared(yaml.getBoolean("legacy-walls-cleared", false));
+        state.setXp(yaml.getLong("xp", 0));
         return state;
     }
 
@@ -160,6 +161,7 @@ public final class GardenStore {
         writeMap(yaml, "applied", state.appliedByKey());
         writeMap(yaml, "pending", state.pendingByKey());
         yaml.set("legacy-walls-cleared", state.legacyWallsCleared());
+        yaml.set("xp", state.xp());
         try {
             writeAtomically(fileFor(state.owner()).toPath(), yaml.saveToString());
         } catch (IOException e) {

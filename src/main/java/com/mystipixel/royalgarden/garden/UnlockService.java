@@ -45,7 +45,18 @@ public final class UnlockService {
     }
 
     /** Everything that applies to one purchase. */
-    public record Terms(Cost cost, List<Requirement> requirements, List<String> commands, List<String> messages) {
+    /**
+     * @param gardenLevel the Garden level needed, 0 for none
+     */
+    public record Terms(Cost cost, int gardenLevel, List<Requirement> requirements, List<String> commands,
+                        List<String> messages) {
+    }
+
+    /** Where plot unlocks read Garden levels from and report purchases to; unset means no levels. */
+    public interface Levels {
+        int level(java.util.UUID owner);
+
+        void unlocked(Player player, int purchase);
     }
 
     private final GardenConfig config;
@@ -53,6 +64,7 @@ public final class UnlockService {
     private final CurrencyService currency;
     private final GardenWorlds worlds;
     private final Logger logger;
+    private Levels levels;
 
     public UnlockService(GardenConfig config, Messages messages, CurrencyService currency,
                          GardenWorlds worlds, Logger logger) {
@@ -61,6 +73,18 @@ public final class UnlockService {
         this.currency = currency;
         this.worlds = worlds;
         this.logger = logger;
+    }
+
+    public void setLevels(Levels levels) {
+        this.levels = levels;
+    }
+
+    /** The Garden level these terms need that the player lacks, or 0 if they have it. */
+    public int levelShortfall(Player player, Terms terms) {
+        if (levels == null || terms.gardenLevel() <= 0) {
+            return 0;
+        }
+        return levels.level(player.getUniqueId()) < terms.gardenLevel() ? terms.gardenLevel() : 0;
     }
 
     // ── terms ──────────────────────────────────────────────────────────────────
@@ -83,6 +107,9 @@ public final class UnlockService {
             cost = new Cost(base.currency(), Math.round(amount * 100.0) / 100.0);
         }
 
+        ConfigurationSection levelFrom = firstWith("garden-level", byPlot, byCount, fallback);
+        int gardenLevel = levelFrom == null ? 0 : Math.max(0, levelFrom.getInt("garden-level", 0));
+
         ConfigurationSection reqFrom = firstWith("requirements", byPlot, byCount, fallback);
         List<Requirement> requirements = reqFrom == null ? List.of() : requirements(reqFrom);
 
@@ -96,7 +123,7 @@ public final class UnlockService {
                 lines.addAll(layer.getStringList("rewards.messages"));
             }
         }
-        return new Terms(cost, requirements, commands, lines);
+        return new Terms(cost, gardenLevel, requirements, commands, lines);
     }
 
     private static ConfigurationSection section(ConfigurationSection root, String path) {
@@ -195,6 +222,14 @@ public final class UnlockService {
 
         int purchase = state.purchasedCount() + 1;
         Terms terms = terms(px, pz, purchase);
+        if (levels != null && terms.gardenLevel() > 0) {
+            int level = levels.level(player.getUniqueId());
+            if (level < terms.gardenLevel()) {
+                messages.send(player, "unlock-garden-level", "%plot%", plot,
+                        "%required%", String.valueOf(terms.gardenLevel()), "%level%", String.valueOf(level));
+                return false;
+            }
+        }
         Requirement unmet = unmet(player, terms);
         if (unmet != null) {
             String current = Placeholders.apply(player, unmet.placeholder());
@@ -229,6 +264,9 @@ public final class UnlockService {
         }
         for (String line : terms.messages()) {
             player.sendMessage(com.mystipixel.royalskyblock.util.Text.color(Messages.fill(line, placeholders)));
+        }
+        if (levels != null) {
+            levels.unlocked(player, purchase);
         }
         return true;
     }
