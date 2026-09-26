@@ -9,13 +9,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,7 +34,7 @@ public final class VisitorStore {
     /** One player's visitor data. Mutable; save it through {@link #save} after changing it. */
     public static final class Data {
         private final LinkedHashMap<String, Offer> queue = new LinkedHashMap<>();
-        private final Map<String, Long> servedBy = new HashMap<>();
+        private final Map<String, Long> servedBy = new ConcurrentHashMap<>();
         private long lastArrival;
         private long lastSeen;
         private long served;
@@ -139,8 +138,9 @@ public final class VisitorStore {
 
     private final File dir;
     private final Logger logger;
-    private final Map<UUID, Data> cache = new HashMap<>();
-    private final Set<UUID> unreadable = new HashSet<>();
+    // Concurrent: placeholders are often asked for off the server thread (scoreboards, tab lists).
+    private final Map<UUID, Data> cache = new ConcurrentHashMap<>();
+    private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
     public VisitorStore(File dataFolder, Logger logger) {
         this.dir = new File(dataFolder, "visitors");

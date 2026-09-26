@@ -1,5 +1,7 @@
 package com.mystipixel.royalgarden.visitor;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
+import com.destroystokyo.paper.profile.ProfileProperty;
 import com.mystipixel.royalgarden.config.ItemSpec;
 import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalskyblock.util.Text;
@@ -16,7 +18,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +28,9 @@ import java.util.function.Consumer;
 
 /**
  * The Visitors page of the desk, and each visitor's offer.
+ *
+ * <p>The Visitor Log lists every visitor there is: a head for each one the player has served, with how
+ * many times, and a locked icon for the rest.
  *
  * <p>The page lists everyone waiting — including those without a spot outside the barn — with the
  * player's stats, the time to the next arrival and the SkyMart button. Clicking a visitor, or
@@ -94,6 +101,7 @@ public final class VisitorMenu {
         if (service.config().skymartEnabled()) {
             place(builder, used, bottom, "skymart", 9, Material.EMERALD, this::skymart);
         }
+        place(builder, used, bottom, "log-button", 3, Material.WRITABLE_BOOK, viewer -> openLog(viewer, 1));
         fill(builder, used, rows);
         builder.build().open(player);
     }
@@ -118,6 +126,83 @@ public final class VisitorMenu {
         } else {
             player.performCommand(line);
         }
+    }
+
+    // ── the log ────────────────────────────────────────────────────────────────
+
+    /**
+     * The Visitor Log: every visitor in {@code visitors.yml}, in order. Those the viewer has served show
+     * as their head with how many times they have visited; the rest are locked.
+     */
+    public void openLog(Player player, int page) {
+        if (!service.config().enabled()) {
+            messages.send(player, "visitors-disabled");
+            return;
+        }
+        UUID owner = player.getUniqueId();
+        List<VisitorType> all = new ArrayList<>(service.config().visitors());
+        int perPage = 45;
+        int pages = Math.max(1, (all.size() + perPage - 1) / perPage);
+        int current = Math.clamp(page, 1, pages);
+        int from = (current - 1) * perPage;
+        int shown = Math.min(perPage, all.size() - from);
+        int rows = pages > 1 ? 6 : Math.min(6, Math.max(1, (shown + 8) / 9) + 1);
+        String[] paging = {"%page%", String.valueOf(current), "%pages%", String.valueOf(pages)};
+        MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(Messages.fill(
+                string("log.title", "&8Visitor Log"), paging)));
+        boolean[][] used = new boolean[rows + 1][10];
+
+        VisitorStore.Data data = service.store().get(owner);
+        for (int i = 0; i < shown; i++) {
+            VisitorType type = all.get(from + i);
+            int row = i / 9 + 1;
+            int column = i % 9 + 1;
+            builder.setSlot(row, column, Slot.builder(logIcon(owner, type, data.served(type.id()) > 0)).build());
+            used[row][column] = true;
+        }
+
+        place(builder, used, rows, "log.progress", 5, Material.BOOK, null);
+        place(builder, used, rows, "log.back", 1, Material.ARROW, this::open);
+        if (current > 1) {
+            place(builder, used, rows, "log.previous", 4, Material.ARROW, viewer -> openLog(viewer, current - 1));
+        }
+        if (current < pages) {
+            place(builder, used, rows, "log.next", 6, Material.ARROW, viewer -> openLog(viewer, current + 1));
+        }
+        fill(builder, used, rows);
+        builder.build().open(player);
+    }
+
+    private ItemStack logIcon(UUID owner, VisitorType type, boolean served) {
+        String[] placeholders = service.placeholders(owner, type);
+        int level = service.level(owner);
+        String requirement = type.gardenLevel() > level
+                ? Messages.fill(string("log.requirement", "&cNeeds Garden level %garden_level%"), placeholders)
+                : "";
+        String[] all = append(placeholders, "%requirement%", requirement);
+        if (!served) {
+            return ItemSpec.build(section("log.locked"), Material.GRAY_DYE, all);
+        }
+        ItemStack head = ItemSpec.build(section("log.served"), Material.PLAYER_HEAD, all);
+        if (head.getItemMeta() instanceof SkullMeta skull && !type.head().isBlank()) {
+            skull.setPlayerProfile(profile(type));
+            head.setItemMeta(skull);
+        }
+        return head;
+    }
+
+    /** A visitor's face: a base64 skin texture, or a player whose skin to borrow. */
+    private static PlayerProfile profile(VisitorType type) {
+        String head = type.head();
+        if (head.length() > 16) {
+            // A fixed id per visitor, so the client can cache the skin.
+            PlayerProfile profile = Bukkit.createProfile(
+                    UUID.nameUUIDFromBytes(("royalgarden-visitor:" + type.id()).getBytes(StandardCharsets.UTF_8)),
+                    "visitor");
+            profile.setProperty(new ProfileProperty("textures", head));
+            return profile;
+        }
+        return Bukkit.createProfile(head);
     }
 
     // ── one offer ──────────────────────────────────────────────────────────────

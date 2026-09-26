@@ -536,23 +536,50 @@ public final class VisitorService implements Listener {
      */
     public String[] placeholders(UUID owner, Offer offer) {
         VisitorType type = offer == null ? null : config.visitor(offer.visitor());
-        VisitorConfig.Rarity rarity = type == null ? null : config.rarity(type.rarity());
-        VisitorStore.Data data = store.get(owner);
-        OfflinePlayer player = Bukkit.getOfflinePlayer(owner);
+        String id = offer == null ? "" : offer.visitor();
         return new String[]{
-                "%player%", player.getName() == null ? owner.toString() : player.getName(),
-                "%uuid%", owner.toString(),
-                "%visitor%", offer == null ? "" : offer.visitor(),
-                "%visitor_name%", type != null ? type.displayName() : offer == null ? "" : offer.visitor(),
-                "%rarity%", type == null ? "" : type.rarity(),
-                "%rarity_name%", rarity != null ? rarity.displayName() : type == null ? "" : type.rarity(),
                 "%copper%", offer == null ? "0" : String.format("%,d", offer.copper()),
                 "%xp%", offer == null ? "0" : String.format("%,d", offer.xp()),
+                // The rest, with the visitor's id standing in for a visitor since removed from the config.
+                "%visitor%", id,
+                "%visitor_name%", type != null ? type.displayName() : id,
+                "%rarity%", type == null ? "" : type.rarity(),
+                "%rarity_name%", rarityName(type),
+                "%visitor_served%", String.format("%,d", store.get(owner).served(id)),
+                "%player%", name(owner),
+                "%uuid%", owner.toString(),
                 "%currency%", config.copperCurrency(),
-                "%served%", String.format("%,d", data.served()),
-                "%visitor_served%", offer == null ? "0" : String.format("%,d", data.served(offer.visitor())),
-                "%unique%", String.valueOf(data.unique()),
-                "%waiting%", String.valueOf(data.queued())};
+                "%served%", String.format("%,d", store.get(owner).served()),
+                "%unique%", String.valueOf(store.get(owner).unique()),
+                "%waiting%", String.valueOf(store.get(owner).queued())};
+    }
+
+    /**
+     * Placeholders for one visitor rather than one offer — the Visitor Log: {@code %visitor%
+     * %visitor_name% %rarity% %rarity_name% %visitor_served% %garden_level%}.
+     */
+    public String[] placeholders(UUID owner, VisitorType type) {
+        return new String[]{
+                "%visitor%", type.id(),
+                "%visitor_name%", type.displayName(),
+                "%rarity%", type.rarity(),
+                "%rarity_name%", rarityName(type),
+                "%visitor_served%", String.format("%,d", store.get(owner).served(type.id())),
+                "%garden_level%", String.valueOf(Math.max(1, type.gardenLevel())),
+                "%player%", name(owner)};
+    }
+
+    private String rarityName(VisitorType type) {
+        if (type == null) {
+            return "";
+        }
+        VisitorConfig.Rarity rarity = config.rarity(type.rarity());
+        return rarity != null ? rarity.displayName() : type.rarity();
+    }
+
+    private static String name(UUID owner) {
+        OfflinePlayer player = Bukkit.getOfflinePlayer(owner);
+        return player.getName() == null ? owner.toString() : player.getName();
     }
 
     /** Placeholders for the Visitors page's stats: counts, the queue, and the next arrival. */

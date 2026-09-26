@@ -232,6 +232,17 @@ and copy `examples/EcoShop/shops/skymart.yml` and `examples/EcoShop/categories/s
 `plugins/EcoShop/`. Visitors need the `CUSTOM`
 spawn reason in `world.allowed-spawn-reasons` (it is there by default), as Sam does.
 
+The **Visitor Log** (a button on the Visitors page, or `/garden visitors log`) lists every visitor in
+`visitors.yml`: the ones a player has served show as their head (`head:` — a base64 skin texture or a
+player name like `MHF_Villager`) with how many times they have visited, and the rest are locked grey
+dye, with the Garden level they need if the Garden is not there yet.
+
+**Placeholders.** Visitor stats are registered through eco's PlaceholderAPI bridge on the host, so
+they carry its prefix: `%royalskyblock_garden_visitors_served%`, `_unique` (different visitors
+served), `_total` (visitors configured), `_refused`, `_copper` (earned), `_waiting`, `_max_queue`,
+`_next` (time to the next arrival), and `%royalskyblock_garden_visitor_<id>_served%` per visitor.
+Values are plain numbers, for use in conditions.
+
 Admins: `/garden visitor <player> add [visitor]` sends one now (ignoring the clock, queue size and
 level), `clear` sends everyone waiting away, `stats` shows the counts, `reset-stats` zeroes them. The
 console can run it too. `/garden reset` also sends a Garden's waiting visitors away.

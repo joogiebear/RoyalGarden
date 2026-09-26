@@ -25,6 +25,7 @@ import com.mystipixel.royalgarden.milestone.PlacedBlocks;
 import com.mystipixel.royalgarden.visitor.VisitorConfig;
 import com.mystipixel.royalgarden.visitor.VisitorMenu;
 import com.mystipixel.royalgarden.visitor.VisitorNpcs;
+import com.mystipixel.royalgarden.visitor.VisitorPlaceholders;
 import com.mystipixel.royalgarden.visitor.VisitorService;
 import com.mystipixel.royalgarden.visitor.VisitorStore;
 import com.mystipixel.royalskyblock.RoyalSkyblockPlugin;
@@ -92,6 +93,7 @@ public final class RoyalGardenExtension extends Extension {
     private VisitorService visitors;
     private VisitorNpcs visitorNpcs;
     private BukkitTask visitorTicker;
+    private VisitorPlaceholders visitorPlaceholders;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -171,6 +173,7 @@ public final class RoyalGardenExtension extends Extension {
         scheduleMilestoneSaves();
         scheduleVisitorArrivals();
         visitorNpcs.syncAll();
+        visitorPlaceholders.register();                 // picks up visitors new in visitors.yml
         getLogger().info("Reloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml and visitors.yml.");
     }
 
@@ -299,6 +302,8 @@ public final class RoyalGardenExtension extends Extension {
         }
         scheduleVisitorArrivals();
         visitorNpcs.syncAll();
+        this.visitorPlaceholders = new VisitorPlaceholders(getPlugin(), visitors);
+        visitorPlaceholders.register();
 
         CommandGarden garden = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
                 messages, this::reloadFiles, () -> evacuationPoint(host));

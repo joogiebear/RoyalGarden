@@ -132,6 +132,10 @@ rarities:
 #    name, rarity, weight (optional), garden-level (the level they start
 #    visiting at), permission (optional)
 #    icon            : the item shown for them in menus
+#    head            : their face in the Visitor Log once served — a skin
+#                      texture (the base64 "textures" value, e.g. from a
+#                      head database) or a player name whose skin to borrow
+#                      (MHF_Villager, MHF_Pig, …). Blank for a plain head.
 #    entity          : what they are drawn as — villager, wandering_trader,
 #                      piglin, zombie_villager, witch… (any living mob)
 #    profession      : for villagers — farmer, librarian, cleric, nitwit…
@@ -151,6 +155,7 @@ visitors:
     rarity: uncommon
     garden-level: 1
     icon: wheat
+    head: MHF_Villager
     entity: villager
     profession: farmer
     villager-type: plains
@@ -171,6 +176,7 @@ visitors:
     rarity: uncommon
     garden-level: 1
     icon: carrot
+    head: MHF_Villager
     entity: villager
     profession: butcher
     villager-type: taiga
@@ -186,6 +192,7 @@ visitors:
     rarity: uncommon
     garden-level: 1
     icon: potato
+    head: MHF_Villager
     entity: villager
     profession: farmer
     villager-type: swamp
@@ -204,6 +211,7 @@ visitors:
     rarity: uncommon
     garden-level: 2
     icon: beetroot
+    head: MHF_Villager
     entity: villager
     profession: cleric
     villager-type: plains
@@ -219,6 +227,7 @@ visitors:
     rarity: rare
     garden-level: 3
     icon: sugar_cane
+    head: MHF_Villager
     entity: villager
     profession: librarian
     villager-type: desert
@@ -239,6 +248,7 @@ visitors:
     rarity: rare
     garden-level: 3
     icon: melon_slice
+    head: MHF_Villager
     entity: villager
     profession: farmer
     villager-type: jungle
@@ -255,6 +265,7 @@ visitors:
     rarity: rare
     garden-level: 4
     icon: pumpkin
+    head: MHF_Villager
     entity: villager
     profession: mason
     villager-type: savanna
@@ -270,6 +281,7 @@ visitors:
     rarity: rare
     garden-level: 5
     icon: cactus
+    head: MHF_Villager
     entity: villager
     profession: leatherworker
     villager-type: desert
@@ -285,6 +297,7 @@ visitors:
     rarity: legendary
     garden-level: 6
     icon: cocoa_beans
+    head: MHF_Villager
     entity: wandering_trader
     dialogue: "&7\"From far away I came, for beans of brown.\""
     requests:
@@ -299,6 +312,7 @@ visitors:
     rarity: legendary
     garden-level: 8
     icon: red_mushroom
+    head: MHF_MushroomCow
     entity: mooshroom
     dialogue: "&7\"Moo. (Mushrooms, please.)\""
     requests:
@@ -312,6 +326,7 @@ visitors:
     rarity: legendary
     garden-level: 10
     icon: nether_wart
+    head: MHF_PigZombie
     entity: piglin
     dialogue: "&7\"Wart. Now. Gold later, maybe.\""
     requests:
@@ -325,6 +340,7 @@ visitors:
     rarity: mythic
     garden-level: 12
     icon: golden_carrot
+    head: MHF_Villager
     entity: villager
     profession: cleric
     villager-type: snow
@@ -393,6 +409,18 @@ menu:
       - ""
       - "&7Waiting: &e%waiting%&7/&e%max_queue%"
       - "&7Next visitor: &e%next%"
+  # Opens the Visitor Log. Same placeholders as stats.
+  log-button:
+    column: 3
+    material: writable_book
+    name: "&aVisitor Log"
+    lore:
+      - "&7Every visitor you have met,"
+      - "&7and how often they came."
+      - ""
+      - "&7Met: &e%unique%&7/&e%total_visitors%"
+      - ""
+      - "&eClick to view."
   skymart:
     column: 9
     material: copper_ingot
@@ -406,6 +434,48 @@ menu:
     column: 1
     material: arrow
     name: "&7Back to the desk"
+  # The Visitor Log: every visitor in the order above. Served ones show their
+  # head; the rest are locked.
+  # %visitor% %visitor_name% %rarity% %rarity_name% %visitor_served%
+  # %garden_level% (the level they start visiting at) %requirement%
+  log:
+    title: "&8Visitor Log (%page%/%pages%)"
+    served:
+      name: "%visitor_name%"
+      lore:
+        - "%rarity_name%"
+        - ""
+        - "&7Visited &e%visitor_served% &7times."
+    locked:
+      material: gray_dye
+      name: "&7???"
+      lore:
+        - "%rarity_name%"
+        - ""
+        - "&7You have not served this"
+        - "&7visitor yet."
+        - "%requirement%"
+    # Shown as %requirement% while the Garden is below the visitor's level.
+    requirement: "&cNeeds Garden level %garden_level%"
+    # Bottom row. Same placeholders as stats above.
+    progress:
+      column: 5
+      material: book
+      name: "&aVisitors met: &e%unique%&7/&e%total_visitors%"
+      lore:
+        - "&7Served in total: &e%served%"
+    back:
+      column: 1
+      material: arrow
+      name: "&7Back"
+    previous:
+      column: 4
+      material: arrow
+      name: "&7Previous page"
+    next:
+      column: 6
+      material: arrow
+      name: "&7Next page"
   offer:
     title: "&8%visitor_name%"
     # The visitor; its material is the visitor's icon. Also %dialogue%.

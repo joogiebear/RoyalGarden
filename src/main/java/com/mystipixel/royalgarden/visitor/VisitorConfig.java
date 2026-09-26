@@ -115,6 +115,7 @@ public final class VisitorConfig extends YamlFile {
                     v.getString("entity", "villager").trim().toLowerCase(Locale.ROOT),
                     v.getString("profession", "").trim().toLowerCase(Locale.ROOT),
                     v.getString("villager-type", "").trim().toLowerCase(Locale.ROOT),
+                    v.getString("head", "").trim(),
                     lines(v, "dialogue"),
                     List.copyOf(requests),
                     v.getConfigurationSection("rewards")));

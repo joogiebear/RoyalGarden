@@ -15,13 +15,15 @@ import java.util.List;
  * @param entity      the entity type they are drawn as, lower case ({@code villager}, {@code piglin}…)
  * @param profession  a villager profession, for villagers; blank for none
  * @param biome       a villager type (the biome look), for villagers; blank for plains
+ * @param head        their face in the Visitor Log once served: a skin texture (base64) or a player
+ *                    name; blank for a plain head
  * @param dialogue    lines shown on their offer
  * @param requests    the requests they choose between, one per visit
  * @param rewards     their own {@code rewards:} section, or null
  */
 public record VisitorType(String id, String displayName, String rarity, double weight, int gardenLevel,
                           String permission, Material icon, String entity, String profession, String biome,
-                          List<String> dialogue, List<Request> requests, ConfigurationSection rewards) {
+                          String head, List<String> dialogue, List<Request> requests, ConfigurationSection rewards) {
 
     /** One set of items a visitor may ask for, chosen by {@code weight}. */
     public record Request(double weight, List<Item> items) {

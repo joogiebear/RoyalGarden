@@ -145,7 +145,11 @@ public final class CommandGarden extends PluginCommand {
             return;
         }
         if (args.get(0).equalsIgnoreCase("visitors") && visitorMenu != null) {
-            visitorMenu.open(player);
+            if (args.size() > 1 && args.get(1).equalsIgnoreCase("log")) {
+                visitorMenu.openLog(player, 1);
+            } else {
+                visitorMenu.open(player);
+            }
             return;
         }
         admin(player, args);
@@ -154,6 +158,9 @@ public final class CommandGarden extends PluginCommand {
     @Override
     public List<String> tabComplete(Player player, List<String> args) {
         if (!player.hasPermission(ADMIN)) {
+            if (args.size() == 2 && args.get(0).equalsIgnoreCase("visitors")) {
+                return "log".startsWith(args.get(1).toLowerCase(Locale.ROOT)) ? List.of("log") : List.of();
+            }
             if (args.size() > 1) {
                 return List.of();
             }
