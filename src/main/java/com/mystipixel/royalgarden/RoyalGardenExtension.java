@@ -14,6 +14,7 @@ import com.mystipixel.royalgarden.garden.PresetLibrary;
 import com.mystipixel.royalgarden.garden.PresetService;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.mystipixel.royalgarden.garden.UnlockService;
+import com.mystipixel.royalgarden.hooks.RoyalGardenExpansion;
 import com.mystipixel.royalgarden.level.GardenLevels;
 import com.mystipixel.royalgarden.level.LevelConfig;
 import com.mystipixel.royalgarden.milestone.MilestoneConfig;
@@ -93,7 +94,7 @@ public final class RoyalGardenExtension extends Extension {
     private VisitorService visitors;
     private VisitorNpcs visitorNpcs;
     private BukkitTask visitorTicker;
-    private VisitorPlaceholders visitorPlaceholders;
+    private Object expansion;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -173,7 +174,6 @@ public final class RoyalGardenExtension extends Extension {
         scheduleMilestoneSaves();
         scheduleVisitorArrivals();
         visitorNpcs.syncAll();
-        visitorPlaceholders.register();                 // picks up visitors new in visitors.yml
         getLogger().info("Reloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml and visitors.yml.");
     }
 
@@ -302,8 +302,7 @@ public final class RoyalGardenExtension extends Extension {
         }
         scheduleVisitorArrivals();
         visitorNpcs.syncAll();
-        this.visitorPlaceholders = new VisitorPlaceholders(getPlugin(), visitors);
-        visitorPlaceholders.register();
+        registerExpansion(new VisitorPlaceholders(visitors));
 
         CommandGarden garden = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
                 messages, this::reloadFiles, () -> evacuationPoint(host));
@@ -327,6 +326,30 @@ public final class RoyalGardenExtension extends Extension {
         }
         long period = milestoneConfig.saveIntervalSeconds() * 20L;
         milestoneSaver = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneStore::saveAll, period, period);
+    }
+
+    /**
+     * Register {@code %royalgarden_...%} with PlaceholderAPI, if it is enabled.
+     *
+     * <p>The expansion class extends a PlaceholderAPI type, so it is only touched behind the enabled
+     * check, and held as an {@code Object} so this class never needs PlaceholderAPI to load. A failure
+     * costs the placeholders, never the extension.
+     */
+    private void registerExpansion(VisitorPlaceholders visitorPlaceholders) {
+        if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            getLogger().info("PlaceholderAPI not found — %royalgarden_...% placeholders are off.");
+            return;
+        }
+        try {
+            RoyalGardenExpansion created = new RoyalGardenExpansion(getVersion(), visitorPlaceholders::resolve);
+            if (created.register()) {
+                this.expansion = created;
+            } else {
+                getLogger().warning("PlaceholderAPI refused the royalgarden expansion.");
+            }
+        } catch (LinkageError unusable) {
+            getLogger().warning("Could not register %royalgarden_...% placeholders: " + unusable);
+        }
     }
 
     /** Check for visitor arrivals every {@code arrivals.check-every-seconds}. */
@@ -429,6 +452,16 @@ public final class RoyalGardenExtension extends Extension {
         if (visitorTicker != null) {
             visitorTicker.cancel();
             visitorTicker = null;
+        }
+        if (expansion != null) {
+            // persist() keeps it across PlaceholderAPI reloads, so it must be removed by hand here or an
+            // extension reload would leave the old one answering from a dead service.
+            try {
+                ((RoyalGardenExpansion) expansion).unregister();
+            } catch (LinkageError ignored) {
+                // PlaceholderAPI went away first; nothing is left to unregister from
+            }
+            expansion = null;
         }
         if (visitors != null) {
             visitors.shutdown();

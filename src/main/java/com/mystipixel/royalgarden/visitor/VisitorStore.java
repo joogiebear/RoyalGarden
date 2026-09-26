@@ -156,7 +156,16 @@ public final class VisitorStore {
 
     /** A player's data, read from disk the first time. */
     public Data get(UUID player) {
-        return cache.computeIfAbsent(player, this::read);
+        return cache.computeIfAbsent(player, id -> read(id, true));
+    }
+
+    /**
+     * A player's data for reading only: the cached copy if there is one, else read from disk without
+     * caching it — for placeholders asked about offline players. Never write through it.
+     */
+    public Data peek(UUID player) {
+        Data cached = cache.get(player);
+        return cached != null ? cached : read(player, false);
     }
 
     /** Whether this player's file could not be read, so nothing of theirs may change. */
@@ -165,7 +174,11 @@ public final class VisitorStore {
         return unreadable.contains(player);
     }
 
-    private Data read(UUID player) {
+    /**
+     * @param keep whether the result will be cached. Only then is a broken file copied aside and marked
+     *             read-only; a peek just sees nothing, so asking about one repeatedly copies nothing.
+     */
+    private Data read(UUID player, boolean keep) {
         Data data = new Data();
         File file = fileFor(player);
         if (!file.exists()) {
@@ -175,6 +188,9 @@ public final class VisitorStore {
         try {
             yaml.load(file);
         } catch (IOException | InvalidConfigurationException broken) {
+            if (!keep) {
+                return data;
+            }
             File aside = new File(dir, player + ".yml.broken-" + System.currentTimeMillis());
             try {
                 Files.copy(file.toPath(), aside.toPath());

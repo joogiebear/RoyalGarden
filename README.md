@@ -237,11 +237,11 @@ The **Visitor Log** (a button on the Visitors page, or `/garden visitors log`) l
 player name like `MHF_Villager`) with how many times they have visited, and the rest are locked grey
 dye, with the Garden level they need if the Garden is not there yet.
 
-**Placeholders.** Visitor stats are registered through eco's PlaceholderAPI bridge on the host, so
-they carry its prefix: `%royalskyblock_garden_visitors_served%`, `_unique` (different visitors
-served), `_total` (visitors configured), `_refused`, `_copper` (earned), `_waiting`, `_max_queue`,
-`_next` (time to the next arrival), and `%royalskyblock_garden_visitor_<id>_served%` per visitor.
-Values are plain numbers, for use in conditions.
+**Placeholders** (with PlaceholderAPI installed): `%royalgarden_visitors_served%`,
+`_visitors_unique` (different visitors served), `_visitors_total` (visitors configured),
+`_visitors_refused`, `_visitors_copper` (earned), `_visitors_waiting`, `_visitors_max_queue`,
+`_visitors_next` (time to the next arrival), and `%royalgarden_visitor_<id>_served%` per visitor.
+Values are plain numbers, for use in conditions, and work for offline players too.
 
 Admins: `/garden visitor <player> add [visitor]` sends one now (ignoring the clock, queue size and
 level), `clear` sends everyone waiting away, `stats` shows the counts, `reset-stats` zeroes them. The

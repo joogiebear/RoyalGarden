@@ -1,73 +1,67 @@
 package com.mystipixel.royalgarden.visitor;
 
 import com.mystipixel.royalgarden.config.Durations;
-import com.willfp.eco.core.EcoPlugin;
-import com.willfp.eco.core.placeholder.PlayerPlaceholder;
-import org.bukkit.entity.Player;
+import org.bukkit.OfflinePlayer;
 
-import java.util.function.Function;
+import java.util.Locale;
 
 /**
- * Visitor stats as PlaceholderAPI placeholders.
- *
- * <p>Registered through eco's placeholder system rather than a PlaceholderAPI expansion of our own:
- * PlaceholderAPI is not on this extension's class path (see
- * {@link com.mystipixel.royalgarden.config.Placeholders}), while eco already bridges every placeholder
- * its plugins register. They are registered on the host, so they carry its prefix:
+ * Visitor stats for {@code %royalgarden_<key>%}, answered without PlaceholderAPI's types so the logic
+ * loads on any server; {@link com.mystipixel.royalgarden.hooks.RoyalGardenExpansion} is the front end.
  *
  * <pre>
- *   %royalskyblock_garden_visitors_served%        visitors served in total
- *   %royalskyblock_garden_visitors_unique%        different visitors served
- *   %royalskyblock_garden_visitors_total%         visitors in visitors.yml
- *   %royalskyblock_garden_visitors_refused%       visitors refused
- *   %royalskyblock_garden_visitors_copper%        Copper earned from visitors
- *   %royalskyblock_garden_visitors_waiting%       visitors waiting now
- *   %royalskyblock_garden_visitors_max_queue%     most that can wait
- *   %royalskyblock_garden_visitors_next%          time to the next arrival
- *   %royalskyblock_garden_visitor_&lt;id&gt;_served%   times one visitor has been served
+ *   %royalgarden_visitors_served%        visitors served in total
+ *   %royalgarden_visitors_unique%        different visitors served
+ *   %royalgarden_visitors_total%         visitors in visitors.yml
+ *   %royalgarden_visitors_refused%       visitors refused
+ *   %royalgarden_visitors_copper%        Copper earned from visitors
+ *   %royalgarden_visitors_waiting%       visitors waiting now
+ *   %royalgarden_visitors_max_queue%     most that can wait
+ *   %royalgarden_visitors_next%          time to the next arrival (blank while the queue is full)
+ *   %royalgarden_visitor_&lt;id&gt;_served%   times one visitor has been served
  * </pre>
  *
- * <p>Plain numbers, no separators, so they can be compared in conditions. Only online players have
- * values.
+ * <p>Plain numbers, no separators, so they can be compared in conditions. Offline players are read
+ * from disk without being cached, so leaderboards and holograms do not fill memory with them.
  */
 public final class VisitorPlaceholders {
 
-    public static final String PREFIX = "garden_";
-
-    private final EcoPlugin plugin;
     private final VisitorService service;
 
-    public VisitorPlaceholders(EcoPlugin plugin, VisitorService service) {
-        this.plugin = plugin;
+    public VisitorPlaceholders(VisitorService service) {
         this.service = service;
     }
 
-    /**
-     * Register every placeholder, including one per visitor in {@code visitors.yml}. Run again after a
-     * reload to add visitors that were new in it; registering an identifier twice replaces it.
-     */
-    public void register() {
-        stat("visitors_served", data -> String.valueOf(data.served()));
-        stat("visitors_unique", data -> String.valueOf(data.unique()));
-        stat("visitors_refused", data -> String.valueOf(data.refused()));
-        stat("visitors_copper", data -> String.valueOf(data.copper()));
-        stat("visitors_waiting", data -> String.valueOf(data.queued()));
-        new PlayerPlaceholder(plugin, PREFIX + "visitors_total",
-                player -> String.valueOf(service.config().visitors().size())).register();
-        new PlayerPlaceholder(plugin, PREFIX + "visitors_max_queue",
-                player -> String.valueOf(service.maxQueue(player.getUniqueId()))).register();
-        new PlayerPlaceholder(plugin, PREFIX + "visitors_next", player -> {
-            long next = service.untilNext(player.getUniqueId());
-            return next < 0 ? "" : Durations.format(next);
-        }).register();
-        for (VisitorType type : service.config().visitors()) {
-            String id = type.id();
-            stat("visitor_" + id + "_served", data -> String.valueOf(data.served(id)));
+    /** The value for {@code key}, or null if the key is not one of ours. */
+    public String resolve(OfflinePlayer player, String key) {
+        String params = key.toLowerCase(Locale.ROOT);
+        VisitorStore.Data data = service.store().peek(player.getUniqueId());
+        switch (params) {
+            case "visitors_served":
+                return String.valueOf(data.served());
+            case "visitors_unique":
+                return String.valueOf(data.unique());
+            case "visitors_total":
+                return String.valueOf(service.config().visitors().size());
+            case "visitors_refused":
+                return String.valueOf(data.refused());
+            case "visitors_copper":
+                return String.valueOf(data.copper());
+            case "visitors_waiting":
+                return String.valueOf(data.queued());
+            case "visitors_max_queue":
+                return String.valueOf(service.maxQueue(player.getUniqueId()));
+            case "visitors_next": {
+                long next = service.untilNext(player.getUniqueId(), data);
+                return next < 0 ? "" : Durations.format(next);
+            }
+            default:
+                break;
         }
-    }
-
-    private void stat(String name, Function<VisitorStore.Data, String> value) {
-        new PlayerPlaceholder(plugin, PREFIX + name, (Player player) -> value.apply(
-                service.store().get(player.getUniqueId()))).register();
+        if (params.startsWith("visitor_") && params.endsWith("_served")) {
+            String id = params.substring("visitor_".length(), params.length() - "_served".length());
+            return service.config().visitor(id) == null ? null : String.valueOf(data.served(id));
+        }
+        return null;
     }
 }

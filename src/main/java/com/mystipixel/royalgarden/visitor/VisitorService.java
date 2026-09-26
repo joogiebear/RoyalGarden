@@ -248,7 +248,11 @@ public final class VisitorService implements Listener {
 
     /** Milliseconds until the next visitor, or -1 while the queue is full. */
     public long untilNext(UUID owner) {
-        VisitorStore.Data data = store.get(owner);
+        return untilNext(owner, store.get(owner));
+    }
+
+    /** {@link #untilNext(UUID)} for data already in hand. */
+    public long untilNext(UUID owner, VisitorStore.Data data) {
         if (data.queued() >= maxQueue(owner)) {
             return -1;
         }
