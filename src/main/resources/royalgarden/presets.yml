@@ -1,0 +1,46 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RoyalGarden  ·  presets.yml
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Which plot presets players can choose at the desk (right-click a plot they
+#  own), and on what terms.
+#
+#  Making a preset:
+#    1. Build a plot the way you want it, in any Garden (not the farmhouse).
+#    2. Stand on it:  /garden capture <id>
+#    3. An entry for <id> appears below with selectable: false. Name it, price
+#       it, set selectable: true, and /garden reload.
+#
+#  flat and bedrock are built in (no capture needed) and can be listed too.
+#
+#  Per preset:
+#    display-name : shown in the menu
+#    icon         : menu item
+#    lore         : lines under the name
+#    cost         : e.g. "5000 coins" — RoyalSkyblock currencies
+#    cooldown     : wait before the same plot can be rebuilt again
+#                   (leave out to use presets.players.cooldown in config.yml)
+#    permission   : needed to choose it ("" = anyone)
+#    selectable   : false hides it from players (admins can still apply it)
+#
+#  Entries are shown in the order written here.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Preset every NEW Garden's plots are generated from. "" = plain fields.
+default: ""
+
+presets:
+  flat:
+    display-name: "&aPlain field"
+    icon: grass_block
+    lore:
+      - "&7Grass over dirt, a path around the edge."
+      - "&7Start again from nothing."
+    cost: 0 coins
+    selectable: true
+  bedrock:
+    display-name: "&8Bare slab"
+    icon: bedrock
+    lore:
+      - "&7Just the floor. Build anything."
+    cost: 0 coins
+    selectable: true

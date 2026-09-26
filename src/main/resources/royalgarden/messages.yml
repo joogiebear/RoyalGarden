@@ -1,0 +1,107 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RoyalGarden  ·  messages.yml
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Every line a player can read. & colour codes and &#rrggbb hex work.
+#  Set a message to "" to switch it off.
+#  Placeholders are listed next to the messages that have them.
+#  Missing keys fall back to the shipped text, so updates never leave a blank.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+prefix: "&2&lGarden &8» &r"
+
+# ── Going to your Garden ─────────────────────────────────────────────────────
+garden-opening: "&7Opening your Garden…"
+garden-welcome: "&aWelcome to your Garden. &7Talk to Sam, or use /desk."
+garden-open-failed: "&cYour Garden could not be opened. The error is in the server log."
+garden-unreadable: "&cYour Garden's data could not be read. Please contact staff — nothing has been lost."
+
+# ── Unlocking ────────────────────────────────────────────────────────────────
+# %plot% %cost% %count% (plots now owned)
+unlocked: "&aUnlocked plot &f%plot%&a for &e%cost%&a. &7(%count% plots)"
+unlock-not-adjacent: "&cUnlock a plot next to &f%plot%&c first."
+# %limit%
+unlock-limit-reached: "&cYou can own at most &f%limit%&c plots."
+# %plot% %cost%
+unlock-cannot-afford: "&cPlot &f%plot%&c costs &e%cost%&c."
+# Default text for a requirement with no message of its own. %required% %current% %plot%
+unlock-requirement: "&cYou need at least &f%required%&c to unlock this plot &7(you have %current%)."
+cost-free: "&aFree"
+payment-failed: "&cThe payment could not be taken. Nothing was changed."
+payment-refunded: "&cThat did not go through, so you have been refunded."
+
+# ── Presets ──────────────────────────────────────────────────────────────────
+presets-disabled: "&cChoosing presets is switched off."
+presets-none: "&7There are no presets to choose from yet."
+presets-go-to-garden: "&cGo to your Garden first: &f/garden"
+# %plot%
+presets-plot-not-yours: "&cYou can only rebuild plots you have unlocked, and never the farmhouse."
+# %preset%
+presets-no-permission: "&cYou do not have access to &f%preset%&c."
+# %plot% %time%
+presets-cooldown: "&cPlot &f%plot%&c was rebuilt recently. Try again in &f%time%&c."
+# %preset% %plot% %cost% %time%
+presets-confirm: "&eThis replaces &lEVERYTHING&e on plot &f%plot%&e with &f%preset%&e for &6%cost%&e. Click again within %time% to confirm."
+# %preset% %cost%
+presets-cannot-afford: "&f%preset%&c costs &e%cost%&c."
+presets-failed: "&cThat preset could not be read, so nothing was changed. Please tell staff."
+# %preset% %plot%
+presets-applying: "&aBuilding &f%preset%&a on plot &f%plot%&a… &7Stand back — it takes about a minute."
+plot-busy: "&cPlot &f%plot%&c is already being built. Wait for it to finish."
+
+# Menu fragments
+preset-none: "&7as generated"
+preset-current: "&a✔ On this plot now"
+preset-status-ready: "&eClick to choose."
+preset-status-cooldown: "&cAvailable in %time%"
+preset-status-no-permission: "&cLocked"
+menu-presets-hint: "&eRight-click to choose a preset."
+
+# ── Protection (shown in the action bar) ─────────────────────────────────────
+# %plot%
+deny-locked: "&cPlot %plot% is locked. Open the desk to unlock it."
+deny-farmhouse: "&cThe farmhouse plot is protected."
+deny-floor: "&cThat is the floor of your Garden."
+deny-outside: "&cThat is outside your Garden."
+deny-visitor: "&cThis is not your Garden."
+
+# ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
+no-permission: "&cYou cannot do that."
+admin-help: "&7/garden &8— &7go to your Garden. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>"
+admin-stand-in-garden: "&cStand in a Garden first."
+admin-stand-on-plot: "&cStand on the plot you want to use."
+admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
+admin-capture-farmhouse: "&cThat is the farmhouse plot. Build presets on any other plot."
+# %plot% %preset% %layers%
+admin-captured: "&aCaptured plot %plot% as '%preset%' (%layers% layers). &7Add it to presets.yml to offer it to players."
+# %error%
+admin-capture-failed: "&cCould not save the preset: %error%"
+admin-apply-usage: "&cName a preset: /garden apply <name>  — or /garden flat, /garden bedrock"
+admin-apply-farmhouse: "&cThe farmhouse plot cannot be replaced."
+# %preset% %plot%
+admin-applying: "&aBuilding '%preset%' on plot %plot%… &7This takes about a minute."
+# %preset%
+admin-no-preset: "&cNo preset called '%preset%'. Try flat, bedrock, or /garden presets."
+admin-default-set: "&aNew plots will be built from '%preset%'."
+admin-default-cleared: "&aNew plots will be flat."
+admin-deleted: "&aDeleted preset '%preset%'."
+admin-presets-empty: "&7No presets captured yet."
+admin-presets-header: "&aPresets:"
+# %preset% %flags%
+admin-presets-line: "&f  %preset%%flags%"
+admin-presets-default: " &e(default)"
+admin-presets-selectable: " &b(players)"
+admin-reloaded: "&aReloaded config.yml, messages.yml and presets.yml."
+# %player%
+admin-unknown-player: "&cNo player called %player% has played here."
+admin-no-garden: "&c%player% has no Garden yet."
+admin-reset: "&aReset %player%'s Garden: unlocks and presets forgotten. The world was kept."
+admin-reset-world: "&aReset %player%'s Garden and deleted its world. It is rebuilt on their next /garden."
+# %player% %error%
+admin-reset-failed: "&cResetting %player%'s Garden failed: %error%"
+# %player% %plot%
+admin-unlocked: "&aUnlocked %plot% for %player%."
+admin-locked: "&aLocked %plot% for %player%."
+admin-unchanged: "&7%plot% was already like that for %player%."
+admin-bad-plot: "&c'%plot%' is not a plot on this board."
+# %player% %unlocked% %total% %plots% %loaded% %readonly%
+admin-info: "&a%player%&7: %unlocked%/%total% plots (%plots%). Loaded: %loaded%. Read-only: %readonly%."

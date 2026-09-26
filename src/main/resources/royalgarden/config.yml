@@ -1,0 +1,249 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RoyalGarden  ·  config.yml
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Lives in plugins/RoyalSkyblock/extensions/RoyalGarden/.
+#  Reload with /garden reload (or the RoyalSkyblock reload). Everything except
+#  `layout:` takes effect on reload; `layout:` needs a restart.
+#
+#  Costs use RoyalSkyblock's currencies (the `currencies:` section of ITS
+#  config.yml), written the same way island upgrades write them:
+#      cost: 5000 coins         or     cost: { currency: gems, amount: 50 }
+#  "0" or leaving it out means free.
+#
+#  Durations: 2d, 4h, 30m, 45s, 1h30m — or 0 for none.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── The board ─────────────────────────────────────────────────────────────────
+# ⚠ Decide these BEFORE anyone has a Garden. Changing them later misplaces every
+#   plot in every existing Garden, and captured presets must be recaptured.
+layout:
+  grid: 5            # plots per side: 1, 3 or 5 (odd, so the farmhouse has a middle)
+  plot-size: 96      # blocks per plot side, 32–512
+  ground-y: 100      # surface height
+
+# ── Building plots ────────────────────────────────────────────────────────────
+generation:
+  # Block writes per tick across ALL Gardens together. Lower it if contest
+  # openings (lots of new Gardens at once) cost TPS; raise it on a strong box.
+  blocks-per-tick: 24000
+  # Ticks between rows when a preset is applied (96 rows ≈ 58s at 12). Slow on
+  # purpose: it looks like the farm being built. 0 = as fast as the budget allows.
+  paste-ticks-per-row: 12
+  # Tallest preset that can be captured, counted from the floor up.
+  max-template-height: 48
+  # What a plain plot is made of.
+  blocks:
+    surface: grass_block
+    rim: dirt_path
+    subsoil: dirt
+    floor: bedrock
+  # Remove the stone-brick plot walls old versions built. Runs once per Garden.
+  clear-legacy-walls: true
+
+# ── Buying plots ──────────────────────────────────────────────────────────────
+# A plot can be bought when it touches (not diagonally) one you already own.
+unlock:
+  # Most plots a player may own, farmhouse included. Raise it per rank with the
+  # permission royalgarden.limit.<n> (the highest one a player has wins).
+  max-plots: 25
+
+  # Applies to every purchase unless by-count / by-plot say otherwise.
+  default:
+    cost: 10000 coins
+    # Multiplies the default cost for each plot already bought:
+    # 1.0 = flat price; 1.25 = 10000, 12500, 15625, ...
+    cost-scaling: 1.25
+    # Checked with PlaceholderAPI. All must pass. Leave empty for none.
+    #   - placeholder: "%ecoskills_farming%"
+    #     min: 10
+    #     message: "&cYou need Farming 10 to buy more plots."
+    requirements: []
+    # Run on every purchase. Placeholders: %player% %uuid% %plot% %count% %purchase%
+    rewards:
+      commands: []
+      messages: []
+
+  # Overrides by the n-th plot bought (the farmhouse doesn't count, so 1 is the
+  # first purchase, 24 the last on a 5x5 board). Any of cost / requirements /
+  # rewards. Rewards ADD to the default ones rather than replacing them.
+  #   by-count:
+  #     1:
+  #       cost: 0 coins
+  #     12:
+  #       rewards:
+  #         commands: ["eco give %player% 50000"]
+  #         messages: ["&6Halfway there!"]
+  #     24:
+  #       rewards:
+  #         commands: ["broadcast %player% has unlocked their whole Garden!"]
+  by-count: {}
+
+  # Overrides for particular plots by name (A1 top-left … E5 bottom-right; the
+  # farmhouse is C3). Most specific, so it wins over by-count.
+  #   by-plot:
+  #     A1: { cost: 250000 coins }
+  #     E5:
+  #       cost: 250000 coins
+  #       requirements:
+  #         - placeholder: "%royalskyblock_level%"
+  #           min: 100
+  #           message: "&cCorner plots need island level 100."
+  by-plot: {}
+
+# ── Presets ───────────────────────────────────────────────────────────────────
+# Which presets players can choose, and what they cost, is in presets.yml.
+presets:
+  # Paste crops, stems, cane, berries etc. at age 0 instead of as captured, so a
+  # fresh preset is a planted farm, not a free harvest. Recommended for contests.
+  reset-crop-age: true
+  # Blocks never pasted (they become air) — anything harvestable on the spot.
+  never-paste:
+    - melon
+    - pumpkin
+  players:
+    # Let players rebuild their own plots from the desk (right-click a plot).
+    enabled: true
+    # Wait between two rebuilds of the SAME plot. A preset can set its own.
+    # royalgarden.bypass.cooldown skips it.
+    cooldown: 1h
+    # Players click a preset twice to confirm; this long between clicks. 0 = one click.
+    confirm-window: 10s
+
+# ── World rules ───────────────────────────────────────────────────────────────
+world:
+  difficulty: peaceful
+  # Any gamerule; both the classic names and the 26.2 ids work.
+  gamerules:
+    doMobSpawning: false
+    mobGriefing: false
+    doFireTick: false
+    doInsomnia: false
+    doPatrolSpawning: false
+    doTraderSpawning: false
+    keepInventory: true
+  border:
+    warning-distance: 0
+    damage-amount: 0.0
+    damage-buffer: 0.0
+  # Remove vanilla mobs (ones no plugin has tagged) as chunks load.
+  sweep-vanilla-mobs: true
+  # Why a creature may spawn. CUSTOM covers plugins (EcoMobs, Sam). Add BREEDING,
+  # SPAWNER_EGG, SPAWNER, EGG … to allow animal and mob farms — and switch
+  # sweep-vanilla-mobs off, or it will clear them on the next load.
+  allowed-spawn-reasons:
+    - CUSTOM
+    - COMMAND
+
+# ── Protection ────────────────────────────────────────────────────────────────
+# true = protected. Operators (royalgarden.bypass) ignore all of it.
+protection:
+  farmhouse: true      # the centre plot is read-only
+  floor: true          # the floor course can't be broken
+  locked-plots: true   # can't walk, pearl or ride into a plot you don't own
+  pistons: true        # pistons can't push into / pull out of protected ground
+  liquids: true        # water and lava can't flow into protected ground
+  explosions: true     # explosions leave protected ground alone
+  growth: true         # trees and bone meal stay out of protected ground
+  dispensers: true     # dispensers can't place into protected ground
+  visitors-can-build: false
+  visitors-can-interact: false
+  # Blocks in protected areas that can still be right-clicked.
+  interact-allow: []
+
+# ── Sam ───────────────────────────────────────────────────────────────────────
+sam:
+  enabled: true
+  name: "&aSam &7— Garden Desk"
+  profession: farmer
+
+# ── Commands ──────────────────────────────────────────────────────────────────
+# Command names (restart to change).
+commands:
+  garden: garden
+  desk: desk
+
+# ── Admin ─────────────────────────────────────────────────────────────────────
+admin:
+  # Where players standing in a Garden go when /garden reset <player> world
+  # deletes it. Blank = RoyalSkyblock's spawn.world.
+  evacuate-world: ""
+
+# ── The desk menu ─────────────────────────────────────────────────────────────
+menu:
+  title: "&8The Garden"
+  # Fills empty slots. "" for none.
+  filler: black_stained_glass_pane
+  items:
+    # Placeholders: %plot%
+    farmhouse:
+      material: hay_block
+      name: "&6Farmhouse"
+      lore:
+        - "&7Plot %plot% — always yours."
+        - "&7Sam and the desk are here."
+        - ""
+        - "&eClick to go here."
+    # %plot% %preset% %presets-hint%
+    unlocked:
+      material: grass_block
+      name: "&aPlot %plot%"
+      lore:
+        - "&7Built from: &f%preset%"
+        - ""
+        - "&eLeft-click to go here."
+        - "%presets-hint%"
+    building:
+      material: scaffolding
+      name: "&ePlot %plot% &7(building…)"
+      lore:
+        - "&7Being rebuilt from &f%preset%&7."
+        - ""
+        - "&eLeft-click to go and watch."
+    # %plot% %cost% %purchase% %requirement%
+    unlockable:
+      material: lime_stained_glass_pane
+      name: "&ePlot %plot%"
+      lore:
+        - "&7Locked, and next to a plot you own."
+        - ""
+        - "&7Cost: %cost%"
+        - "%requirement%"
+        - ""
+        - "&eClick to unlock."
+    # %plot% %limit%
+    limit-reached:
+      material: barrier
+      name: "&cPlot %plot%"
+      lore:
+        - "&7You own the most plots you can (%limit%)."
+    # %plot%
+    locked:
+      material: gray_stained_glass_pane
+      name: "&8Plot %plot%"
+      lore:
+        - "&7Locked — unlock a plot next to it first."
+    # %unlocked% %total% %limit% %size%
+    summary:
+      material: wheat
+      name: "&aYour Garden"
+      lore:
+        - "&7%unlocked% of %total% plots unlocked"
+        - "&7Each plot is %size%×%size%"
+        - ""
+        - "&7Each new plot must touch"
+        - "&7one you already own."
+
+# ── The preset picker (right-click an owned plot) ─────────────────────────────
+preset-menu:
+  title: "&8Presets — Plot %plot%"
+  # Added under each preset's own lore from presets.yml.
+  # %preset% %plot% %cost% %cooldown% %status% %current%
+  entry-lore:
+    - ""
+    - "&7Cost: %cost%"
+    - "&7Cooldown: &f%cooldown%"
+    - "%current%"
+    - "%status%"
+  back:
+    material: arrow
+    name: "&7Back to the board"

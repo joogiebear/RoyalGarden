@@ -12,7 +12,7 @@ import java.util.List;
  *
  * <p>The same thing right-clicking Sam opens. Hypixel's Garden works this way round too: the desk is
  * the interface, the NPC is one door into it, and the command is the door you use once you know where
- * you are going.
+ * you are going. The name comes from {@code commands.desk} in the config.
  */
 public final class CommandDesk extends PluginCommand {
 
@@ -21,8 +21,8 @@ public final class CommandDesk extends PluginCommand {
 
     private final GardenMenu menu;
 
-    public CommandDesk(EcoPlugin plugin, GardenMenu menu) {
-        super(plugin, "desk", PERMISSION, true);
+    public CommandDesk(EcoPlugin plugin, String name, GardenMenu menu) {
+        super(plugin, name, PERMISSION, true);
         this.menu = menu;
     }
 

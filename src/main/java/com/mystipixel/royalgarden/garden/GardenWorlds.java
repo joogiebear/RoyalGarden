@@ -1,24 +1,26 @@
 package com.mystipixel.royalgarden.garden;
 
+import com.mystipixel.royalgarden.config.GardenConfig;
+import com.mystipixel.royalskyblock.world.IslandWorldRules;
 import com.mystipixel.royalskyblock.world.IslandWorldService;
-import com.willfp.eco.core.EcoPlugin;
 import org.bukkit.Bukkit;
-import org.bukkit.Difficulty;
 import org.bukkit.GameRule;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
@@ -32,7 +34,7 @@ import java.util.logging.Logger;
  * guarantees without owning any of that code, and without ever importing an ASP type.
  *
  * <p>Ownership needs no storage of its own: the world is named from the owner's UUID, so the name
- * <em>is</em> the record. Per-plot unlock state will need real persistence, and that is Phase 2.
+ * <em>is</em> the record. Everything else about a Garden lives in {@link GardenStore}.
  */
 public final class GardenWorlds {
 
@@ -42,39 +44,28 @@ public final class GardenWorlds {
      */
     private static final String PREFIX = "garden_";
 
-    /**
-     * Blocks written per tick while laying out a board.
-     *
-     * <p>Everything is spread against this budget rather than done a plot at a time, because a plot is
-     * not a fixed amount of work once a template is involved: the default is four courses, a captured
-     * farm can be forty. A block budget is the thing that actually stays constant.
-     */
-    private static final int BLOCKS_PER_TICK = 24_000;
-
-    /**
-     * Ticks between rows when a player applies a preset — 96 rows, so about 58 seconds a plot.
-     *
-     * <p>Deliberately slow, and not for performance: the budget above could lay the same plot in about
-     * a second. Choosing a farm should look like the farm being built, and taking a minute is also what
-     * stops a preset being something you flip between casually.
-     */
-    private static final long PASTE_TICKS_PER_ROW = 12L;
-
-    private final EcoPlugin plugin;
+    private final Plugin plugin;
+    private final GardenConfig config;
     private final IslandWorldService worlds;
     private final GardenStore store;
     private final PresetLibrary presets;
+    private final BuildQueue queue;
     private final Logger logger;
 
-    /** Plots currently being written, as {@code world:px,pz}, so two pastes cannot interleave. */
-    private final Set<String> laying = new HashSet<>();
+    /** Opens in flight, so two requests for the same Garden share one load — or one creation. */
+    private final Map<UUID, CompletableFuture<World>> opening = new ConcurrentHashMap<>();
 
-    public GardenWorlds(EcoPlugin plugin, IslandWorldService worlds, GardenStore store,
-                        PresetLibrary presets, Logger logger) {
+    /** Run on every Garden once it is prepared; this is how Sam gets to the desk. */
+    private Consumer<World> onPrepared = world -> { };
+
+    public GardenWorlds(Plugin plugin, GardenConfig config, IslandWorldService worlds, GardenStore store,
+                        PresetLibrary presets, BuildQueue queue, Logger logger) {
         this.plugin = plugin;
+        this.config = config;
         this.worlds = worlds;
         this.store = store;
         this.presets = presets;
+        this.queue = queue;
         this.logger = logger;
     }
 
@@ -83,68 +74,19 @@ public final class GardenWorlds {
         return presets;
     }
 
-    // ── applying presets ───────────────────────────────────────────────────────
-
-    /**
-     * Capture a plot and store it under a preset id.
-     *
-     * <p>Nothing already built changes. Capturing records what a plot looks like; applying it is a
-     * separate, destructive act, and keeping the two apart is what makes capture safe to run at any
-     * time while you are still building.
-     */
-    public PlotTemplate capture(World world, int px, int pz, String id) throws IOException {
-        PlotTemplate captured = PlotTemplate.capture(world, px, pz);
-        presets.save(id, captured);
-        logger.info("Captured plot " + GardenLayout.plotName(px, pz) + " as preset '" + id + "' ("
-                + captured.height() + " layers).");
-        return captured;
+    /** Something to run on every Garden after {@link #prepare}. */
+    public void onPrepared(Consumer<World> action) {
+        this.onPrepared = action == null ? world -> { } : action;
     }
 
-    /**
-     * Stamp a preset onto one plot, or flatten it back to a plain field with a null id.
-     *
-     * <p>Overwrites the plot completely. That is the intended behaviour and the reason it is only ever
-     * reached from a deliberate action: a plot someone has farmed for a week and a plot they just
-     * unlocked look the same to this method.
-     */
-    public boolean applyPreset(World world, int px, int pz, String id) {
-        String key = world.getName() + ":" + px + "," + pz;
-        if (!laying.add(key)) {
-            // A second paste over a plot already being written would interleave rows with the first
-            // and leave a plot that is half of each, with nothing to say which.
-            return false;
-        }
-        GardenBuilder.Base base = GardenBuilder.Base.BEDROCK.name().equalsIgnoreCase(id)
-                ? GardenBuilder.Base.BEDROCK
-                : GardenBuilder.Base.FLAT;
-        PlotTemplate preset = isBuiltIn(id) ? null : presets.get(id);
-        lay(world, List.of(new int[]{px, pz}), "applying '" + label(id) + "' to",
-                preset, base, true, PASTE_TICKS_PER_ROW, () -> laying.remove(key));
-        return true;
-    }
-
-    /** Whether an id names a generated plot rather than a captured one. */
-    public static boolean isBuiltIn(String id) {
-        return id == null
-                || id.equalsIgnoreCase(GardenBuilder.Base.FLAT.name())
-                || id.equalsIgnoreCase(GardenBuilder.Base.BEDROCK.name());
-    }
-
-    private static String label(String id) {
-        return id == null ? "flat" : id.toLowerCase(java.util.Locale.ROOT);
-    }
-
-    /** Whether a plot is mid-paste right now. */
-    public boolean isLaying(World world, int px, int pz) {
-        return laying.contains(world.getName() + ":" + px + "," + pz);
-    }
+    // ── identity ───────────────────────────────────────────────────────────────
 
     /** The world name for a player's Garden. */
     public static String worldName(UUID owner) {
         return PREFIX + owner;
     }
 
-    /** Whether a world name is a Garden at all. */
+    /** Whether a world is a Garden at all. */
     public static boolean isGarden(World world) {
         return world != null && world.getName().startsWith(PREFIX);
     }
@@ -161,15 +103,33 @@ public final class GardenWorlds {
         }
     }
 
-    /** Unlock state for a Garden world, or null if it is not one. */
+    /** Whether an id names a generated plot rather than a captured one. */
+    public static boolean isBuiltIn(String id) {
+        return id == null
+                || id.equalsIgnoreCase(GardenBuilder.Base.FLAT.name())
+                || id.equalsIgnoreCase(GardenBuilder.Base.BEDROCK.name());
+    }
+
+    private static String label(String id) {
+        return id == null ? "flat" : id.toLowerCase(Locale.ROOT);
+    }
+
+    // ── state ──────────────────────────────────────────────────────────────────
+
+    /** State for a Garden world, or null if it is not one. */
     public GardenState stateOf(World world) {
         UUID owner = ownerOf(world);
         return owner == null ? null : store.get(owner);
     }
 
-    /** Unlock state for a player. */
+    /** State for a player. */
     public GardenState state(UUID owner) {
         return store.get(owner);
+    }
+
+    /** Persist a state changed from outside (admin commands). */
+    public void save(GardenState state) {
+        store.save(state);
     }
 
     /**
@@ -188,10 +148,103 @@ public final class GardenWorlds {
         return true;
     }
 
+    /** Whether this player has ever had a Garden — so looking at one does not create it. */
+    public boolean hasGarden(UUID owner) {
+        return store.exists(owner) || worlds.isLoaded(worldName(owner));
+    }
+
     /** Whether this player's Garden is loaded right now. */
     public boolean isLoaded(UUID owner) {
         return worlds.isLoaded(worldName(owner));
     }
+
+    // ── presets ────────────────────────────────────────────────────────────────
+
+    /**
+     * Capture a plot and store it under a preset id.
+     *
+     * <p>Nothing already built changes. Capturing records what a plot looks like; applying it is a
+     * separate, destructive act, and keeping the two apart is what makes capture safe to run at any
+     * time while you are still building.
+     */
+    public PlotTemplate capture(World world, int px, int pz, String id) throws IOException {
+        PlotTemplate captured = PlotTemplate.capture(world, px, pz, config.maxTemplateHeight());
+        presets.save(id, captured);
+        logger.info("Captured plot " + GardenLayout.plotName(px, pz) + " as preset '" + id + "' ("
+                + captured.height() + " layers).");
+        return captured;
+    }
+
+    /** Whether a plot is being written right now. */
+    public boolean isBuilding(World world, int px, int pz) {
+        return queue.isBuilding(world.getName(), px, pz);
+    }
+
+    /**
+     * Rebuild one plot from a preset, or from {@code flat} / {@code bedrock}.
+     *
+     * <p>Overwrites the plot completely. That is the intended behaviour and the reason it is only ever
+     * reached from a deliberate action: a plot someone has farmed for a week and a plot they just
+     * unlocked look the same to this method.
+     *
+     * <p>The rebuild is recorded as pending before it starts and cleared when it finishes, so one cut
+     * short by the world unloading is picked up again by {@link #prepare} on the next visit rather than
+     * leaving a plot that is half of two farms.
+     *
+     * @param paced whether to take the slow, visible pace ({@code generation.paste-ticks-per-row})
+     * @return false if the plot is already being written, or the preset could not be read
+     */
+    public boolean rebuild(World world, int px, int pz, String id, boolean paced) {
+        if (queue.isBuilding(world.getName(), px, pz)) {
+            // A second paste over a plot already being written would interleave rows with the first
+            // and leave a plot that is half of each, with nothing to say which.
+            return false;
+        }
+        GardenBuilder.Base base = GardenBuilder.Base.BEDROCK.name().equalsIgnoreCase(id)
+                ? GardenBuilder.Base.BEDROCK
+                : GardenBuilder.Base.FLAT;
+        PlotTemplate preset = null;
+        if (!isBuiltIn(id)) {
+            preset = presets.get(id);
+            if (preset == null) {
+                return false;
+            }
+        }
+        String label = label(id);
+        UUID owner = ownerOf(world);
+        if (owner != null) {
+            GardenState state = store.get(owner);
+            state.setPending(px, pz, label);
+            store.save(state);
+        }
+        logger.info("Garden '" + world.getName() + "': applying '" + label + "' to plot "
+                + GardenLayout.plotName(px, pz) + ".");
+        queue.submit(new BuildQueue.Job(world.getName(), px, pz, preset, base, palette(), pasteRules(),
+                true, GardenBuilder.ceiling(config.maxTemplateHeight()),
+                paced ? config.pasteTicksPerRow() : 0L,
+                outcome -> {
+                    if (owner == null || outcome == BuildQueue.Outcome.UNLOADED) {
+                        return;                      // stays pending; resumed on the next load
+                    }
+                    GardenState now = store.get(owner);
+                    now.setPending(px, pz, null);
+                    if (outcome == BuildQueue.Outcome.DONE) {
+                        now.setPresetOn(px, pz, label);
+                    }
+                    store.save(now);
+                }));
+        return true;
+    }
+
+    private GardenBuilder.Palette palette() {
+        return new GardenBuilder.Palette(config.surface(), config.rim(), config.subsoil(), config.floor());
+    }
+
+    private PlotTemplate.PasteRules pasteRules() {
+        return new PlotTemplate.PasteRules(config.resetCropAge(), config.neverPaste());
+    }
+
+    // ── opening ────────────────────────────────────────────────────────────────
 
     /**
      * Get a player's Garden, building it if this is the first time they have asked for one.
@@ -200,17 +253,34 @@ public final class GardenWorlds {
      * prepared, so callers can teleport into it directly. That is a deliberate departure from the host
      * service's contract (which completes on an unspecified thread): every caller here would otherwise
      * have to remember to hop back, and forgetting is the kind of bug that only shows up under load.
+     *
+     * <p>Two opens of the same Garden while the first is still in flight share it. Without that, a
+     * double-click on first visit made both find "no such world" and both try to create it.
      */
     public CompletableFuture<World> open(UUID owner) {
+        CompletableFuture<World> result = new CompletableFuture<>();
+        CompletableFuture<World> inFlight = opening.putIfAbsent(owner, result);
+        if (inFlight != null) {
+            return inFlight;
+        }
         String name = worldName(owner);
-        return load(name)
+        load(name)
                 .thenCompose(world -> world != null
                         ? CompletableFuture.completedFuture(world)
                         : create(name))
                 .thenCompose(world -> onMain(() -> {
                     prepare(world);
                     return world;
-                }));
+                }))
+                .whenComplete((world, error) -> {
+                    opening.remove(owner, result);
+                    if (error != null) {
+                        result.completeExceptionally(error);
+                    } else {
+                        result.complete(world);
+                    }
+                });
+        return result;
     }
 
     /**
@@ -242,10 +312,15 @@ public final class GardenWorlds {
         return worlds.createIsland(name)
                 .thenCompose(world -> onMain(() -> {
                     long started = System.nanoTime();
-                    // Build before prepare: prepare reconciles the world against the unlock state, and
-                    // it should find the centre plot already there rather than generate it twice.
-                    GardenBuilder.build(world);
-                    prepare(world);
+                    GardenBuilder.build(world, palette());
+                    UUID owner = ownerOf(world);
+                    if (owner != null) {
+                        // A new world has no walls from older versions to clear; say so now so the
+                        // first prepare does not walk the whole board looking for them.
+                        GardenState state = store.get(owner);
+                        state.setLegacyWallsCleared(true);
+                        store.save(state);
+                    }
                     logger.info("Built Garden '" + name + "' in "
                             + (System.nanoTime() - started) / 1_000_000 + "ms.");
                     return world;
@@ -261,55 +336,89 @@ public final class GardenWorlds {
      * <p>Idempotent on purpose. World properties come from RoyalSkyblock's island config (the host's
      * service builds the property map, and it does not know Gardens exist), so anything The Garden
      * needs differently has to be re-asserted here — including on worlds built before a setting was
-     * added.
+     * added, and after a {@code /garden reload} changed one.
      */
     public void prepare(World world) {
-        applyBorder(world);
-
-        // A farm, not a survival world: nothing spawns that the farmer did not put there, and nothing
-        // rearranges what they planted. DO_MOB_SPAWNING closes the natural path cheaply, without an
-        // event per attempt; GardenProtection closes the rest and lets plugin spawns (EcoMobs) through.
-        world.setDifficulty(Difficulty.PEACEFUL);
-        world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
-        world.setGameRule(GameRule.MOB_GRIEFING, false);
-        world.setGameRule(GameRule.DO_FIRE_TICK, false);
-        world.setGameRule(GameRule.DO_INSOMNIA, false);
-        world.setGameRule(GameRule.DO_PATROL_SPAWNING, false);
-        world.setGameRule(GameRule.DO_TRADER_SPAWNING, false);
-        world.setGameRule(GameRule.KEEP_INVENTORY, true);
-
+        applyRules(world);
         world.setSpawnLocation(GardenBuilder.spawn(world));
-        sweepMobs(world);
+
+        GardenState state = stateOf(world);
+        if (state != null && !state.legacyWallsCleared() && !state.readOnly()) {
+            if (config.clearLegacyWalls()) {
+                GardenBuilder.clearLegacyWalls(world);
+            }
+            state.setLegacyWallsCleared(true);
+            store.save(state);
+        }
+
         sync(world);
+        resumePending(world, state);
+        onPrepared.accept(world);
+    }
+
+    /** Border, difficulty and gamerules, from {@code world:} in the config. */
+    public void applyRules(World world) {
+        WorldBorder border = world.getWorldBorder();
+        border.setCenter(0.0, 0.0);
+        border.setSize(GardenLayout.span());
+        border.setWarningDistance((int) config.borderWarningDistance());
+        border.setDamageAmount(config.borderDamageAmount());
+        border.setDamageBuffer(config.borderDamageBuffer());
+
+        world.setDifficulty(config.difficulty());
+        ConfigurationSection rules = config.gamerules();
+        if (rules != null) {
+            for (String key : rules.getKeys(false)) {
+                applyGameRule(world, key, rules);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void applyGameRule(World world, String key, ConfigurationSection rules) {
+        // The host's resolver: it accepts both 26.2 ids and the classic camelCase names.
+        GameRule<?> rule = IslandWorldRules.resolveRule(key);
+        if (rule == null) {
+            logger.warning("world.gamerules: unknown gamerule '" + key + "' — skipped.");
+            return;
+        }
+        try {
+            if (rule.getType() == Boolean.class) {
+                world.setGameRule((GameRule<Boolean>) rule, rules.getBoolean(key));
+            } else if (rule.getType() == Integer.class) {
+                world.setGameRule((GameRule<Integer>) rule, rules.getInt(key));
+            }
+        } catch (RuntimeException rejected) {
+            logger.warning("world.gamerules: could not set '" + key + "': " + rejected.getMessage());
+        }
     }
 
     /**
-     * Remove vanilla mobs that are already in the world.
+     * Remove vanilla mobs among some entities — called as each chunk's entities load.
      *
-     * <p>Blocking spawns only stops new ones. A Garden built before that rule existed had twenty-five
-     * plots of plains grass and no restriction, so it grew horses and sheep — and they were saved into
-     * the slime file, which means they come back on every load until something takes them out.
+     * <p>Blocking spawns only stops new ones. A Garden built before that rule existed grew horses and
+     * sheep, and they were saved into the slime file, so they come back on every load until something
+     * takes them out.
+     *
+     * <p>This runs from {@code EntitiesLoadEvent} rather than when the world opens. Paper loads a
+     * chunk's entities separately from, and after, its blocks, so sweeping {@code world.getEntities()}
+     * at open time saw almost nothing and removed almost nothing.
      *
      * <p>The test is an <b>empty persistent data container</b>. Every plugin that spawns a mob and
      * intends to keep it tags it: Sam carries this extension's key, and EcoMobs tags its own, so both
-     * survive while anything vanilla spawned does not. That is why this can run on every load without
-     * eventually deleting the content it is meant to protect — and why it keeps working when EcoMobs
-     * arrives, without knowing anything about EcoMobs.
-     *
-     * <p>Only {@code Mob}s are considered. Dropped items, armour stands, item frames and paintings are
-     * not mobs and are left exactly where they are.
+     * survive while anything vanilla spawned does not. Only {@code Mob}s are considered — dropped items,
+     * armour stands, item frames and paintings are left exactly where they are.
      */
-    public void sweepMobs(World world) {
+    public void sweepMobs(World world, Iterable<Entity> entities) {
+        if (!config.sweepVanillaMobs()) {
+            return;
+        }
         int removed = 0;
-        for (Entity entity : world.getEntities()) {
-            if (!(entity instanceof Mob mob)) {
-                continue;
+        for (Entity entity : entities) {
+            if (entity instanceof Mob mob && mob.getPersistentDataContainer().isEmpty()) {
+                mob.remove();
+                removed++;
             }
-            if (!mob.getPersistentDataContainer().isEmpty()) {
-                continue;                    // a plugin owns this one
-            }
-            mob.remove();
-            removed++;
         }
         if (removed > 0) {
             logger.info("Garden '" + world.getName() + "': removed " + removed + " vanilla mob(s).");
@@ -317,134 +426,83 @@ public final class GardenWorlds {
     }
 
     /**
-     * The world's own border, parked at the edge of the board.
+     * Bring the world up to date with what it should contain: every plot generated, locked or not.
      *
-     * <p>This is the hard edge of the world; which plots inside it a player may enter is enforced
-     * per-plot by {@link GardenProtection}, since a world border is a centred square and cannot cut a
-     * locked plot out of the middle of the board.
-     */
-    public void applyBorder(World world) {
-        WorldBorder border = world.getWorldBorder();
-        border.setCenter(0.0, 0.0);
-        border.setSize(GardenLayout.SPAN);
-        border.setWarningDistance(0);
-        border.setDamageAmount(0.0);
-        border.setDamageBuffer(0.0);
-    }
-
-    /**
-     * Bring the world up to date with what it should contain: every plot generated, locked or not, and
-     * no leftovers from an older layout.
-     *
-     * <p>All twenty-five are built, because a locked plot you can see across the border reads as a
-     * place you are going to own — an empty hole reads as a bug. Unlocking changes where the border is,
-     * not whether the ground exists.
-     *
-     * <p>Generation is spread one plot per tick. The board is 230,400 columns; laying it in a single
-     * tick is roughly a five-second freeze, and the player is standing on the farmhouse plot — built
-     * synchronously before this starts — while the rest fills in behind them.
+     * <p>All plots are built, because a locked plot you can see across the board reads as a place you
+     * are going to own — an empty hole reads as a bug. Unlocking changes where you may go, not whether
+     * the ground exists. Plots already queued are skipped, so opening a Garden again while it is still
+     * generating does not start a second copy of the same work.
      */
     public void sync(World world) {
-        GardenBuilder.clearLegacyWalls(world);
-
-        List<int[]> missing = new ArrayList<>();
-        for (int px = 0; px < GardenLayout.GRID; px++) {
-            for (int pz = 0; pz < GardenLayout.GRID; pz++) {
-                if (!GardenBuilder.isGenerated(world, px, pz)) {
-                    missing.add(new int[]{px, pz});
+        PlotTemplate fill = presets.defaultPreset();
+        int queued = 0;
+        for (int px = 0; px < GardenLayout.grid(); px++) {
+            for (int pz = 0; pz < GardenLayout.grid(); pz++) {
+                if (GardenBuilder.isGenerated(world, px, pz) || queue.isBuilding(world.getName(), px, pz)) {
+                    continue;
                 }
+                // The farmhouse plot is never templated: stamping a farm over it would delete the barn,
+                // the desk and Sam.
+                PlotTemplate preset = GardenLayout.isCentre(px, pz) ? null : fill;
+                queue.submit(new BuildQueue.Job(world.getName(), px, pz, preset, GardenBuilder.Base.FLAT,
+                        palette(), pasteRules(), false, GardenBuilder.ceiling(config.maxTemplateHeight()),
+                        0L, null));
+                queued++;
             }
         }
-        if (missing.isEmpty()) {
+        if (queued > 0) {
+            logger.info("Garden '" + world.getName() + "': generating " + queued + " plot(s).");
+        }
+    }
+
+    /** Restart rebuilds that were cut short by the world unloading. */
+    private void resumePending(World world, GardenState state) {
+        if (state == null || state.readOnly()) {
             return;
         }
-        // Board generation runs at full speed. The slow pace exists to make choosing a farm feel
-        // deliberate; nobody chose to wait through the world being created in the first place.
-        lay(world, missing, "generating", presets.defaultPreset(),
-                GardenBuilder.Base.FLAT, false, 0L, null);
+        for (Map.Entry<int[], String> entry : state.pending().entrySet()) {
+            int[] plot = entry.getKey();
+            if (queue.isBuilding(world.getName(), plot[0], plot[1])) {
+                continue;
+            }
+            if (!rebuild(world, plot[0], plot[1], entry.getValue(), false)) {
+                logger.warning("Garden '" + world.getName() + "': could not resume '" + entry.getValue()
+                        + "' on plot " + GardenLayout.plotName(plot[0], plot[1]) + "; leaving it as it is.");
+                state.setPending(plot[0], plot[1], null);
+                store.save(state);
+            }
+        }
     }
+
+    // ── admin ──────────────────────────────────────────────────────────────────
 
     /**
-     * Write a list of plots into the world, a fixed number of blocks per tick.
+     * Reset a player's Garden: forget its unlocks and presets, and optionally delete the world too.
      *
-     * <p>Row by row against a block budget rather than plot by plot: with a tall template one plot is
-     * far too much for a single tick, and with the default field it is far too little. Work is
-     * persisted once at the end — an interrupted run simply leaves plots ungenerated, and the next load
-     * finds them missing and lays them again.
+     * <p>With {@code wipeWorld}, anyone standing in it is sent to {@code evacuateTo} first, its queued
+     * builds are dropped, and the world is unloaded without saving and deleted through the host. The
+     * next {@code /garden} then builds a brand-new one — which is what a fresh contest needs.
      */
-    private void lay(World world, List<int[]> plots, String verb, PlotTemplate preset,
-                     GardenBuilder.Base base, boolean clearAbove,
-                     long ticksPerRow, Runnable whenDone) {
-        String name = world.getName();
-        logger.info("Garden '" + name + "': " + verb + " " + plots.size() + " plot(s)"
-                + (preset != null ? " (" + preset.height() + " layers)" : " (flat)") + ".");
-        long started = System.nanoTime();
-        long period = Math.max(1L, ticksPerRow);
-
-        new BukkitRunnable() {
-            private int plot = 0;
-            private int row = 0;
-
-            @Override
-            public void run() {
-                // The world can be unloaded under us — the host unloads an empty Garden after its
-                // grace period, and writing blocks into a world nobody holds would throw every tick.
-                if (Bukkit.getWorld(name) == null) {
-                    finish();
-                    return;
-                }
-                int blocks = BLOCKS_PER_TICK;
-                boolean paced = ticksPerRow > 0;
-                int rowsThisRun = 0;
-
-                while (plot < plots.size() && blocks > 0 && !(paced && rowsThisRun >= 1)) {
-                    int[] at = plots.get(plot);
-                    blocks -= writeRow(world, at[0], at[1], row, preset, base, clearAbove);
-                    rowsThisRun++;
-                    if (++row >= GardenLayout.PLOT_SIZE) {
-                        row = 0;
-                        plot++;
-                    }
-                }
-                if (plot >= plots.size()) {
-                    worlds.saveIsland(name);
-                    logger.info("Garden '" + name + "': " + verb + " done in "
-                            + (System.nanoTime() - started) / 1_000_000 + "ms.");
-                    finish();
-                }
+    public CompletableFuture<Void> reset(UUID owner, boolean wipeWorld, Location evacuateTo) {
+        store.reset(owner);
+        if (!wipeWorld) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String name = worldName(owner);
+        queue.cancel(name);
+        World world = Bukkit.getWorld(name);
+        if (world != null) {
+            for (Player player : world.getPlayers()) {
+                player.teleport(evacuateTo);
             }
-
-            private void finish() {
-                cancel();
-                if (whenDone != null) {
-                    whenDone.run();
-                }
-            }
-        }.runTaskTimer(plugin, 1L, period);
+        }
+        CompletableFuture<Void> unloaded = worlds.isLoaded(name)
+                ? worlds.unloadIsland(name, false)
+                : CompletableFuture.completedFuture(null);
+        return unloaded.thenCompose(ignored -> worlds.deleteIsland(name));
     }
 
-    /**
-     * Write one row of one plot, from the template if there is one.
-     *
-     * <p>The farmhouse plot is never templated. It carries the barn, the desk and Sam, and stamping a
-     * captured farm over it would delete all three.
-     */
-    private int writeRow(World world, int px, int pz, int row, PlotTemplate preset,
-                         GardenBuilder.Base base, boolean clearAbove) {
-        int written;
-        int contentTop;
-        if (preset != null && !GardenLayout.isCentre(px, pz)) {
-            written = preset.pasteRow(world, px, pz, row);
-            contentTop = GardenLayout.GROUND_Y - 3 + preset.height();
-        } else {
-            written = GardenBuilder.generatePlotRow(world, px, pz, row, base);
-            contentTop = GardenBuilder.baseTop();
-        }
-        if (clearAbove) {
-            written += GardenBuilder.clearRowAbove(world, px, pz, row, contentTop);
-        }
-        return written;
-    }
+    // ── plumbing ───────────────────────────────────────────────────────────────
 
     /** Walk an async failure's cause chain looking for ASP's "no such world" signal. */
     private static boolean isUnknownWorld(Throwable error) {

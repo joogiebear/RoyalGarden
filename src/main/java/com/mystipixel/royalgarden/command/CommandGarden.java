@@ -1,28 +1,37 @@
 package com.mystipixel.royalgarden.command;
 
+import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalgarden.garden.GardenBuilder;
 import com.mystipixel.royalgarden.garden.GardenLayout;
+import com.mystipixel.royalgarden.garden.GardenState;
 import com.mystipixel.royalgarden.garden.GardenWorlds;
 import com.mystipixel.royalgarden.garden.PresetLibrary;
-import com.mystipixel.royalgarden.garden.Sam;
 import com.willfp.eco.core.EcoPlugin;
 import com.willfp.eco.core.command.impl.PluginCommand;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
+import java.util.function.Supplier;
+import java.util.logging.Level;
 
 /**
  * {@code /garden} — go to your Garden, building it if you have never been.
  *
+ * <p>With arguments, and {@code royalgarden.admin}, it is also the admin tool: capturing and applying
+ * presets, and managing other players' Gardens — which is most of what running a contest needs.
+ *
  * <p>Registered through eco's command framework rather than a {@code plugin.yml} entry, because an
  * extension has no {@code plugin.yml} of its own to put one in. eco registers into the live command
- * map, which is what makes commands possible from an extension at all.
+ * map, which is what makes commands possible from an extension at all. The name comes from
+ * {@code commands.garden} in the config.
  */
 public final class CommandGarden extends PluginCommand {
 
@@ -37,17 +46,25 @@ public final class CommandGarden extends PluginCommand {
      */
     public static final String PERMISSION = "royalgarden.garden";
 
-    private final GardenWorlds worlds;
-    private final Sam sam;
-
-    public CommandGarden(EcoPlugin plugin, GardenWorlds worlds, Sam sam) {
-        super(plugin, "garden", PERMISSION, true);
-        this.worlds = worlds;
-        this.sam = sam;
-    }
-
-    /** Lets a player capture and stamp plot templates. */
+    /** Lets a player run the admin subcommands. */
     public static final String ADMIN = "royalgarden.admin";
+
+    private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
+            "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info");
+
+    private final GardenWorlds worlds;
+    private final Messages messages;
+    private final Runnable reload;
+    private final Supplier<Location> evacuateTo;
+
+    public CommandGarden(EcoPlugin plugin, String name, GardenWorlds worlds, Messages messages,
+                         Runnable reload, Supplier<Location> evacuateTo) {
+        super(plugin, name, PERMISSION, true);
+        this.worlds = worlds;
+        this.messages = messages;
+        this.reload = reload;
+        this.evacuateTo = evacuateTo;
+    }
 
     @Override
     public void onExecute(Player player, List<String> args) {
@@ -58,96 +75,156 @@ public final class CommandGarden extends PluginCommand {
         visit(player);
     }
 
+    @Override
+    public List<String> tabComplete(Player player, List<String> args) {
+        if (!player.hasPermission(ADMIN)) {
+            return List.of();
+        }
+        List<String> options = new ArrayList<>();
+        if (args.size() <= 1) {
+            options.addAll(VERBS);
+        } else {
+            String verb = args.get(0).toLowerCase(Locale.ROOT);
+            if (args.size() == 2) {
+                switch (verb) {
+                    case "apply", "default", "delete" -> {
+                        options.addAll(worlds.presets().ids());
+                        if (verb.equals("apply")) {
+                            options.add("flat");
+                            options.add("bedrock");
+                        }
+                    }
+                    case "reset", "unlock", "lock", "visit", "info" -> {
+                        for (Player online : Bukkit.getOnlinePlayers()) {
+                            options.add(online.getName());
+                        }
+                    }
+                    default -> {
+                    }
+                }
+            } else if (args.size() == 3) {
+                if (verb.equals("unlock") || verb.equals("lock")) {
+                    for (int pz = 0; pz < GardenLayout.grid(); pz++) {
+                        for (int px = 0; px < GardenLayout.grid(); px++) {
+                            options.add(GardenLayout.plotName(px, pz));
+                        }
+                    }
+                } else if (verb.equals("reset")) {
+                    options.add("world");
+                }
+            }
+        }
+        String typed = args.isEmpty() ? "" : args.get(args.size() - 1).toLowerCase(Locale.ROOT);
+        options.removeIf(option -> !option.toLowerCase(Locale.ROOT).startsWith(typed));
+        return options;
+    }
+
+    // ── admin ──────────────────────────────────────────────────────────────────
+
     /**
-     * The template subcommands: capture a plot, stamp it over the others, or forget it.
-     *
-     * <p>Kept as arguments on {@code /garden} rather than a command of their own — three admin verbs
-     * do not need their own name in the command map, and grouping them means the permission that gates
-     * them is one node instead of three.
+     * The admin subcommands. Kept as arguments on {@code /garden} rather than commands of their own —
+     * they do not need their own names in the command map, and one node gates all of them.
      */
     private void admin(Player player, List<String> args) {
         if (!player.hasPermission(ADMIN)) {
-            player.sendMessage(Component.text("You cannot do that.", NamedTextColor.RED));
+            messages.send(player, "no-permission");
             return;
         }
-        World world = player.getWorld();
-        if (!GardenWorlds.isGarden(world)) {
-            player.sendMessage(Component.text("Stand in a Garden first.", NamedTextColor.RED));
-            return;
-        }
-
         String verb = args.get(0).toLowerCase(Locale.ROOT);
-        String name = args.size() > 1 ? args.get(1).toLowerCase(Locale.ROOT) : null;
+        String arg = args.size() > 1 ? args.get(1) : null;
         PresetLibrary presets = worlds.presets();
 
         switch (verb) {
-            case "capture" -> capture(player, world, name);
-            case "apply" -> apply(player, world, name);
-            case "flat" -> apply(player, world, "flat");
-            case "bedrock" -> apply(player, world, "bedrock");
-            case "default" -> {
-                if (name != null && !presets.exists(name)) {
-                    player.sendMessage(Component.text("No preset called '" + name + "'.", NamedTextColor.RED));
+            case "capture" -> inGarden(player, world -> capture(player, world, lower(arg)));
+            case "apply" -> {
+                if (arg == null) {
+                    // Deliberately not "flat": a bare /garden apply used to flatten the plot you stood on.
+                    messages.send(player, "admin-apply-usage");
                     return;
                 }
-                presets.setDefault(name);
-                player.sendMessage(Component.text(name == null
-                        ? "New plots will be flat."
-                        : "New plots will be built from '" + name + "'.", NamedTextColor.GREEN));
+                inGarden(player, world -> apply(player, world, lower(arg)));
             }
-            case "delete" -> player.sendMessage(presets.delete(name)
-                    ? Component.text("Deleted preset '" + name + "'.", NamedTextColor.GREEN)
-                    : Component.text("No preset called '" + name + "'.", NamedTextColor.RED));
+            case "flat" -> inGarden(player, world -> apply(player, world, "flat"));
+            case "bedrock" -> inGarden(player, world -> apply(player, world, "bedrock"));
+            case "default" -> {
+                String id = lower(arg);
+                if (id != null && !presets.exists(id)) {
+                    messages.send(player, "admin-no-preset", "%preset%", id);
+                    return;
+                }
+                presets.setDefault(id);
+                messages.send(player, id == null ? "admin-default-cleared" : "admin-default-set", "%preset%", id);
+            }
+            case "delete" -> messages.send(player, presets.delete(lower(arg)) ? "admin-deleted" : "admin-no-preset",
+                    "%preset%", arg);
             case "presets" -> list(player, presets);
-            default -> player.sendMessage(Component.text(
-                    "/garden — go to your Garden. Admin: capture <name>, apply <name>, flat, "
-                            + "default [name], delete <name>, presets.", NamedTextColor.GRAY));
+            case "reload" -> {
+                reload.run();
+                messages.send(player, "admin-reloaded");
+            }
+            case "reset" -> reset(player, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
+            case "unlock", "lock" -> setLock(player, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
+            case "visit" -> adminVisit(player, arg);
+            case "info" -> info(player, arg);
+            default -> messages.send(player, "admin-help");
         }
+    }
+
+    private static String lower(String value) {
+        return value == null ? null : value.toLowerCase(Locale.ROOT);
+    }
+
+    private void inGarden(Player player, java.util.function.Consumer<World> action) {
+        World world = player.getWorld();
+        if (!GardenWorlds.isGarden(world)) {
+            messages.send(player, "admin-stand-in-garden");
+            return;
+        }
+        action.accept(world);
     }
 
     private void list(Player player, PresetLibrary presets) {
         List<String> ids = presets.ids();
         if (ids.isEmpty()) {
-            player.sendMessage(Component.text("No presets captured yet.", NamedTextColor.GRAY));
+            messages.send(player, "admin-presets-empty");
             return;
         }
-        player.sendMessage(Component.text("Presets:", NamedTextColor.GREEN));
+        messages.send(player, "admin-presets-header");
         for (String id : ids) {
-            boolean isDefault = id.equals(presets.defaultId());
-            player.sendMessage(Component.text("  " + id, NamedTextColor.WHITE)
-                    .append(isDefault
-                            ? Component.text("  (default)", NamedTextColor.YELLOW)
-                            : Component.empty()));
+            PresetLibrary.Entry entry = presets.entry(id);
+            String flags = (id.equals(presets.defaultId()) ? messages.raw("admin-presets-default") : "")
+                    + (entry != null && entry.selectable() ? messages.raw("admin-presets-selectable") : "");
+            messages.send(player, "admin-presets-line", "%preset%", id, "%flags%", flags);
         }
     }
 
     /** Capture the plot the player is standing on under a name. */
     private void capture(Player player, World world, String name) {
         if (name == null || !PresetLibrary.validId(name)) {
-            player.sendMessage(Component.text(
-                    "Name the preset: /garden capture <name>  (a-z, 0-9, _ and - only)",
-                    NamedTextColor.RED));
+            messages.send(player, "admin-capture-usage");
             return;
         }
         int px = GardenLayout.plotAt(player.getLocation().getBlockX());
         int pz = GardenLayout.plotAt(player.getLocation().getBlockZ());
         if (!GardenLayout.inGrid(px, pz)) {
-            player.sendMessage(Component.text("Stand on a plot to capture it.", NamedTextColor.RED));
+            messages.send(player, "admin-stand-on-plot");
             return;
         }
         if (GardenLayout.isCentre(px, pz)) {
             // The farmhouse plot is never stamped, so capturing it could only ever be a mistake.
-            player.sendMessage(Component.text(
-                    "That is the farmhouse plot. Build presets on any other plot.", NamedTextColor.RED));
+            messages.send(player, "admin-capture-farmhouse");
+            return;
+        }
+        if (worlds.isBuilding(world, px, pz)) {
+            messages.send(player, "plot-busy", "%plot%", GardenLayout.plotName(px, pz));
             return;
         }
         try {
             int layers = worlds.capture(world, px, pz, name).height();
-            player.sendMessage(Component.text("Captured plot " + GardenLayout.plotName(px, pz)
-                    + " as '" + name + "' (" + layers + " layers).", NamedTextColor.GREEN));
+            messages.send(player, "admin-captured", "%plot%", GardenLayout.plotName(px, pz),
+                    "%preset%", name, "%layers%", String.valueOf(layers));
         } catch (IOException failed) {
-            player.sendMessage(Component.text("Could not save the preset: " + failed.getMessage(),
-                    NamedTextColor.RED));
+            messages.send(player, "admin-capture-failed", "%error%", failed.getMessage());
             getPlugin().getLogger().severe("Preset capture failed: " + failed);
         }
     }
@@ -156,60 +233,138 @@ public final class CommandGarden extends PluginCommand {
     private void apply(Player player, World world, String name) {
         int px = GardenLayout.plotAt(player.getLocation().getBlockX());
         int pz = GardenLayout.plotAt(player.getLocation().getBlockZ());
+        String plot = GardenLayout.plotName(px, pz);
         if (!GardenLayout.inGrid(px, pz)) {
-            player.sendMessage(Component.text("Stand on the plot you want to change.", NamedTextColor.RED));
+            messages.send(player, "admin-stand-on-plot");
             return;
         }
         if (GardenLayout.isCentre(px, pz)) {
-            player.sendMessage(Component.text("The farmhouse plot cannot be replaced.", NamedTextColor.RED));
+            messages.send(player, "admin-apply-farmhouse");
             return;
         }
-        if (!GardenWorlds.isBuiltIn(name) && !worlds.presets().exists(name)) {
-            player.sendMessage(Component.text("No preset called '" + name + "'. Try flat, bedrock, "
-                    + "or /garden presets.", NamedTextColor.RED));
+        if (!worlds.presets().applicable(name)) {
+            messages.send(player, "admin-no-preset", "%preset%", name);
             return;
         }
-        if (!worlds.applyPreset(world, px, pz, name)) {
-            player.sendMessage(Component.text("That plot is already being built. Wait for it to finish.",
-                    NamedTextColor.RED));
+        if (!worlds.rebuild(world, px, pz, name, true)) {
+            messages.send(player, "plot-busy", "%plot%", plot);
             return;
         }
-        player.sendMessage(Component.text("Building '" + (name == null ? "flat" : name)
-                + "' on plot " + GardenLayout.plotName(px, pz) + "…", NamedTextColor.GREEN)
-                .append(Component.text(" This takes about a minute.", NamedTextColor.GRAY)));
+        messages.send(player, "admin-applying", "%preset%", name, "%plot%", plot);
     }
 
-    private void visit(Player player) {
-        boolean firstVisit = !worlds.isLoaded(player.getUniqueId());
-        if (firstVisit) {
-            player.sendMessage(Component.text("Opening your Garden…", NamedTextColor.GRAY));
+    /** A player by name, online or known to the server; null (with a message) if there is none. */
+    private OfflinePlayer target(Player sender, String name) {
+        if (name == null) {
+            messages.send(sender, "admin-help");
+            return null;
         }
+        OfflinePlayer found = Bukkit.getPlayerExact(name);
+        if (found == null) {
+            found = Bukkit.getOfflinePlayerIfCached(name);
+        }
+        if (found == null) {
+            messages.send(sender, "admin-unknown-player", "%player%", name);
+        }
+        return found;
+    }
 
-        worlds.open(player.getUniqueId()).whenComplete((world, error) -> {
+    private void reset(Player sender, String name, boolean wipeWorld) {
+        OfflinePlayer target = target(sender, name);
+        if (target == null) {
+            return;
+        }
+        String who = target.getName() == null ? name : target.getName();
+        worlds.reset(target.getUniqueId(), wipeWorld, evacuateTo.get()).whenComplete((ignored, error) -> {
             if (error != null) {
-                // The future can fail on either thread; get back on the main one before touching the
-                // player, and log the whole chain — the message alone is usually the least useful part.
-                Bukkit.getScheduler().runTask(getPlugin(), () ->
-                        player.sendMessage(Component.text("Your Garden could not be opened. "
-                                + "The error is in the server log.", NamedTextColor.RED)));
-                getPlugin().getLogger().severe("Failed to open Garden for " + player.getName() + ":");
-                error.printStackTrace();
+                getPlugin().getLogger().log(Level.WARNING, "Resetting the Garden of " + who + " failed", error);
+                messages.send(sender, "admin-reset-failed", "%player%", who, "%error%", String.valueOf(error.getMessage()));
                 return;
             }
-            arrive(player, world);
+            messages.send(sender, wipeWorld ? "admin-reset-world" : "admin-reset", "%player%", who);
         });
     }
 
-    /** Put the player on the doorstep, and make sure Sam is at the desk before they walk in. */
-    private void arrive(Player player, World world) {
-        // open() already completes on the server thread, but arriving is worth being explicit about:
-        // both calls below are main-thread-only, and a future's thread is easy to lose track of.
-        Bukkit.getScheduler().runTask(getPlugin(), () -> {
-            sam.ensure(world);
+    private void setLock(Player sender, boolean unlock, String name, String plotName) {
+        OfflinePlayer target = target(sender, name);
+        if (target == null) {
+            return;
+        }
+        int[] plot = GardenLayout.parsePlot(plotName);
+        if (plot == null) {
+            messages.send(sender, "admin-bad-plot", "%plot%", String.valueOf(plotName));
+            return;
+        }
+        GardenState state = worlds.state(target.getUniqueId());
+        if (state.readOnly()) {
+            messages.send(sender, "garden-unreadable");
+            return;
+        }
+        boolean changed = unlock ? state.forceUnlock(plot[0], plot[1]) : state.lock(plot[0], plot[1]);
+        if (changed) {
+            worlds.save(state);
+        }
+        String who = target.getName() == null ? name : target.getName();
+        messages.send(sender, changed ? (unlock ? "admin-unlocked" : "admin-locked") : "admin-unchanged",
+                "%player%", who, "%plot%", GardenLayout.plotName(plot[0], plot[1]));
+    }
+
+    private void adminVisit(Player sender, String name) {
+        OfflinePlayer target = target(sender, name);
+        if (target == null) {
+            return;
+        }
+        UUID owner = target.getUniqueId();
+        if (!worlds.hasGarden(owner)) {
+            messages.send(sender, "admin-no-garden", "%player%", String.valueOf(target.getName()));
+            return;
+        }
+        worlds.open(owner).whenComplete((world, error) -> {
+            if (error != null || world == null) {
+                messages.send(sender, "garden-open-failed");
+                return;
+            }
+            sender.teleportAsync(GardenBuilder.spawn(world));
+        });
+    }
+
+    private void info(Player sender, String name) {
+        OfflinePlayer target = target(sender, name);
+        if (target == null) {
+            return;
+        }
+        GardenState state = worlds.state(target.getUniqueId());
+        List<String> plots = new ArrayList<>();
+        for (int[] plot : state.plots()) {
+            plots.add(GardenLayout.plotName(plot[0], plot[1]));
+        }
+        messages.send(sender, "admin-info", "%player%", String.valueOf(target.getName()),
+                "%unlocked%", String.valueOf(state.unlockedCount()),
+                "%total%", String.valueOf(GardenLayout.plotCount()),
+                "%plots%", String.join(", ", plots),
+                "%loaded%", String.valueOf(worlds.isLoaded(target.getUniqueId())),
+                "%readonly%", String.valueOf(state.readOnly()));
+    }
+
+    // ── going to your Garden ───────────────────────────────────────────────────
+
+    private void visit(Player player) {
+        if (!worlds.isLoaded(player.getUniqueId())) {
+            messages.send(player, "garden-opening");
+        }
+        worlds.open(player.getUniqueId()).whenComplete((world, error) -> {
+            if (error != null) {
+                // The future can fail on either thread; log the whole chain — the message alone is
+                // usually the least useful part.
+                getPlugin().getLogger().log(Level.SEVERE, "Failed to open Garden for " + player.getName(), error);
+                messages.send(player, "garden-open-failed");
+                return;
+            }
+            // open() completes on the server thread with the world prepared (Sam included), so the
+            // player can be moved straight in.
             player.teleportAsync(GardenBuilder.spawn(world)).thenAccept(moved -> {
                 if (moved) {
-                    player.sendMessage(Component.text("Welcome to your Garden. ", NamedTextColor.GREEN)
-                            .append(Component.text("Talk to Sam, or use /desk.", NamedTextColor.GRAY)));
+                    messages.send(player, "garden-welcome");
                 }
             });
         });

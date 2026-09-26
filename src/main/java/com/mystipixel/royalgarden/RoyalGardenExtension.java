@@ -2,14 +2,20 @@ package com.mystipixel.royalgarden;
 
 import com.mystipixel.royalgarden.command.CommandDesk;
 import com.mystipixel.royalgarden.command.CommandGarden;
+import com.mystipixel.royalgarden.config.GardenConfig;
+import com.mystipixel.royalgarden.config.Messages;
+import com.mystipixel.royalgarden.garden.BuildQueue;
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenMenu;
 import com.mystipixel.royalgarden.garden.GardenProtection;
 import com.mystipixel.royalgarden.garden.GardenStore;
 import com.mystipixel.royalgarden.garden.GardenWorlds;
 import com.mystipixel.royalgarden.garden.PresetLibrary;
+import com.mystipixel.royalgarden.garden.PresetService;
 import com.mystipixel.royalgarden.garden.Sam;
+import com.mystipixel.royalgarden.garden.UnlockService;
 import com.mystipixel.royalskyblock.RoyalSkyblockPlugin;
+import com.mystipixel.royalskyblock.currency.CurrencyService;
 import com.mystipixel.royalskyblock.data.Storage;
 import com.mystipixel.royalskyblock.island.IslandManager;
 import com.mystipixel.royalskyblock.world.IslandWorldService;
@@ -17,6 +23,8 @@ import com.willfp.eco.core.EcoPlugin;
 import com.willfp.eco.core.command.impl.PluginCommand;
 import com.willfp.eco.core.extensions.Extension;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.event.HandlerList;
 import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
@@ -37,20 +45,23 @@ import java.util.function.Supplier;
  * {@code extension.yml}. It does so quietly: a jar with no manifest is skipped with a log line and
  * no error, so the console is the only confirmation a build actually took.
  *
- * <h2>Phase 1</h2>
- *
- * <p>A player gets a Garden world of their own, built on first visit: a 5&times;5 board of plots with
- * the farmhouse on the middle one, Sam at the desk, and a border at the board's edge. Every plot is
- * generated up front — locked ones included, so the board reads as land to earn rather than holes —
- * and unlocking is a change of what you may walk onto and edit, persisted per player.
+ * <p>Everything tunable lives in {@code plugins/RoyalSkyblock/extensions/RoyalGarden/}:
+ * {@code config.yml} (the board, costs, rewards, rules, menus), {@code messages.yml} and
+ * {@code presets.yml}. The host's reload reloads them too.
  */
 public final class RoyalGardenExtension extends Extension {
 
     private IslandManager islands;
     private IslandWorldService worlds;
     private Storage storage;
+    private CurrencyService currency;
 
+    private GardenConfig config;
+    private Messages messages;
+    private PresetLibrary presets;
+    private BuildQueue queue;
     private GardenWorlds gardens;
+    private GardenMenu menu;
     private Sam sam;
     private GardenProtection protection;
     private PluginCommand gardenCommand;
@@ -90,6 +101,7 @@ public final class RoyalGardenExtension extends Extension {
         this.islands = resolve("island manager", host::islands);
         this.worlds = resolve("world service", host::worlds);
         this.storage = resolve("storage", host::storage);
+        this.currency = resolve("currency service", host::currency);
 
         if (!isReady()) {
             getLogger().warning("RoyalGarden is loaded but idle: the host has no island services. "
@@ -100,7 +112,34 @@ public final class RoyalGardenExtension extends Extension {
 
         getLogger().info("Host services resolved — world backend is "
                 + this.worlds.getClass().getSimpleName() + ".");
-        start();
+        try {
+            start(host);
+        } catch (RuntimeException failed) {
+            getLogger().log(java.util.logging.Level.SEVERE, "RoyalGarden could not start; the host is "
+                    + "unaffected.", failed);
+        }
+    }
+
+    /**
+     * Re-read {@code config.yml}, {@code messages.yml} and {@code presets.yml}.
+     *
+     * <p>Reached from the host's own reload and from {@code /garden reload}. The board's shape is the
+     * one thing that does not change here — see {@link GardenConfig}.
+     */
+    @Override
+    protected void onReload() {
+        reloadFiles();
+    }
+
+    private void reloadFiles() {
+        if (config == null) {
+            return;
+        }
+        config.reload();
+        messages.reload();
+        presets.reload();
+        menu.reload();
+        getLogger().info("Reloaded config.yml, messages.yml and presets.yml.");
     }
 
     /**
@@ -108,9 +147,7 @@ public final class RoyalGardenExtension extends Extension {
      *
      * <p>Not {@link #getDataFolder()}, which returns the <em>host's</em> folder — every extension
      * calling it writes into {@code plugins/RoyalSkyblock/} directly, mixed in with the host's own
-     * {@code gui/}, {@code perks/} and {@code upgrades/}. With one extension that is untidy; with
-     * several it is a folder nobody can read, and no way to tell which files an extension owns when
-     * removing it.
+     * {@code gui/}, {@code perks/} and {@code upgrades/}.
      */
     private File dataDir() {
         return new File(new File(getPlugin().getDataFolder(), "extensions"), getName());
@@ -140,40 +177,66 @@ public final class RoyalGardenExtension extends Extension {
     }
 
     /** Stand everything up. Only reached once the host's services are known to exist. */
-    private void start() {
+    private void start(RoyalSkyblockPlugin host) {
         File data = dataDir();
         if (!data.exists() && !data.mkdirs()) {
             getLogger().warning("Could not create " + data + " — Garden data will not persist.");
         }
         migrateStrayData(data);
 
-        GardenStore store = new GardenStore(data, getLogger());
-        PresetLibrary presets = new PresetLibrary(data, getLogger());
-        this.gardens = new GardenWorlds(getPlugin(), worlds, store, presets, getLogger());
+        this.config = new GardenConfig(data, getLogger());
+        String layoutProblem = GardenLayout.configure(config.grid(), config.plotSize(), config.groundY());
+        if (layoutProblem != null) {
+            getLogger().severe(layoutProblem + " — using the default 5x5 board of 96-block plots.");
+        }
+        this.messages = new Messages(data, getLogger());
 
-        GardenMenu menu = new GardenMenu(gardens);
-        this.sam = new Sam(getPlugin(), menu);
-        this.protection = new GardenProtection(gardens);
+        GardenStore store = new GardenStore(data, getLogger());
+        this.presets = new PresetLibrary(data, getLogger());
+        this.queue = new BuildQueue(getPlugin(), config, worlds, getLogger());
+        this.gardens = new GardenWorlds(getPlugin(), config, worlds, store, presets, queue, getLogger());
+
+        UnlockService unlocks = new UnlockService(config, messages, currency, gardens, getLogger());
+        PresetService presetService = new PresetService(config, messages, currency, gardens);
+        this.menu = new GardenMenu(config, messages, gardens, unlocks, presetService);
+        this.sam = new Sam(getPlugin(), config, menu);
+        this.protection = new GardenProtection(gardens, config, messages);
+        gardens.onPrepared(sam::ensureWhenLoaded);
         Bukkit.getPluginManager().registerEvents(sam, getPlugin());
         Bukkit.getPluginManager().registerEvents(protection, getPlugin());
 
         declare(CommandGarden.PERMISSION, PermissionDefault.TRUE, "Go to your Garden.");
         declare(CommandDesk.PERMISSION, PermissionDefault.TRUE, "Open the Garden desk.");
         declare(GardenProtection.BYPASS, PermissionDefault.OP, "Edit a Garden's protected blocks.");
-        declare(CommandGarden.ADMIN, PermissionDefault.OP, "Capture and stamp plot templates.");
+        declare(PresetService.BYPASS_COOLDOWN, PermissionDefault.OP, "Skip the cooldown between plot rebuilds.");
+        declare(CommandGarden.ADMIN, PermissionDefault.OP, "Manage presets and other players' Gardens.");
 
-        this.gardenCommand = new CommandGarden(getPlugin(), gardens, sam);
-        this.deskCommand = new CommandDesk(getPlugin(), menu);
+        this.gardenCommand = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
+                messages, this::reloadFiles, () -> evacuationPoint(host));
+        this.deskCommand = new CommandDesk(getPlugin(), config.commandName("desk", "desk"), menu);
         gardenCommand.register();
         deskCommand.register();
 
-        getLogger().info("Ready: /garden, /desk, Sam at the desk, "
-                + GardenLayout.GRID + "×" + GardenLayout.GRID + " plots of "
-                + GardenLayout.PLOT_SIZE + ".");
+        getLogger().info("Ready: /" + gardenCommand.getName() + ", /" + deskCommand.getName()
+                + ", Sam at the desk, " + GardenLayout.grid() + "×" + GardenLayout.grid()
+                + " plots of " + GardenLayout.plotSize() + ".");
+    }
+
+    /** Where players standing in a Garden go when it is deleted. */
+    private Location evacuationPoint(RoyalSkyblockPlugin host) {
+        String name = config.evacuateWorld();
+        if (name == null || name.isBlank()) {
+            name = host.conf().getString("spawn.world", "world");
+        }
+        World world = name == null ? null : Bukkit.getWorld(name);
+        if (world == null) {
+            world = Bukkit.getWorlds().get(0);
+        }
+        return world.getSpawnLocation();
     }
 
     /**
-     * Register a permission node that every player has by default.
+     * Register a permission node.
      *
      * <p>An extension has no {@code plugin.yml}, so there is nowhere to declare a node the way the host
      * declares its own — and an <em>undeclared</em> node is not simply ungated. Bukkit resolves one it
@@ -201,16 +264,17 @@ public final class RoyalGardenExtension extends Extension {
 
     /** Whether every host service this extension needs is present. */
     public boolean isReady() {
-        return islands != null && worlds != null && storage != null;
+        return islands != null && worlds != null && storage != null && currency != null;
     }
 
     /**
-     * Tear down what {@link #start()} put up.
+     * Tear down what {@link #start} put up.
      *
-     * <p>Commands and listeners are registered against the <em>host</em> plugin, so nothing here is
-     * cleaned up for us on an extension reload — leaving them would stack a second copy of both on the
-     * next load. Garden worlds are not unloaded: the host's world service owns their lifecycle and
-     * saves them on shutdown, and racing it would be the one way to actually lose someone's farm.
+     * <p>Commands, listeners and the build queue's task are registered against the <em>host</em>
+     * plugin, so nothing here is cleaned up for us on an extension reload — leaving them would stack a
+     * second copy of each on the next load. Garden worlds are not unloaded: the host's world service owns
+     * their lifecycle and saves them on shutdown, and racing it would be the one way to actually lose
+     * someone's farm. Rebuilds cut short here are recorded as pending and resume on the next visit.
      */
     @Override
     protected void onDisable() {
@@ -222,6 +286,10 @@ public final class RoyalGardenExtension extends Extension {
             deskCommand.unregister();
             deskCommand = null;
         }
+        if (queue != null) {
+            queue.shutdown();
+            queue = null;
+        }
         if (sam != null) {
             HandlerList.unregisterAll(sam);
             sam = null;
@@ -230,14 +298,19 @@ public final class RoyalGardenExtension extends Extension {
             HandlerList.unregisterAll(protection);
             protection = null;
         }
-        Bukkit.getPluginManager().removePermission(CommandGarden.PERMISSION);
-        Bukkit.getPluginManager().removePermission(CommandDesk.PERMISSION);
-        Bukkit.getPluginManager().removePermission(GardenProtection.BYPASS);
-        Bukkit.getPluginManager().removePermission(CommandGarden.ADMIN);
+        PluginManager plugins = Bukkit.getPluginManager();
+        plugins.removePermission(CommandGarden.PERMISSION);
+        plugins.removePermission(CommandDesk.PERMISSION);
+        plugins.removePermission(GardenProtection.BYPASS);
+        plugins.removePermission(PresetService.BYPASS_COOLDOWN);
+        plugins.removePermission(CommandGarden.ADMIN);
+        this.config = null;
+        this.menu = null;
         this.gardens = null;
         this.islands = null;
         this.worlds = null;
         this.storage = null;
+        this.currency = null;
     }
 
     /** The host's island manager, once enabled. */
@@ -250,7 +323,7 @@ public final class RoyalGardenExtension extends Extension {
         return worlds;
     }
 
-    /** The host's storage. Garden unlock state is expected to live here from Phase 2. */
+    /** The host's storage. */
     public Storage storage() {
         return storage;
     }

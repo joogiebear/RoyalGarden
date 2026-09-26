@@ -70,14 +70,35 @@
             <version>26.2.build.123-stable</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.13.4</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <finalName>RoyalGarden</finalName>
         <resources>
+            <!--
+              Only extension.yml is filtered (for its version). The shipped configs are full of
+              %placeholders% and @-free text today, but filtering them would turn any future ${...} or
+              @...@ in a message into a build-time substitution nobody asked for.
+            -->
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
+                <includes>
+                    <include>extension.yml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>extension.yml</exclude>
+                </excludes>
             </resource>
         </resources>
         <plugins>
@@ -85,6 +106,11 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.15.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
             </plugin>
         </plugins>
     </build>

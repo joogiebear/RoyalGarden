@@ -1,43 +1,55 @@
 package com.mystipixel.royalgarden.garden;
 
+import com.mystipixel.royalgarden.config.Durations;
+import com.mystipixel.royalgarden.config.GardenConfig;
+import com.mystipixel.royalgarden.config.ItemSpec;
+import com.mystipixel.royalgarden.config.Messages;
+import com.mystipixel.royalskyblock.util.Text;
 import com.willfp.eco.core.gui.menu.Menu;
 import com.willfp.eco.core.gui.menu.MenuBuilder;
 import com.willfp.eco.core.gui.slot.Slot;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The desk menu: the board, drawn as itself.
+ * The desk menu: the board, drawn as itself — and, from any plot you own, the preset picker.
  *
- * <p>A 5&times;5 grid of plots and a 9&times;6 inventory are a lucky fit — the board sits in columns
- * 3&ndash;7 of the first five rows, dead centre, and every slot is the plot it represents rather than
- * a list entry describing one. Clicking a plot you own walks you to it; clicking one you can buy buys
- * it.
+ * <p>A 5&times;5 grid of plots and a 9-wide inventory are a lucky fit — the board sits centred in the
+ * top rows, and every slot is the plot it represents rather than a list entry describing one. Left-click
+ * a plot you own to walk there, right-click it to choose a preset; click one you can buy to buy it.
  *
- * <p>Built once and rendered per player: every slot reads the clicking player's own unlock state, so
- * one menu object serves everybody and {@link Menu#refresh} is enough to show an unlock the instant it
- * happens.
+ * <p>Every icon, title and line comes from {@code menu:} and {@code preset-menu:} in {@code config.yml}.
+ * The board menu is built once and rendered per player — each slot reads the viewer's own state — and
+ * rebuilt by {@link #reload()} so edited icons show without a restart.
  */
 public final class GardenMenu {
 
-    /** Left-hand column of the board inside the inventory, so the five plots land centred. */
-    private static final int COLUMN_OFFSET = 3;
-
+    private final GardenConfig config;
+    private final Messages messages;
     private final GardenWorlds worlds;
-    private final Menu menu;
+    private final UnlockService unlocks;
+    private final PresetService presetService;
+    private Menu menu;
 
-    public GardenMenu(GardenWorlds worlds) {
+    public GardenMenu(GardenConfig config, Messages messages, GardenWorlds worlds, UnlockService unlocks,
+                      PresetService presetService) {
+        this.config = config;
+        this.messages = messages;
         this.worlds = worlds;
+        this.unlocks = unlocks;
+        this.presetService = presetService;
+        this.menu = build();
+    }
+
+    /** Rebuild the menu from the current config. */
+    public void reload() {
         this.menu = build();
     }
 
@@ -45,24 +57,53 @@ public final class GardenMenu {
         menu.open(player);
     }
 
-    private Menu build() {
-        MenuBuilder builder = Menu.builder(6).setTitle("The Garden");
+    private ConfigurationSection items() {
+        return config.yaml().getConfigurationSection("menu.items");
+    }
 
-        for (int px = 0; px < GardenLayout.GRID; px++) {
-            for (int pz = 0; pz < GardenLayout.GRID; pz++) {
+    private Menu build() {
+        int grid = GardenLayout.grid();
+        int rows = grid + 1;
+        int columnOffset = (9 - grid) / 2 + 1;             // eco slots are 1-indexed
+        MenuBuilder builder = Menu.builder(rows)
+                .setTitle(Text.legacy(config.yaml().getString("menu.title", "&8The Garden")));
+
+        boolean[][] used = new boolean[rows + 1][10];
+        for (int px = 0; px < grid; px++) {
+            for (int pz = 0; pz < grid; pz++) {
                 int plotX = px;
                 int plotZ = pz;
-                // eco slots are 1-indexed (row, column). North is up: plot z maps to the row.
-                builder.setSlot(pz + 1, px + COLUMN_OFFSET, Slot.builder(
-                                player -> icon(player, plotX, plotZ))
+                // North is up: plot z maps to the row.
+                builder.setSlot(pz + 1, px + columnOffset, Slot.builder(player -> icon(player, plotX, plotZ))
                         .onLeftClick((event, slot, clicked) ->
-                                click((Player) event.getWhoClicked(), clicked, plotX, plotZ))
+                                leftClick((Player) event.getWhoClicked(), clicked, plotX, plotZ))
+                        .onRightClick((event, slot, clicked) ->
+                                rightClick((Player) event.getWhoClicked(), plotX, plotZ))
                         .build());
+                used[pz + 1][px + columnOffset] = true;
             }
         }
 
-        builder.setSlot(6, 5, Slot.builder(this::summary).build());
+        builder.setSlot(rows, 5, Slot.builder(this::summary).build());
+        used[rows][5] = true;
+
+        ItemStack filler = filler();
+        if (filler != null) {
+            for (int row = 1; row <= rows; row++) {
+                for (int column = 1; column <= 9; column++) {
+                    if (!used[row][column]) {
+                        builder.setSlot(row, column, Slot.builder(filler).build());
+                    }
+                }
+            }
+        }
         return builder.build();
+    }
+
+    private ItemStack filler() {
+        String raw = config.yaml().getString("menu.filler", "");
+        Material material = raw == null || raw.isBlank() ? null : Material.matchMaterial(raw.trim());
+        return material == null || !material.isItem() ? null : ItemSpec.plain(material, " ", List.of());
     }
 
     // ── rendering ──────────────────────────────────────────────────────────────
@@ -70,100 +111,178 @@ public final class GardenMenu {
     /** The item for one plot, from this player's point of view. */
     private ItemStack icon(Player player, int px, int pz) {
         GardenState state = worlds.state(player.getUniqueId());
-        String name = GardenLayout.plotName(px, pz);
+        String plot = GardenLayout.plotName(px, pz);
+        ConfigurationSection items = items();
 
         if (GardenLayout.isCentre(px, pz)) {
-            return item(Material.HAY_BLOCK,
-                    Component.text("Farmhouse", NamedTextColor.GOLD),
-                    List.of(grey("Plot " + name + " — always yours."),
-                            grey("Sam and the desk are here."),
-                            Component.empty(),
-                            grey("This plot is protected.")));
+            return ItemSpec.build(section(items, "farmhouse"), Material.HAY_BLOCK, "%plot%", plot);
         }
         if (state.isUnlocked(px, pz)) {
-            return item(Material.GRASS_BLOCK,
-                    Component.text("Plot " + name, NamedTextColor.GREEN),
-                    List.of(grey("Unlocked."),
-                            Component.empty(),
-                            Component.text("Click to go here.", NamedTextColor.YELLOW)));
+            World here = player.getWorld();
+            boolean building = player.getUniqueId().equals(GardenWorlds.ownerOf(here))
+                    && worlds.isBuilding(here, px, pz);
+            String preset = state.presetOn(px, pz);
+            PresetLibrary.Entry entry = preset == null ? null : worlds.presets().entry(preset);
+            String presetName = entry != null ? entry.displayName()
+                    : preset != null ? preset : messages.raw("preset-none");
+            return ItemSpec.build(section(items, building ? "building" : "unlocked"), Material.GRASS_BLOCK,
+                    "%plot%", plot, "%preset%", presetName,
+                    "%presets-hint%", config.playerPresetsEnabled() ? messages.raw("menu-presets-hint") : "");
         }
         if (state.canUnlock(px, pz)) {
-            return item(Material.LIME_STAINED_GLASS_PANE,
-                    Component.text("Plot " + name, NamedTextColor.YELLOW),
-                    List.of(grey("Locked, and next to a plot you own."),
-                            Component.empty(),
-                            Component.text("Click to unlock.", NamedTextColor.YELLOW)));
+            int purchase = state.purchasedCount() + 1;
+            if (state.unlockedCount() >= unlocks.limit(player)) {
+                return ItemSpec.build(section(items, "limit-reached"), Material.BARRIER,
+                        "%plot%", plot, "%limit%", String.valueOf(unlocks.limit(player)));
+            }
+            UnlockService.Terms terms = unlocks.terms(px, pz, purchase);
+            UnlockService.Requirement unmet = unlocks.unmet(player, terms);
+            return ItemSpec.build(section(items, "unlockable"), Material.LIME_STAINED_GLASS_PANE,
+                    "%plot%", plot, "%cost%", unlocks.display(terms.cost()),
+                    "%purchase%", String.valueOf(purchase),
+                    "%requirement%", unmet == null ? "" : Messages.fill(
+                            unmet.message().isEmpty() ? messages.raw("unlock-requirement") : unmet.message(),
+                            "%required%", String.valueOf(unmet.min()), "%current%", "?", "%plot%", plot));
         }
-        return item(Material.GRAY_STAINED_GLASS_PANE,
-                Component.text("Plot " + name, NamedTextColor.DARK_GRAY),
-                List.of(grey("Locked — you cannot farm here."),
-                        grey("Unlock a plot next to it first.")));
+        return ItemSpec.build(section(items, "locked"), Material.GRAY_STAINED_GLASS_PANE, "%plot%", plot);
     }
 
     /** The counter at the bottom of the menu. */
     private ItemStack summary(Player player) {
         GardenState state = worlds.state(player.getUniqueId());
-        int total = GardenLayout.GRID * GardenLayout.GRID;
-        return item(Material.WHEAT,
-                Component.text("Your Garden", NamedTextColor.GREEN),
-                List.of(grey(state.unlockedCount() + " of " + total + " plots unlocked"),
-                        grey("Each plot is " + GardenLayout.PLOT_SIZE + "×" + GardenLayout.PLOT_SIZE),
-                        Component.empty(),
-                        grey("Locked plots are sealed off until"),
-                        grey("you unlock them — each new plot must"),
-                        grey("touch one you already own.")));
+        return ItemSpec.build(section(items(), "summary"), Material.WHEAT,
+                "%unlocked%", String.valueOf(state.unlockedCount()),
+                "%total%", String.valueOf(GardenLayout.plotCount()),
+                "%limit%", String.valueOf(unlocks.limit(player)),
+                "%size%", String.valueOf(GardenLayout.plotSize()));
+    }
+
+    private static ConfigurationSection section(ConfigurationSection parent, String key) {
+        return parent == null ? null : parent.getConfigurationSection(key);
     }
 
     // ── clicking ───────────────────────────────────────────────────────────────
 
-    private void click(Player player, Menu clicked, int px, int pz) {
+    private void leftClick(Player player, Menu clicked, int px, int pz) {
         GardenState state = worlds.state(player.getUniqueId());
-
         if (state.isUnlocked(px, pz)) {
             visit(player, px, pz);
             return;
         }
-        if (!state.canUnlock(px, pz)) {
-            player.sendMessage(Component.text("Unlock a plot next to that one first.", NamedTextColor.RED));
-            return;
-        }
-        if (worlds.unlock(player.getUniqueId(), px, pz)) {
-            player.sendMessage(Component.text("Unlocked plot " + GardenLayout.plotName(px, pz) + ".",
-                    NamedTextColor.GREEN));
+        if (unlocks.attempt(player, px, pz)) {
             clicked.refresh(player);
         }
     }
 
-    /** Walk the player to a plot, opening their Garden first if they are not standing in it. */
-    private void visit(Player player, int px, int pz) {
-        World here = player.getWorld();
-        if (GardenWorlds.isGarden(here) && player.getUniqueId().equals(GardenWorlds.ownerOf(here))) {
-            player.closeInventory();
-            player.teleportAsync(GardenLayout.plotCentre(here, px, pz));
+    private void rightClick(Player player, int px, int pz) {
+        GardenState state = worlds.state(player.getUniqueId());
+        if (GardenLayout.isCentre(px, pz) || !state.isUnlocked(px, pz)) {
             return;
         }
-        player.closeInventory();
-        worlds.open(player.getUniqueId()).thenAccept(world ->
-                player.teleportAsync(GardenLayout.plotCentre(world, px, pz)));
-    }
-
-    // ── item helpers ───────────────────────────────────────────────────────────
-
-    private static ItemStack item(Material material, Component name, List<Component> lore) {
-        ItemStack stack = new ItemStack(material);
-        ItemMeta meta = stack.getItemMeta();
-        // Item names and lore render italic by default, which reads as placeholder text.
-        meta.displayName(name.decoration(TextDecoration.ITALIC, false));
-        List<Component> lines = new ArrayList<>(lore.size());
-        for (Component line : lore) {
-            lines.add(line.decoration(TextDecoration.ITALIC, false));
+        if (!config.playerPresetsEnabled()) {
+            messages.send(player, "presets-disabled");
+            return;
         }
-        meta.lore(lines);
-        stack.setItemMeta(meta);
-        return stack;
+        openPresets(player, px, pz);
     }
 
-    private static Component grey(String text) {
-        return Component.text(text, NamedTextColor.GRAY);
+    /** Walk the player to a plot, opening their Garden first if they are not standing in it. */
+    private void visit(Player player, int px, int pz) {
+        player.closeInventory();
+        World here = player.getWorld();
+        if (player.getUniqueId().equals(GardenWorlds.ownerOf(here))) {
+            player.teleportAsync(standingSpot(here, px, pz));
+            return;
+        }
+        worlds.open(player.getUniqueId()).whenComplete((world, error) -> {
+            if (error != null || world == null) {
+                messages.send(player, "garden-open-failed");
+                return;
+            }
+            player.teleportAsync(standingSpot(world, px, pz));
+        });
+    }
+
+    /**
+     * Somewhere to stand at the middle of a plot: on top of whatever is built there.
+     *
+     * <p>The fixed surface height used to be the target, which put anyone visiting a plot with a farm
+     * on it inside the farm.
+     */
+    static Location standingSpot(World world, int px, int pz) {
+        Location centre = GardenLayout.plotCentre(world, px, pz);
+        int top = world.getHighestBlockYAt(centre.getBlockX(), centre.getBlockZ());
+        if (top >= GardenLayout.floorY()) {
+            centre.setY(top + 1);
+        }
+        return centre;
+    }
+
+    // ── the preset picker ──────────────────────────────────────────────────────
+
+    /** Open the preset picker for one of the player's plots. */
+    public void openPresets(Player player, int px, int pz) {
+        List<PresetLibrary.Entry> entries = worlds.presets().selectable();
+        if (entries.isEmpty()) {
+            messages.send(player, "presets-none");
+            return;
+        }
+        int shown = Math.min(entries.size(), 45);
+        int rows = Math.min(6, (shown + 8) / 9 + 1);
+        String plot = GardenLayout.plotName(px, pz);
+        MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(Messages.fill(
+                config.yaml().getString("preset-menu.title", "&8Presets — Plot %plot%"), "%plot%", plot)));
+
+        for (int i = 0; i < shown; i++) {
+            PresetLibrary.Entry entry = entries.get(i);
+            builder.setSlot(i / 9 + 1, i % 9 + 1, Slot.builder(viewer -> presetIcon(viewer, entry, px, pz))
+                    .onLeftClick((event, slot, clicked) -> {
+                        Player who = (Player) event.getWhoClicked();
+                        if (presetService.choose(who, px, pz, entry)) {
+                            who.closeInventory();
+                        } else {
+                            clicked.refresh(who);
+                        }
+                    })
+                    .build());
+        }
+        ConfigurationSection back = config.yaml().getConfigurationSection("preset-menu.back");
+        builder.setSlot(rows, 1, Slot.builder(ItemSpec.build(back, Material.ARROW))
+                .onLeftClick((event, slot, clicked) -> open((Player) event.getWhoClicked()))
+                .build());
+        builder.build().open(player);
+    }
+
+    private ItemStack presetIcon(Player player, PresetLibrary.Entry entry, int px, int pz) {
+        GardenState state = worlds.state(player.getUniqueId());
+        long wait = presetService.cooldownLeft(player, state, px, pz, entry);
+        boolean current = entry.id().equals(state.presetOn(px, pz));
+        String status;
+        if (!entry.permission().isBlank() && !player.hasPermission(entry.permission())) {
+            status = messages.raw("preset-status-no-permission");
+        } else if (wait > 0) {
+            status = messages.raw("preset-status-cooldown", "%time%", Durations.format(wait));
+        } else {
+            status = messages.raw("preset-status-ready");
+        }
+        String[] placeholders = {
+                "%preset%", entry.displayName(),
+                "%plot%", GardenLayout.plotName(px, pz),
+                "%cost%", presetService.display(entry.cost()),
+                "%cooldown%", Durations.format(presetService.cooldownFor(entry)),
+                "%status%", status,
+                "%current%", current ? messages.raw("preset-current") : ""};
+        List<String> lore = new ArrayList<>();
+        for (String line : entry.lore()) {
+            lore.add(Messages.fill(line, placeholders));
+        }
+        for (String line : config.yaml().getStringList("preset-menu.entry-lore")) {
+            String filled = Messages.fill(line, placeholders);
+            if (line.trim().startsWith("%") && line.trim().endsWith("%") && filled.isBlank()) {
+                continue;
+            }
+            lore.add(filled);
+        }
+        return ItemSpec.plain(entry.icon(), Messages.fill(entry.displayName(), placeholders), lore);
     }
 }

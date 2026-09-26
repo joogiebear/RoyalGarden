@@ -10,9 +10,9 @@ import org.bukkit.block.Block;
  * Generates a brand-new Garden: the centre plot and the farmhouse standing on it.
  *
  * <p>Only the centre plot is built <em>here</em>, synchronously, so the player has somewhere to stand
- * the moment the world exists. The other twenty-four are laid in behind them by
- * {@link GardenWorlds#sync}, spread across ticks — locked plots included, because ground you will one
- * day own should look like ground, not a hole in the board.
+ * the moment the world exists. The rest are laid in behind them by {@link GardenWorlds#sync} through
+ * the {@link BuildQueue} — locked plots included, because ground you will one day own should look like
+ * ground, not a hole in the board.
  *
  * <p>Everything here writes blocks, so it must run on the server thread. It is also deterministic:
  * every Garden is identical, which keeps "is this world already built?" a question about the world
@@ -42,7 +42,7 @@ public final class GardenBuilder {
      * into — and so the spawn point can never be inside a block if the barn is ever reshaped.
      */
     public static Location spawn(World world) {
-        Location spawn = new Location(world, 0.5, GardenLayout.GROUND_Y + 1, BARN_Z + 4.5);
+        Location spawn = new Location(world, 0.5, GardenLayout.groundY() + 1, BARN_Z + 4.5);
         spawn.setYaw(180f);   // facing -z, toward the doors
         spawn.setPitch(0f);
         return spawn;
@@ -50,30 +50,32 @@ public final class GardenBuilder {
 
     /** Where Sam stands: behind the desk at the back of the barn, facing the doors. */
     public static Location samPost(World world) {
-        Location post = new Location(world, 0.5, GardenLayout.GROUND_Y + 1, -BARN_Z + 1.5);
+        Location post = new Location(world, 0.5, GardenLayout.groundY() + 1, -BARN_Z + 1.5);
         post.setYaw(180f);
         post.setPitch(0f);
         return post;
     }
 
     /** Build the centre plot and its farmhouse into a freshly created world. */
-    public static void build(World world) {
-        generatePlot(world, GardenLayout.CENTRE, GardenLayout.CENTRE);
+    public static void build(World world, Palette palette) {
+        for (int row = 0; row < GardenLayout.plotSize(); row++) {
+            generatePlotRow(world, GardenLayout.centre(), GardenLayout.centre(), row, Base.FLAT, palette);
+        }
         barn(world);
         approach(world);
     }
 
     /**
-     * Generate one plot: its ground, and the path around its rim.
+     * What a generated plot is made of, from {@code generation.blocks} in {@code config.yml}.
      *
-     * <p>This is what unlocking a plot <em>means</em> — a locked plot is not a fenced-off area, it is
-     * an area that does not exist yet. Idempotent, so it can be re-run to repair a plot whose blocks
-     * were lost, and cheap enough (9,216 columns) to run inside a click handler.
+     * @param surface the top course
+     * @param rim     the top course around the plot's edge, so plots read as separate fields
+     * @param subsoil the two courses under the surface
+     * @param floor   the bottom course, the only thing between a shovel and the void
      */
-    public static void generatePlot(World world, int px, int pz) {
-        for (int row = 0; row < GardenLayout.PLOT_SIZE; row++) {
-            generatePlotRow(world, px, pz, row, Base.FLAT);
-        }
+    public record Palette(Material surface, Material rim, Material subsoil, Material floor) {
+        public static final Palette DEFAULT =
+                new Palette(Material.GRASS_BLOCK, Material.DIRT_PATH, Material.DIRT, Material.BEDROCK);
     }
 
     /**
@@ -91,17 +93,17 @@ public final class GardenBuilder {
 
     /** Blocks written by one call to {@link #generatePlotRow} — four courses across the plot. */
     public static int rowCost() {
-        return GardenLayout.PLOT_SIZE * 4;
+        return GardenLayout.plotSize() * 4;
     }
 
     /** The first Y above a generated base, i.e. where clearing starts. */
     public static int baseTop() {
-        return GardenLayout.GROUND_Y + 1;
+        return GardenLayout.groundY() + 1;
     }
 
-    /** The highest Y a plot owns, so clearing knows where to stop. */
-    public static int ceiling() {
-        return GardenLayout.GROUND_Y - 3 + PlotTemplate.MAX_HEIGHT;
+    /** The highest Y a plot owns — the top of the tallest template allowed — so clearing knows where to stop. */
+    public static int ceiling(int maxTemplateHeight) {
+        return GardenLayout.floorY() + maxTemplateHeight;
     }
 
     /**
@@ -112,13 +114,12 @@ public final class GardenBuilder {
      * the top of the old build floating above the new one. Only done when applying: during world
      * generation everything above is already air, and clearing it would be a million wasted writes.
      */
-    public static int clearRowAbove(World world, int px, int pz, int row, int fromY) {
+    public static int clearRowAbove(World world, int px, int pz, int row, int fromY, int top) {
         int x = GardenLayout.plotMin(px) + row;
         int zMin = GardenLayout.plotMin(pz);
-        int top = ceiling();
         int cleared = 0;
         for (int y = fromY; y <= top; y++) {
-            for (int z = zMin; z < zMin + GardenLayout.PLOT_SIZE; z++) {
+            for (int z = zMin; z < zMin + GardenLayout.plotSize(); z++) {
                 Block block = world.getBlockAt(x, y, z);
                 if (!block.getType().isAir()) {
                     block.setType(Material.AIR, false);
@@ -130,20 +131,20 @@ public final class GardenBuilder {
     }
 
     /**
-     * Generate one x-row of the default plot: grass over dirt over stone, with a path along the rim.
+     * Generate one x-row of a plain plot: surface over subsoil over floor, with a rim along the edge.
      *
-     * <p>A row at a time so the caller can spend a fixed block budget per tick. The whole board is
-     * 230,400 columns, and laying it in one go is seconds of frozen server.
+     * <p>A row at a time so the caller can spend a fixed block budget per tick. The whole default
+     * board is 230,400 columns, and laying it in one go is seconds of frozen server.
      *
-     * <p>The bottom course is bedrock: a plot floats over the void, and the floor is the only thing
+     * <p>The bottom course is the floor: a plot floats over the void, and the floor is the only thing
      * between a player with a shovel and a fall out of their own Garden.
      */
-    public static int generatePlotRow(World world, int px, int pz, int row, Base base) {
-        int y = GardenLayout.GROUND_Y;
+    public static int generatePlotRow(World world, int px, int pz, int row, Base base, Palette palette) {
+        int y = GardenLayout.groundY();
         int x = GardenLayout.plotMin(px) + row;
         int zMin = GardenLayout.plotMin(pz);
         int zMax = GardenLayout.plotMax(pz);
-        boolean edgeRow = row == 0 || row == GardenLayout.PLOT_SIZE - 1;
+        boolean edgeRow = row == 0 || row == GardenLayout.plotSize() - 1;
 
         for (int z = zMin; z <= zMax; z++) {
             if (base == Base.BEDROCK) {
@@ -152,11 +153,11 @@ public final class GardenBuilder {
                 world.getBlockAt(x, y - 2, z).setType(Material.AIR, false);
             } else {
                 boolean rim = edgeRow || z == zMin || z == zMax;
-                world.getBlockAt(x, y, z).setType(rim ? Material.DIRT_PATH : Material.GRASS_BLOCK, false);
-                world.getBlockAt(x, y - 1, z).setType(Material.DIRT, false);
-                world.getBlockAt(x, y - 2, z).setType(Material.DIRT, false);
+                world.getBlockAt(x, y, z).setType(rim ? palette.rim() : palette.surface(), false);
+                world.getBlockAt(x, y - 1, z).setType(palette.subsoil(), false);
+                world.getBlockAt(x, y - 2, z).setType(palette.subsoil(), false);
             }
-            world.getBlockAt(x, y - 3, z).setType(Material.BEDROCK, false);
+            world.getBlockAt(x, y - 3, z).setType(palette.floor(), false);
         }
         return rowCost();
     }
@@ -173,9 +174,9 @@ public final class GardenBuilder {
      * and stamp the default preset back over it on the next load.
      */
     public static boolean isGenerated(World world, int px, int pz) {
-        return !world.getBlockAt((int) GardenLayout.plotCentre(world, px, pz).getX(),
-                GardenLayout.GROUND_Y - 3, (int) GardenLayout.plotCentre(world, px, pz).getZ())
-                .getType().isAir();
+        int half = GardenLayout.plotSize() / 2;
+        return !world.getBlockAt(GardenLayout.plotMin(px) + half, GardenLayout.floorY(),
+                GardenLayout.plotMin(pz) + half).getType().isAir();
     }
 
     /**
@@ -185,10 +186,13 @@ public final class GardenBuilder {
      * A Garden built then still has them standing, and nothing else would ever remove them — so this
      * runs once per load and clears the course above every plot rim. Cheap, and it means an old Garden
      * repairs itself rather than needing to be wiped.
+     *
+     * <p>It touches every plot edge, which loads most of the board's chunks, so it runs once per Garden
+     * — {@link GardenState#legacyWallsCleared()} records that it has — and not on every visit.
      */
     public static void clearLegacyWalls(World world) {
-        int y = GardenLayout.GROUND_Y + 1;
-        for (int p = 0; p < GardenLayout.GRID; p++) {
+        int y = GardenLayout.groundY() + 1;
+        for (int p = 0; p < GardenLayout.grid(); p++) {
             for (int v = GardenLayout.boardMin(); v <= GardenLayout.boardMax(); v++) {
                 clearWall(world, GardenLayout.plotMin(p), y, v);
                 clearWall(world, GardenLayout.plotMax(p), y, v);
@@ -207,7 +211,7 @@ public final class GardenBuilder {
 
     /** A short path from the spawn point to the barn doors, so the way in reads as intended. */
     private static void approach(World world) {
-        int y = GardenLayout.GROUND_Y;
+        int y = GardenLayout.groundY();
         for (int z = BARN_Z; z <= BARN_Z + 6; z++) {
             for (int x = -1; x <= 1; x++) {
                 world.getBlockAt(x, y, z).setType(Material.DIRT_PATH, false);
@@ -223,7 +227,7 @@ public final class GardenBuilder {
      * automatically if the plot maths ever changes.
      */
     private static void barn(World world) {
-        int y = GardenLayout.GROUND_Y;
+        int y = GardenLayout.groundY();
 
         // floor, and a hollow to stand in
         for (int x = -BARN_X; x <= BARN_X; x++) {
