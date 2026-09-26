@@ -93,6 +93,44 @@ unlock:
   #           message: "&cCorner plots need island level 100."
   by-plot: {}
 
+# ── Clearing plots ────────────────────────────────────────────────────────────
+# Locked plots are overgrown with trees, boulders, bushes, fallen logs and
+# undergrowth. A bought plot has to be cleared before it can be built on: every
+# piece of debris that goes (broken, or leaves decaying once their tree is cut)
+# adds to the plot's clearing %, and at `required-percent` it is yours to build.
+# While clearing, the owner can break debris there and nothing else.
+#
+# Debris is grown once per locked plot — on a new Garden, and on existing
+# Gardens' locked plots the next time they load. Plots already bought are left
+# alone. Changing the amounts below only affects plots not grown yet.
+clearing:
+  enabled: true
+  required-percent: 90
+  # Blocks left bare inside each plot edge, so nothing overhangs the next plot.
+  margin: 3
+  trees:
+    count: 14
+    # Each needs a <type>_log and <type>_leaves. spruce grows as a cone.
+    types: [oak, birch, spruce]
+  boulders:
+    count: 10
+    blocks: [stone, cobblestone, andesite, mossy_cobblestone]
+  bushes:
+    count: 12
+    blocks: [oak_leaves, azalea_leaves, flowering_azalea_leaves]
+  fallen-logs:
+    count: 6
+  undergrowth:
+    # Chance per bare block of ground of a plant on it.
+    chance: 0.06
+    # Single-block plants only — a tall plant's top half goes without a trace.
+    blocks: [short_grass, short_grass, short_grass, fern, dandelion, poppy, cornflower]
+  # When a plot is cleared. Placeholders: %player% %uuid% %plot%
+  #   commands: ["garden xp %player% give 50"]
+  rewards:
+    commands: []
+    messages: []
+
 # ── Presets ───────────────────────────────────────────────────────────────────
 # Which presets players can choose, and what they cost, is in presets.yml.
 presets:
@@ -195,6 +233,16 @@ menu:
         - ""
         - "&eLeft-click to go here."
         - "%presets-hint%"
+    # A bought plot still being cleared. %plot% %percent% %required% %bar% %cleared% %total%
+    clearing:
+      material: oak_sapling
+      name: "&6Plot %plot% &7(clearing)"
+      lore:
+        - "&7Overgrown — clear it to build here."
+        - ""
+        - "%bar% &f%percent%%&7/%required%%"
+        - ""
+        - "&eLeft-click to go here."
     building:
       material: scaffolding
       name: "&ePlot %plot% &7(building…)"

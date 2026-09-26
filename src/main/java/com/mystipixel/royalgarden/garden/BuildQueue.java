@@ -48,6 +48,7 @@ public final class BuildQueue {
         private final boolean clearAbove;
         private final int ceiling;
         private final long ticksPerRow;
+        private final Overgrowth.Plan growth;
         private final Consumer<Outcome> whenDone;
         private int row;
         private long nextTick;
@@ -71,6 +72,28 @@ public final class BuildQueue {
             this.clearAbove = clearAbove;
             this.ceiling = ceiling;
             this.ticksPerRow = ticksPerRow;
+            this.growth = null;
+            this.whenDone = whenDone;
+        }
+
+        /**
+         * Lay a plot's debris over whatever ground it already has.
+         *
+         * <p>Writes only into air above the ground, so it may share the queue with the job generating the
+         * same plot's ground: the two never write the same block.
+         */
+        public Job(String world, int px, int pz, Overgrowth.Plan growth, Consumer<Outcome> whenDone) {
+            this.world = world;
+            this.px = px;
+            this.pz = pz;
+            this.preset = null;
+            this.base = null;
+            this.palette = null;
+            this.rules = null;
+            this.clearAbove = false;
+            this.ceiling = 0;
+            this.ticksPerRow = 0L;
+            this.growth = growth;
             this.whenDone = whenDone;
         }
 
@@ -106,6 +129,16 @@ public final class BuildQueue {
     public boolean isBuilding(String world, int px, int pz) {
         for (Job job : jobs) {
             if (job.covers(world, px, pz)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether a plot's debris is queued or being laid right now. */
+    public boolean isGrowing(String world, int px, int pz) {
+        for (Job job : jobs) {
+            if (job.growth != null && job.covers(world, px, pz)) {
                 return true;
             }
         }
@@ -196,6 +229,9 @@ public final class BuildQueue {
 
     /** Write one row of one plot, from the template if there is one. */
     private int writeRow(World world, Job job) {
+        if (job.growth != null) {
+            return Math.max(1, job.growth.writeRow(world, job.px, job.pz, job.row));
+        }
         int written;
         int contentTop;
         if (job.preset != null) {

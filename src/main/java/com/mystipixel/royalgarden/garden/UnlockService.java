@@ -256,6 +256,10 @@ public final class UnlockService {
 
         String count = String.valueOf(state.unlockedCount());
         messages.send(player, "unlocked", "%plot%", plot, "%cost%", display(cost), "%count%", count);
+        if (config.clearing().enabled() && state.isClearing(px, pz)) {
+            messages.send(player, "unlocked-needs-clearing", "%plot%", plot,
+                    "%required%", String.valueOf(config.clearing().required()));
+        }
         String[] placeholders = {"%player%", player.getName(), "%uuid%", player.getUniqueId().toString(),
                 "%plot%", plot, "%count%", count, "%purchase%", String.valueOf(purchase)};
         for (String command : terms.commands()) {

@@ -52,6 +52,8 @@ import java.util.UUID;
  *   <li><b>The farmhouse plot</b> — read-only. It carries the barn, the desk and Sam, and is the one
  *       plot every Garden has, so it is the one plot whose contents can be relied upon.</li>
  *   <li><b>Locked plots</b> — read-only and off-limits until bought.</li>
+ *   <li><b>Plots being cleared</b> — bought, but still overgrown: the owner may walk in and break the
+ *       debris ({@link ClearingService}) and do nothing else until enough of it is gone.</li>
  * </ul>
  *
  * <p>Plus the <b>floor course</b> under every plot, which is all that stands between a shovel and a
@@ -75,6 +77,7 @@ public final class GardenProtection implements Listener {
     private final GardenConfig config;
     private final Messages messages;
     private java.util.function.Predicate<Block> machines = block -> false;
+    private ClearingService clearing;
 
     public GardenProtection(GardenWorlds worlds, GardenConfig config, Messages messages) {
         this.worlds = worlds;
@@ -88,6 +91,15 @@ public final class GardenProtection implements Listener {
      */
     public void setMachines(java.util.function.Predicate<Block> machines) {
         this.machines = machines == null ? block -> false : machines;
+    }
+
+    /** Hold plots that are still being cleared to breaking debris only. */
+    public void setClearing(ClearingService clearing) {
+        this.clearing = clearing;
+    }
+
+    private boolean uncleared(GardenState state, int px, int pz) {
+        return clearing != null && clearing.blocks(state, px, pz);
     }
 
     // ── the rules ──────────────────────────────────────────────────────────────
@@ -112,7 +124,9 @@ public final class GardenProtection implements Listener {
             return config.protect("farmhouse");
         }
         GardenState state = worlds.stateOf(world);
-        return state == null || !state.isUnlocked(px, pz);
+        // A plot being cleared is protected like a locked one from everything but its owner's hands:
+        // otherwise a tree grown or a bush bone-mealed from next door would be debris to clear for free.
+        return state == null || !state.isUnlocked(px, pz) || uncleared(state, px, pz);
     }
 
     private boolean isProtected(Block block) {
@@ -136,7 +150,7 @@ public final class GardenProtection implements Listener {
      * <p>Returns the reason rather than a boolean so the message the player gets is decided in the same
      * place as the decision — a refusal with the wrong explanation is its own kind of bug.
      */
-    private String refuse(Player player, Block block) {
+    private String refuse(Player player, Block block, boolean breaking) {
         World world = block.getWorld();
         if (!GardenWorlds.isGarden(world) || player.hasPermission(BYPASS)) {
             return null;
@@ -160,20 +174,33 @@ public final class GardenProtection implements Listener {
         if (state == null || !state.isUnlocked(px, pz)) {
             return "deny-locked";
         }
+        if (uncleared(state, px, pz) && !(breaking && clearing.isDebris(block))) {
+            return "deny-uncleared";
+        }
         return null;
     }
 
     private boolean check(Player player, Block block, Event event) {
-        String refusal = refuse(player, block);
+        String refusal = refuse(player, block, event instanceof BlockBreakEvent);
         if (refusal == null) {
             return true;
         }
         if (event instanceof org.bukkit.event.Cancellable cancellable) {
             cancellable.setCancelled(true);
         }
-        messages.actionBar(player, refusal, "%plot%",
-                GardenLayout.plotName(GardenLayout.plotAt(block.getX()), GardenLayout.plotAt(block.getZ())));
+        messages.actionBar(player, refusal, placeholders(block));
         return false;
+    }
+
+    /** {@code %plot%}, and for a plot being cleared how far along it is. */
+    private String[] placeholders(Block block) {
+        int px = GardenLayout.plotAt(block.getX());
+        int pz = GardenLayout.plotAt(block.getZ());
+        GardenState state = worlds.stateOf(block.getWorld());
+        if (clearing != null && state != null && GardenLayout.inGrid(px, pz) && state.isClearing(px, pz)) {
+            return clearing.placeholders(state, px, pz);
+        }
+        return new String[]{"%plot%", GardenLayout.plotName(px, pz)};
     }
 
     // ── movement ───────────────────────────────────────────────────────────────
@@ -326,8 +353,7 @@ public final class GardenProtection implements Listener {
             if (event.getItem() == null || !event.getItem().getType().isEdible()) {
                 event.setUseItemInHand(Event.Result.DENY);
             }
-            messages.actionBar(player, visitor ? "deny-visitor" : refusalFor(block), "%plot%",
-                    GardenLayout.plotName(GardenLayout.plotAt(block.getX()), GardenLayout.plotAt(block.getZ())));
+            messages.actionBar(player, visitor ? "deny-visitor" : refusalFor(block), placeholders(block));
         }
     }
 
@@ -340,7 +366,11 @@ public final class GardenProtection implements Listener {
         if (!GardenLayout.inGrid(px, pz)) {
             return "deny-outside";
         }
-        return GardenLayout.isCentre(px, pz) ? "deny-farmhouse" : "deny-locked";
+        if (GardenLayout.isCentre(px, pz)) {
+            return "deny-farmhouse";
+        }
+        GardenState state = worlds.stateOf(block.getWorld());
+        return state != null && state.isUnlocked(px, pz) ? "deny-uncleared" : "deny-locked";
     }
 
     /** Item frames and paintings. */
@@ -446,7 +476,7 @@ public final class GardenProtection implements Listener {
         if (!config.protect("growth")) {
             return;
         }
-        if (event.getPlayer() != null && refuse(event.getPlayer(), event.getBlock()) != null) {
+        if (event.getPlayer() != null && refuse(event.getPlayer(), event.getBlock(), false) != null) {
             event.setCancelled(true);
             return;
         }

@@ -21,7 +21,8 @@ import java.util.UUID;
  * <ul>
  *   <li>the preset must be listed as {@code selectable} in {@code presets.yml}, and the player must
  *       hold its {@code permission} if it names one;</li>
- *   <li>the plot must be theirs, unlocked, not the farmhouse, and not already being built;</li>
+ *   <li>the plot must be theirs, unlocked, not the farmhouse, not already being built, and cleared of
+ *       its debris — a preset stamped over the overgrowth would clear it for the price of the preset;</li>
  *   <li>a <b>cooldown</b> per plot, from the preset or {@code presets.players.cooldown};</li>
  *   <li>a <b>cost</b>, charged through the host's currencies;</li>
  *   <li>a <b>second click</b> to confirm, within {@code presets.players.confirm-window}.</li>
@@ -43,12 +44,27 @@ public final class PresetService {
     private final GardenWorlds worlds;
     private final Map<UUID, Armed> armed = new HashMap<>();
     private java.util.function.ToIntFunction<UUID> levels;
+    private ClearingService clearing;
 
     public PresetService(GardenConfig config, Messages messages, CurrencyService currency, GardenWorlds worlds) {
         this.config = config;
         this.messages = messages;
         this.currency = currency;
         this.worlds = worlds;
+    }
+
+    /** Refuse presets on plots that still have debris to clear. */
+    public void setClearing(ClearingService clearing) {
+        this.clearing = clearing;
+    }
+
+    /** Whether this plot must be cleared before a preset can go on it; tells the player so if it must. */
+    public boolean refuseUncleared(Player player, GardenState state, int px, int pz) {
+        if (clearing == null || !clearing.blocks(state, px, pz)) {
+            return false;
+        }
+        messages.send(player, "presets-clear-first", clearing.placeholders(state, px, pz));
+        return true;
     }
 
     /** Where presets read Garden levels from, for their {@code garden-level:} gate. */
@@ -108,6 +124,9 @@ public final class PresetService {
         }
         if (GardenLayout.isCentre(px, pz) || !state.isUnlocked(px, pz)) {
             messages.send(player, "presets-plot-not-yours", "%plot%", plot);
+            return false;
+        }
+        if (refuseUncleared(player, state, px, pz)) {
             return false;
         }
         if (!entry.permission().isBlank() && !player.hasPermission(entry.permission())) {

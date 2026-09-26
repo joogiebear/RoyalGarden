@@ -168,6 +168,43 @@ entry in `presets.yml`. Players right-click a plot at the desk to choose one; it
 says, has a per-plot cooldown and needs a confirming second click. By default crops paste at age 0
 and melons/pumpkins are never pasted, so a preset is a planted farm rather than a free harvest.
 
+### Clearing plots
+
+Locked plots are **overgrown** — trees, boulders, bushes, fallen logs and undergrowth (`clearing:` in
+`config.yml`). Buying a plot is only the first step: it then has to be **cleared** before it can be built
+on. Every piece of debris that goes counts towards the plot's clearing percentage — broken by the owner,
+or leaves decaying once their tree is felled — and at `required-percent` (90 by default) the plot is
+finished and becomes ordinary ground. The desk shows the progress; the action bar shows it as you work.
+
+While a plot is being cleared its owner may break debris there and nothing else: no placing, tilling,
+bone meal, buckets or presets. It is shielded from pistons, liquids, growth and explosions like a locked
+plot, so debris cannot be added from next door and cleared for free.
+
+- **Debris is planned from a seed per Garden and plot**, so it is the same every time it is asked for,
+  and is written through the shared build queue, only into air. It is counted as it is written, so a
+  run cut short by an unload and redone later still ends with the right total.
+- **Tree leaves carry their real distance from a log** and are not persistent: they hold on a locked
+  plot and decay once the trunk is cut. Bushes are persistent leaves and have to be broken.
+- **The count is kept by events and checked against the world.** The first time a plot's debris is
+  touched after its world loads, the plot is recounted, so a missed save or a rolled-back world can
+  neither strand a player at 89% nor hand them progress for debris that came back.
+- **Existing Gardens** grow debris on their locked plots on their next load. Plots already bought are
+  left alone.
+
+`/garden clear <player> <plot>` finishes a plot's clearing by hand.
+
+Placeholders, for tab lists and scoreboards (online players only):
+
+| Placeholder | Value |
+|---|---|
+| `%royalgarden_clearing_plot%` | the plot you are standing on |
+| `%royalgarden_clearing_percent%` | how clear it is — its % while being cleared, 100 once clear, blank if locked |
+| `%royalgarden_clearing_bar%` | a progress bar toward the required % |
+| `%royalgarden_clearing_status%` | a ready-made line (`clearing-status` in `messages.yml`), blank unless on a plot being cleared |
+| `%royalgarden_clearing_required%` | the % needed to build |
+| `%royalgarden_clearing_active%` | how many of your plots are being cleared |
+| `%royalgarden_clearing_<plot>%` | one of your plots by name, e.g. `clearing_b2` |
+
 ### Crop Milestones
 
 `milestones.yml` gives every player a lifetime total per crop, climbing through tiers. Each tier
@@ -380,7 +417,7 @@ it too.
 ### Admin commands
 
 `/garden capture <id>` · `apply <id>` · `flat` · `bedrock` · `default [id]` · `delete <id>` · `presets` ·
-`reload` · `reset <player> [world]` · `unlock <player> <plot>` · `lock <player> <plot>` ·
+`reload` · `reset <player> [world]` · `unlock <player> <plot>` · `lock <player> <plot>` · `clear <player> <plot>` ·
 `visit <player>` · `info <player>` · `milestones <player>` · `milestone <player> <crop> <amount>|reset` ·
 `level <player>` · `xp <player> give|take|set <amount>` ·
 `visitor <player> add [visitor]|clear|stats|reset-stats` · `upgrade <player> <crop> <level>|reset` ·

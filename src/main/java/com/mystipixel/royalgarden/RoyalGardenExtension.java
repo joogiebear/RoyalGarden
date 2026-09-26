@@ -10,6 +10,8 @@ import com.mystipixel.royalgarden.composter.ComposterStore;
 import com.mystipixel.royalgarden.config.GardenConfig;
 import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalgarden.garden.BuildQueue;
+import com.mystipixel.royalgarden.garden.ClearingPlaceholders;
+import com.mystipixel.royalgarden.garden.ClearingService;
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenMenu;
 import com.mystipixel.royalgarden.garden.GardenProtection;
@@ -97,6 +99,7 @@ public final class RoyalGardenExtension extends Extension {
     private GardenMenu menu;
     private Sam sam;
     private GardenProtection protection;
+    private ClearingService clearing;
     private PluginCommand gardenCommand;
     private PluginCommand deskCommand;
     private LevelConfig levelConfig;
@@ -278,6 +281,14 @@ public final class RoyalGardenExtension extends Extension {
         Bukkit.getPluginManager().registerEvents(sam, getPlugin());
         Bukkit.getPluginManager().registerEvents(protection, getPlugin());
 
+        // Clearing: locked plots grow debris, and a bought plot must be cleared before it can be built on.
+        this.clearing = new ClearingService(getPlugin(), config, messages, gardens);
+        protection.setClearing(clearing);
+        presetService.setClearing(clearing);
+        menu.setClearing(clearing);
+        Bukkit.getPluginManager().registerEvents(clearing, getPlugin());
+        clearing.start();
+
         declare(CommandGarden.PERMISSION, PermissionDefault.TRUE, "Go to your Garden.");
         declare(CommandDesk.PERMISSION, PermissionDefault.TRUE, "Open the Garden desk.");
         declare(GardenProtection.BYPASS, PermissionDefault.OP, "Edit a Garden's protected blocks.");
@@ -392,6 +403,7 @@ public final class RoyalGardenExtension extends Extension {
         UpgradeService upgradeLookup = upgrades;
         ComposterService composterLookup = composter;
         PestService pestLookup = pests;
+        ClearingPlaceholders clearingLookup = new ClearingPlaceholders(gardens, clearing, messages);
         registerExpansion((player, key) -> {
             String value = visitorPlaceholders.resolve(player, key);
             if (value == null) {
@@ -399,6 +411,9 @@ public final class RoyalGardenExtension extends Extension {
             }
             if (value == null) {
                 value = composterLookup.resolve(player, key);
+            }
+            if (value == null) {
+                value = clearingLookup.resolve(player, key);
             }
             return value != null ? value : pestLookup.resolve(player, key);
         });
@@ -411,6 +426,7 @@ public final class RoyalGardenExtension extends Extension {
         garden.setUpgrades(upgrades, upgradeMenu);
         garden.setComposter(composter, composterMenu);
         garden.setPests(pests, pestMenu);
+        garden.setClearing(clearing);
         this.gardenCommand = garden;
         this.deskCommand = new CommandDesk(getPlugin(), config.commandName("desk", "desk"), menu);
         gardenCommand.register();
@@ -634,6 +650,11 @@ public final class RoyalGardenExtension extends Extension {
         if (protection != null) {
             HandlerList.unregisterAll(protection);
             protection = null;
+        }
+        if (clearing != null) {
+            HandlerList.unregisterAll(clearing);
+            clearing.shutdown();
+            clearing = null;
         }
         PluginManager plugins = Bukkit.getPluginManager();
         plugins.removePermission(CommandGarden.PERMISSION);

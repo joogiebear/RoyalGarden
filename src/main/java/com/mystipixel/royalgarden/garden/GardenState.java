@@ -19,6 +19,8 @@ import java.util.UUID;
  *   <li><b>When each plot was last rebuilt</b>, for the preset cooldown.</li>
  *   <li><b>Rebuilds still in progress</b>, so one interrupted by the world unloading picks up again
  *       on the next visit instead of leaving half a farm.</li>
+ *   <li><b>Debris</b>: how much {@link Overgrowth} each locked plot was generated with, and — once a
+ *       plot is bought — how much of it has been cleared. A plot being cleared cannot be built on.</li>
  * </ul>
  *
  * <p>Plots are held as a packed {@code pz * grid + px} so the sets are sets of small ints rather than
@@ -31,6 +33,8 @@ public final class GardenState {
     private final Map<Integer, String> presets = new HashMap<>();
     private final Map<Integer, Long> lastApplied = new HashMap<>();
     private final Map<Integer, String> pending = new HashMap<>();
+    private final Map<Integer, Integer> overgrowth = new HashMap<>();
+    private final Map<Integer, int[]> clearing = new HashMap<>();
     private boolean legacyWallsCleared;
     private long xp;
     private boolean readOnly;
@@ -81,12 +85,18 @@ public final class GardenState {
                 || isUnlocked(px, pz - 1) || isUnlocked(px, pz + 1);
     }
 
-    /** Unlock a plot. Returns false if it was not a legal next purchase. */
+    /**
+     * Unlock a plot. Returns false if it was not a legal next purchase.
+     *
+     * <p>A plot bought with debris on it starts being cleared: see {@link #beginClearing}.
+     */
     public boolean unlock(int px, int pz) {
         if (readOnly || !canUnlock(px, pz)) {
             return false;
         }
-        return unlocked.add(key(px, pz));
+        unlocked.add(key(px, pz));
+        beginClearing(px, pz);
+        return true;
     }
 
     /** Unlock a plot regardless of adjacency — for admins, and for reading from storage. */
@@ -94,12 +104,24 @@ public final class GardenState {
         return GardenLayout.inGrid(px, pz) && unlocked.add(key(px, pz));
     }
 
-    /** Lock a plot again. The farmhouse cannot be locked. */
+    /**
+     * Lock a plot again. The farmhouse cannot be locked.
+     *
+     * <p>A plot locked part-way through clearing keeps the debris still on it as its overgrowth, so
+     * unlocking it again asks for what is left to be cleared rather than what was there to begin with.
+     */
     public boolean lock(int px, int pz) {
         if (!GardenLayout.inGrid(px, pz) || GardenLayout.isCentre(px, pz)) {
             return false;
         }
-        return unlocked.remove(key(px, pz));
+        if (!unlocked.remove(key(px, pz))) {
+            return false;
+        }
+        int[] progress = clearing.remove(key(px, pz));
+        if (progress != null && progress[0] > progress[1]) {
+            overgrowth.put(key(px, pz), progress[0] - progress[1]);
+        }
+        return true;
     }
 
     /** Every unlocked plot as {@code {px, pz}} pairs, in unlock order. */
@@ -151,6 +173,91 @@ public final class GardenState {
         return out;
     }
 
+    // ── debris ─────────────────────────────────────────────────────────────────
+
+    /** Whether a locked plot has had its debris generated. */
+    public boolean isOvergrown(int px, int pz) {
+        return overgrowth.containsKey(key(px, pz));
+    }
+
+    /**
+     * Record that a plot's debris has been generated, {@code blocks} of it.
+     *
+     * <p>If the plot was bought while its debris was still being laid, clearing starts now instead.
+     */
+    public void setOvergrowth(int px, int pz, int blocks) {
+        int k = key(px, pz);
+        if (unlocked.contains(k)) {
+            if (!clearing.containsKey(k) && blocks > 0) {
+                clearing.put(k, new int[]{blocks, 0});
+            }
+            return;
+        }
+        overgrowth.put(k, Math.max(0, blocks));
+    }
+
+    /**
+     * Start clearing a plot that has debris on it. Returns true if it now needs clearing.
+     *
+     * <p>A plot generated with no debris — or bought before debris existed — is ready to build on at once.
+     */
+    public boolean beginClearing(int px, int pz) {
+        int k = key(px, pz);
+        Integer blocks = overgrowth.remove(k);
+        if (blocks == null || blocks <= 0 || !unlocked.contains(k)) {
+            return false;
+        }
+        clearing.put(k, new int[]{blocks, 0});
+        return true;
+    }
+
+    /** Whether a plot is bought and still has a clearing record — below or above the threshold. */
+    public boolean isClearing(int px, int pz) {
+        return clearing.containsKey(key(px, pz));
+    }
+
+    /** Debris the plot had when clearing began; 0 if it is not being cleared. */
+    public int clearingTotal(int px, int pz) {
+        int[] progress = clearing.get(key(px, pz));
+        return progress == null ? 0 : progress[0];
+    }
+
+    /** Debris cleared from the plot so far; 0 if it is not being cleared. */
+    public int clearingDone(int px, int pz) {
+        int[] progress = clearing.get(key(px, pz));
+        return progress == null ? 0 : progress[1];
+    }
+
+    /** Set how much has been cleared, held between none and all of it. */
+    public void setClearingDone(int px, int pz, int done) {
+        int[] progress = clearing.get(key(px, pz));
+        if (progress != null) {
+            progress[1] = Math.clamp(done, 0, progress[0]);
+        }
+    }
+
+    /** How far through clearing a plot is, 0–100, rounded down; 100 when it is not being cleared. */
+    public int clearingPercent(int px, int pz) {
+        int[] progress = clearing.get(key(px, pz));
+        return progress == null ? 100 : percent(progress[1], progress[0]);
+    }
+
+    /** {@code done} of {@code total} as a whole percentage, rounded down so 89.9% never reads as 90. */
+    public static int percent(int done, int total) {
+        return total <= 0 ? 100 : (int) Math.min(100, (long) done * 100 / total);
+    }
+
+    /** Stop tracking a plot's clearing: it is ready to build on. Returns false if it was not being cleared. */
+    public boolean finishClearing(int px, int pz) {
+        return clearing.remove(key(px, pz)) != null;
+    }
+
+    /** Forget any debris a plot had, locked or bought — for a plot that has just been rebuilt over. */
+    public void forgetDebris(int px, int pz) {
+        overgrowth.remove(key(px, pz));
+        clearing.remove(key(px, pz));
+    }
+
     /** Garden XP earned in total. The level is worked out from it; it is never spent. */
     public long xp() {
         return xp;
@@ -195,6 +302,14 @@ public final class GardenState {
 
     Map<Integer, String> pendingByKey() {
         return pending;
+    }
+
+    Map<Integer, Integer> overgrowthByKey() {
+        return overgrowth;
+    }
+
+    Map<Integer, int[]> clearingByKey() {
+        return clearing;
     }
 
     static int keyOf(int px, int pz) {
