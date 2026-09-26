@@ -92,6 +92,16 @@
             <version>${libreforge.version}</version>
             <classifier>shadow</classifier>
             <scope>provided</scope>
+            <!--
+              The shadow jar already contains everything. Its POM names an internal build module
+              (libreforge.core:common) that is never published, so following it fails the build.
+            -->
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>me.clip</groupId>
