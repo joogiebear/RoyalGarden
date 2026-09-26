@@ -94,6 +94,27 @@ unlock:
   #           message: "&cCorner plots need island level 100."
   by-plot: {}
 
+# ── The farmhouse ─────────────────────────────────────────────────────────────
+# What stands on the centre plot. Blank = the built-in barn. Or name a WorldEdit
+# schematic (//schem save) placed in this folder, e.g. "farmhouse.schem".
+#
+# It is pasted centred on the plot, its ground on the Garden's surface. Mark
+# spots in the build with signs whose first line is one of these — they are
+# removed when it is pasted, and whatever goes there faces the way the sign's
+# writing faces:
+#   [sam]        where Sam stands
+#   [spawn]      where players arrive
+#   [window]     where the first visitor in line stands; the line runs back
+#                behind them (spacing, length, speed from visitors.yml line:)
+#   [composter]  the block that opens the Composter
+# Containers are pasted empty. Changing this rebuilds every Garden's farmhouse
+# plot — loaded ones on /garden reload, the rest when they next load.
+farmhouse:
+  schematic: ""
+  # Which layer of the schematic is the ground. auto = the highest layer that
+  # is at least half grass, dirt, stone and the like.
+  ground-layer: auto
+
 # ── Clearing plots ────────────────────────────────────────────────────────────
 # Locked plots are overgrown with trees, boulders, bushes, fallen logs and
 # undergrowth. A bought plot has to be cleared before it can be built on: every

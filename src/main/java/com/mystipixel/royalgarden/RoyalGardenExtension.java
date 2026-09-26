@@ -195,6 +195,8 @@ public final class RoyalGardenExtension extends Extension {
             return;
         }
         config.reload();
+        com.mystipixel.royalgarden.garden.Farmhouse.configure(dataDir(), config.yaml().getConfigurationSection("farmhouse"),
+                getLogger());
         messages.reload();
         presets.reload();
         milestoneConfig.reload();
@@ -214,6 +216,7 @@ public final class RoyalGardenExtension extends Extension {
         pestHolders.compile();                         // after milestones.yml: %blocks% and %drops% come from there
         PestHolders.refreshAll();
         schedulePests();
+        gardens.refreshFarmhouses();                   // a changed farmhouse rebuilds loaded Gardens now, not on next load
         getLogger().info("Reloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, "
                 + "visitors.yml, upgrades.yml, composter.yml and pests.yml.");
     }
@@ -266,6 +269,8 @@ public final class RoyalGardenExtension extends Extension {
             getLogger().severe(layoutProblem + " — using the default 5x5 board of 96-block plots.");
         }
         this.messages = new Messages(data, getLogger());
+        com.mystipixel.royalgarden.garden.Farmhouse.configure(data, config.yaml().getConfigurationSection("farmhouse"),
+                getLogger());
 
         GardenStore store = new GardenStore(data, getLogger());
         this.presets = new PresetLibrary(data, getLogger());

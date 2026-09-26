@@ -85,7 +85,9 @@ public final class Sam implements Listener {
     public void ensure(World world) {
         Location post = GardenBuilder.samPost(world);
         Villager kept = null;
-        for (Entity entity : post.getChunk().getEntities()) {
+        // The whole loaded world, not the post's chunk: a new farmhouse can move the post, and a Sam left at
+        // the old one would otherwise never be found and a second spawned.
+        for (Entity entity : world.getEntities()) {
             if (!isSam(entity)) {
                 continue;
             }

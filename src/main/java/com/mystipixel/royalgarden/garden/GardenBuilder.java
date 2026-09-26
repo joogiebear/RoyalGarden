@@ -54,6 +54,10 @@ public final class GardenBuilder {
      * into — and so the spawn point can never be inside a block if the barn is ever reshaped.
      */
     public static Location spawn(World world) {
+        Farmhouse.Anchor marked = Farmhouse.current().anchor("spawn");
+        if (marked != null) {
+            return marked.at(world);
+        }
         Location spawn = new Location(world, 0.5, GardenLayout.groundY() + 1, BARN_Z + 4.5);
         spawn.setYaw(180f);   // facing -z, toward the doors
         spawn.setPitch(0f);
@@ -67,17 +71,26 @@ public final class GardenBuilder {
      * and his face to the wall; he is re-posted on every load, so that corrects itself.
      */
     public static Location samPost(World world) {
+        Farmhouse.Anchor marked = Farmhouse.current().anchor("sam");
+        if (marked != null) {
+            return marked.at(world);
+        }
         Location post = new Location(world, 0.5, GardenLayout.groundY() + 1, -BARN_Z + 1.5);
         post.setYaw(0f);
         post.setPitch(0f);
         return post;
     }
 
-    /** Build the centre plot and its farmhouse into a freshly created world. */
-    public static void build(World world, Palette palette) {
+    /** Build the centre plot and its farmhouse — built-in or a schematic — into a freshly created world. */
+    public static void build(World world, Palette palette, java.util.logging.Logger logger) {
         for (int row = 0; row < GardenLayout.plotSize(); row++) {
             generatePlotRow(world, GardenLayout.centre(), GardenLayout.centre(), row, Base.FLAT, palette);
         }
+        Farmhouse.current().build(world, logger);
+    }
+
+    /** The built-in barn, with its path and drive-through, onto bare ground. */
+    static void buildBarn(World world) {
         barn(world);
         approach(world);
         driveThrough(world);

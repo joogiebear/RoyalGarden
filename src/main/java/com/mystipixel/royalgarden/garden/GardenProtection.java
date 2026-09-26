@@ -347,7 +347,13 @@ public final class GardenProtection implements Listener {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || machines.test(block)) {
             return;
         }
-        boolean allowed = config.interactAllowed().contains(block.getType());
+        // Doors, trapdoors and gates on the farmhouse plot open for the owner: a farmhouse built from a
+        // schematic has them, and a building you cannot walk into is scenery. Containers stay shut — the
+        // farmhouse is rebuilt when it changes, and anything stored in it would go with it.
+        boolean farmhouseDoor = !visitor && block.getBlockData() instanceof org.bukkit.block.data.Openable
+                && GardenLayout.isCentre(GardenLayout.plotAt(block.getX()), GardenLayout.plotAt(block.getZ()))
+                && block.getY() > GardenLayout.floorY();
+        boolean allowed = farmhouseDoor || config.interactAllowed().contains(block.getType());
         if ((visitor && !config.visitorsCanInteract() && !allowed) || (isProtected(block) && !allowed)) {
             event.setUseInteractedBlock(Event.Result.DENY);
             if (event.getItem() == null || !event.getItem().getType().isEdible()) {

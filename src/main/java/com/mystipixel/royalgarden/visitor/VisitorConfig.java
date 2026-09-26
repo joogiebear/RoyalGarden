@@ -40,6 +40,9 @@ public final class VisitorConfig extends YamlFile {
     private final List<Spot> spots = new ArrayList<>();
     private Spot entry;
     private double walkSpeed;
+    private boolean lineOn;
+    private double lineSpacing;
+    private int lineLength;
     private NavigableMap<Integer, Integer> queueByLevel = new TreeMap<>();
 
     public VisitorConfig(File dataFolder, Logger logger) {
@@ -189,6 +192,7 @@ public final class VisitorConfig extends YamlFile {
         spots.clear();
         entry = null;
         walkSpeed = 0;
+        lineOn = false;
         ConfigurationSection line = yaml().getConfigurationSection("line");
         // No line: section at all means a visitors.yml written before the drive-through existed. This file
         // has no shipped defaults behind it, so the defaults are here: the line is on unless it is turned off.
@@ -253,6 +257,34 @@ public final class VisitorConfig extends YamlFile {
             }
         }
         walkSpeed = Math.clamp(line == null ? 0.1 : line.getDouble("walk-speed", 0.1), 0.0, 1.0);
+        lineOn = true;
+        lineSpacing = spacing;
+        lineLength = length;
+    }
+
+    /**
+     * The line from a farmhouse schematic's {@code [window]} sign, when there is one: the first visitor
+     * stands on the sign facing the way its writing does, and the line runs back behind them. It takes the
+     * place of {@code line.front} and {@code line.direction}; spacing, length and speed still come from here.
+     */
+    private List<Spot> markedLine() {
+        if (!lineOn) {
+            return null;
+        }
+        com.mystipixel.royalgarden.garden.Farmhouse.Anchor window =
+                com.mystipixel.royalgarden.garden.Farmhouse.current().anchor("window");
+        if (window == null) {
+            return null;
+        }
+        double yaw = Math.toRadians(window.yaw());
+        double backX = Math.sin(yaw);                 // facing is (-sin, cos); behind is the opposite
+        double backZ = -Math.cos(yaw);
+        List<Spot> out = new ArrayList<>();
+        for (int i = 0; i <= lineLength; i++) {
+            double step = lineSpacing * (i < lineLength ? i : i + 1);
+            out.add(new Spot(window.x() + backX * step, window.y(), window.z() + backZ * step, window.yaw(), true));
+        }
+        return out;
     }
 
     private static Spot parseSpot(String raw) {
@@ -419,12 +451,15 @@ public final class VisitorConfig extends YamlFile {
 
     /** Where visitors stand, the front of the line first when there is one. */
     public List<Spot> spots() {
-        return Collections.unmodifiableList(spots);
+        List<Spot> marked = markedLine();
+        return marked != null ? Collections.unmodifiableList(marked.subList(0, lineLength))
+                : Collections.unmodifiableList(spots);
     }
 
     /** Where a new visitor walks into the line from; null without a line. */
     public Spot entry() {
-        return entry;
+        List<Spot> marked = markedLine();
+        return marked != null ? marked.get(lineLength) : entry;
     }
 
     /** Blocks per tick visitors walk along the line; 0 to appear in place. */
