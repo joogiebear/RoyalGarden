@@ -14,6 +14,12 @@ import com.mystipixel.royalgarden.garden.PresetLibrary;
 import com.mystipixel.royalgarden.garden.PresetService;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.mystipixel.royalgarden.garden.UnlockService;
+import com.mystipixel.royalgarden.milestone.MilestoneConfig;
+import com.mystipixel.royalgarden.milestone.MilestoneListener;
+import com.mystipixel.royalgarden.milestone.MilestoneMenu;
+import com.mystipixel.royalgarden.milestone.MilestoneService;
+import com.mystipixel.royalgarden.milestone.MilestoneStore;
+import com.mystipixel.royalgarden.milestone.PlacedBlocks;
 import com.mystipixel.royalskyblock.RoyalSkyblockPlugin;
 import com.mystipixel.royalskyblock.currency.CurrencyService;
 import com.mystipixel.royalskyblock.data.Storage;
@@ -29,6 +35,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.PluginManager;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.util.function.Supplier;
@@ -66,6 +73,12 @@ public final class RoyalGardenExtension extends Extension {
     private GardenProtection protection;
     private PluginCommand gardenCommand;
     private PluginCommand deskCommand;
+    private MilestoneConfig milestoneConfig;
+    private MilestoneStore milestoneStore;
+    private MilestoneListener milestoneListener;
+    private PlacedBlocks placedBlocks;
+    private BukkitTask milestoneSaver;
+    private BukkitTask milestoneSweeper;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -138,8 +151,10 @@ public final class RoyalGardenExtension extends Extension {
         config.reload();
         messages.reload();
         presets.reload();
+        milestoneConfig.reload();
         menu.reload();
-        getLogger().info("Reloaded config.yml, messages.yml and presets.yml.");
+        scheduleMilestoneSaves();
+        getLogger().info("Reloaded config.yml, messages.yml, presets.yml and milestones.yml.");
     }
 
     /**
@@ -211,8 +226,23 @@ public final class RoyalGardenExtension extends Extension {
         declare(PresetService.BYPASS_COOLDOWN, PermissionDefault.OP, "Skip the cooldown between plot rebuilds.");
         declare(CommandGarden.ADMIN, PermissionDefault.OP, "Manage presets and other players' Gardens.");
 
-        this.gardenCommand = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
+        // Crop Milestones: lifetime harvest per crop, with tiers and rewards, on the desk.
+        this.milestoneConfig = new MilestoneConfig(data, getLogger());
+        this.milestoneStore = new MilestoneStore(data, getLogger());
+        MilestoneService milestones = new MilestoneService(milestoneConfig, milestoneStore, messages);
+        this.placedBlocks = new PlacedBlocks(getPlugin(), milestoneConfig);
+        this.milestoneListener = new MilestoneListener(milestones, placedBlocks);
+        MilestoneMenu milestoneMenu = new MilestoneMenu(milestones, menu::open);
+        menu.setMilestones(player -> milestoneMenu.open(player, player.getUniqueId(), player.getName()));
+        Bukkit.getPluginManager().registerEvents(placedBlocks, getPlugin());
+        Bukkit.getPluginManager().registerEvents(milestoneListener, getPlugin());
+        scheduleMilestoneSaves();
+        this.milestoneSweeper = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneListener::clearStale, 20L, 20L);
+
+        CommandGarden garden = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
                 messages, this::reloadFiles, () -> evacuationPoint(host));
+        garden.setMilestones(milestones, milestoneMenu);
+        this.gardenCommand = garden;
         this.deskCommand = new CommandDesk(getPlugin(), config.commandName("desk", "desk"), menu);
         gardenCommand.register();
         deskCommand.register();
@@ -220,6 +250,15 @@ public final class RoyalGardenExtension extends Extension {
         getLogger().info("Ready: /" + gardenCommand.getName() + ", /" + deskCommand.getName()
                 + ", Sam at the desk, " + GardenLayout.grid() + "×" + GardenLayout.grid()
                 + " plots of " + GardenLayout.plotSize() + ".");
+    }
+
+    /** Save milestone progress every {@code save-interval-seconds}. */
+    private void scheduleMilestoneSaves() {
+        if (milestoneSaver != null) {
+            milestoneSaver.cancel();
+        }
+        long period = milestoneConfig.saveIntervalSeconds() * 20L;
+        milestoneSaver = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneStore::saveAll, period, period);
     }
 
     /** Where players standing in a Garden go when it is deleted. */
@@ -289,6 +328,26 @@ public final class RoyalGardenExtension extends Extension {
         if (queue != null) {
             queue.shutdown();
             queue = null;
+        }
+        if (milestoneSaver != null) {
+            milestoneSaver.cancel();
+            milestoneSaver = null;
+        }
+        if (milestoneSweeper != null) {
+            milestoneSweeper.cancel();
+            milestoneSweeper = null;
+        }
+        if (milestoneStore != null) {
+            milestoneStore.saveAll();
+            milestoneStore = null;
+        }
+        if (milestoneListener != null) {
+            HandlerList.unregisterAll(milestoneListener);
+            milestoneListener = null;
+        }
+        if (placedBlocks != null) {
+            HandlerList.unregisterAll(placedBlocks);
+            placedBlocks = null;
         }
         if (sam != null) {
             HandlerList.unregisterAll(sam);

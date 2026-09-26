@@ -6,6 +6,9 @@ import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenState;
 import com.mystipixel.royalgarden.garden.GardenWorlds;
 import com.mystipixel.royalgarden.garden.PresetLibrary;
+import com.mystipixel.royalgarden.milestone.MilestoneCrop;
+import com.mystipixel.royalgarden.milestone.MilestoneMenu;
+import com.mystipixel.royalgarden.milestone.MilestoneService;
 import com.willfp.eco.core.EcoPlugin;
 import com.willfp.eco.core.command.impl.PluginCommand;
 import org.bukkit.Bukkit;
@@ -50,12 +53,14 @@ public final class CommandGarden extends PluginCommand {
     public static final String ADMIN = "royalgarden.admin";
 
     private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
-            "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info");
+            "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info", "milestones", "milestone");
 
     private final GardenWorlds worlds;
     private final Messages messages;
     private final Runnable reload;
     private final Supplier<Location> evacuateTo;
+    private MilestoneService milestones;
+    private MilestoneMenu milestoneMenu;
 
     public CommandGarden(EcoPlugin plugin, String name, GardenWorlds worlds, Messages messages,
                          Runnable reload, Supplier<Location> evacuateTo) {
@@ -66,19 +71,32 @@ public final class CommandGarden extends PluginCommand {
         this.evacuateTo = evacuateTo;
     }
 
+    /** Give the command its Crop Milestones subcommands. */
+    public void setMilestones(MilestoneService service, MilestoneMenu menu) {
+        this.milestones = service;
+        this.milestoneMenu = menu;
+    }
+
     @Override
     public void onExecute(Player player, List<String> args) {
-        if (!args.isEmpty()) {
-            admin(player, args);
+        if (args.isEmpty()) {
+            visit(player);
             return;
         }
-        visit(player);
+        // The one subcommand every player has: their own milestones. With a name it is an admin lookup.
+        if (args.get(0).equalsIgnoreCase("milestones") && milestoneMenu != null
+                && (args.size() == 1 || !player.hasPermission(ADMIN))) {
+            milestoneMenu.open(player, player.getUniqueId(), player.getName());
+            return;
+        }
+        admin(player, args);
     }
 
     @Override
     public List<String> tabComplete(Player player, List<String> args) {
         if (!player.hasPermission(ADMIN)) {
-            return List.of();
+            return args.size() <= 1 && "milestones".startsWith(args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT))
+                    ? List.of("milestones") : List.of();
         }
         List<String> options = new ArrayList<>();
         if (args.size() <= 1) {
@@ -94,7 +112,7 @@ public final class CommandGarden extends PluginCommand {
                             options.add("bedrock");
                         }
                     }
-                    case "reset", "unlock", "lock", "visit", "info" -> {
+                    case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone" -> {
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             options.add(online.getName());
                         }
@@ -111,6 +129,11 @@ public final class CommandGarden extends PluginCommand {
                     }
                 } else if (verb.equals("reset")) {
                     options.add("world");
+                } else if (verb.equals("milestone") && milestones != null) {
+                    for (MilestoneCrop crop : milestones.config().crops()) {
+                        options.add(crop.id());
+                    }
+                    options.add("reset");
                 }
             }
         }
@@ -166,6 +189,8 @@ public final class CommandGarden extends PluginCommand {
             case "unlock", "lock" -> setLock(player, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
             case "visit" -> adminVisit(player, arg);
             case "info" -> info(player, arg);
+            case "milestones" -> viewMilestones(player, arg);
+            case "milestone" -> setMilestone(player, args);
             default -> messages.send(player, "admin-help");
         }
     }
@@ -344,6 +369,55 @@ public final class CommandGarden extends PluginCommand {
                 "%plots%", String.join(", ", plots),
                 "%loaded%", String.valueOf(worlds.isLoaded(target.getUniqueId())),
                 "%readonly%", String.valueOf(state.readOnly()));
+    }
+
+    private void viewMilestones(Player sender, String name) {
+        if (milestoneMenu == null) {
+            return;
+        }
+        OfflinePlayer target = target(sender, name);
+        if (target != null) {
+            milestoneMenu.open(sender, target.getUniqueId(), target.getName() == null ? name : target.getName());
+        }
+    }
+
+    /**
+     * {@code /garden milestone <player> <crop> <amount>} sets a total; {@code /garden milestone <player>
+     * reset} clears them all. Neither pays rewards — they are corrections, not harvests.
+     */
+    private void setMilestone(Player sender, List<String> args) {
+        if (milestones == null || args.size() < 3) {
+            messages.send(sender, "admin-milestone-usage");
+            return;
+        }
+        OfflinePlayer target = target(sender, args.get(1));
+        if (target == null) {
+            return;
+        }
+        String who = target.getName() == null ? args.get(1) : target.getName();
+        if (args.get(2).equalsIgnoreCase("reset")) {
+            milestones.store().reset(target.getUniqueId());
+            milestones.store().save(target.getUniqueId());
+            messages.send(sender, "admin-milestone-reset", "%player%", who);
+            return;
+        }
+        MilestoneCrop crop = milestones.config().crop(args.get(2));
+        if (crop == null || args.size() < 4) {
+            messages.send(sender, "admin-milestone-usage");
+            return;
+        }
+        long amount;
+        try {
+            amount = Long.parseLong(args.get(3).replace(",", "").replace("_", ""));
+        } catch (NumberFormatException notANumber) {
+            messages.send(sender, "admin-milestone-usage");
+            return;
+        }
+        milestones.store().set(target.getUniqueId(), crop.id(), amount);
+        milestones.store().save(target.getUniqueId());
+        messages.send(sender, "admin-milestone-set", "%player%", who, "%crop_name%", crop.displayName(),
+                "%total%", String.format("%,d", Math.max(0, amount)),
+                "%tier%", String.valueOf(crop.tierOf(Math.max(0, amount))));
     }
 
     // ── going to your Garden ───────────────────────────────────────────────────

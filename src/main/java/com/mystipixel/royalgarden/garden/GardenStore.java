@@ -200,7 +200,7 @@ public final class GardenStore {
     }
 
     /** Write a file so that a crash leaves either the old contents or the new, never half of each. */
-    static void writeAtomically(Path target, String contents) throws IOException {
+    public static void writeAtomically(Path target, String contents) throws IOException {
         Path temp = target.resolveSibling(target.getFileName() + ".tmp");
         Files.writeString(temp, contents, StandardCharsets.UTF_8);
         try {

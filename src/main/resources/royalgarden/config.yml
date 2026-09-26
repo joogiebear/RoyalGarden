@@ -222,6 +222,16 @@ menu:
       name: "&8Plot %plot%"
       lore:
         - "&7Locked — unlock a plot next to it first."
+    # Crop Milestones button, in the bottom row. `column` is 1–9.
+    milestones:
+      column: 3
+      material: golden_hoe
+      name: "&6Crop Milestones"
+      lore:
+        - "&7Your lifetime harvest per crop,"
+        - "&7and the tiers it has earned."
+        - ""
+        - "&eClick to view."
     # %unlocked% %total% %limit% %size%
     summary:
       material: wheat
