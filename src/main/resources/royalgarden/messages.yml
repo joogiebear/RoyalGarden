@@ -71,6 +71,7 @@ level-xp-gained: "&a+%amount% Garden XP &7(%reason%) &8| &fLevel %level% &7%perc
 level-source-milestone: "milestone"
 level-source-unlock: "new plot"
 level-source-command: "reward"
+# level-source-visitor is with the Visitors messages below.
 # Also %reached% %reached_roman% %player%
 level-up: "&a&lGARDEN LEVEL UP! &fYour Garden is now level &a%reached%&f."
 level-broadcast: "&a%player%&f's Garden reached level &a%reached%&f!"
@@ -84,6 +85,33 @@ presets-garden-level: "&f%preset%&c needs Garden level &a%required%&c."
 preset-status-level: "&cNeeds Garden level %required%"
 menu-level-required: "&cNeeds Garden level %required%"
 
+# ── Visitors ─────────────────────────────────────────────────────────────────
+# Placeholders: %visitor% %visitor_name% %rarity% %rarity_name% %copper% %xp%
+#               %currency% %served% %visitor_served% %unique% %waiting% %player%
+visitor-arrived: "%visitor_name% &7(%rarity_name%&7) &ahas arrived at your Garden. &7Visit the barn or /garden visitors."
+visitor-accepted: "&aYou served %visitor_name%&a: &c+%copper% Copper &8| &2+%xp% Garden XP"
+visitor-refused: "&7You sent %visitor_name% &7away."
+visitor-gone: "&cThat visitor has already left."
+# %items% — the visitor-missing-line entries, joined by visitor-missing-separator
+visitor-missing: "&cYou still need: %items%"
+# %item% %amount%
+visitor-missing-line: "&f%amount%x %item%"
+visitor-missing-separator: "&7, "
+# %item%
+visitor-bad-item: "&cThis visitor wants '%item%', which does not exist here. Please tell staff."
+visitor-unreadable: "&cYour visitors could not be read. Please contact staff — nothing has been lost."
+visitor-not-yours: "&7This visitor is waiting for the Garden's owner."
+visitors-disabled: "&cVisitors are switched off."
+visitor-queue-full: "&cthe queue is full"
+visitor-status-ready: "&eClick to accept!"
+visitor-status-missing: "&cYou do not have everything yet."
+# %have% %amount%
+visitor-item-have: "&a✔ You have %have%"
+visitor-item-missing: "&c✘ You have %have%"
+visitor-check-yes: "&a✔"
+visitor-check-no: "&c✘"
+level-source-visitor: "visitor"
+
 # ── Protection (shown in the action bar) ─────────────────────────────────────
 # %plot%
 deny-locked: "&cPlot %plot% is locked. Open the desk to unlock it."
@@ -94,7 +122,7 @@ deny-visitor: "&cThis is not your Garden."
 
 # ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>"
+admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -118,7 +146,7 @@ admin-presets-header: "&aPresets:"
 admin-presets-line: "&f  %preset%%flags%"
 admin-presets-default: " &e(default)"
 admin-presets-selectable: " &b(players)"
-admin-reloaded: "&aReloaded config.yml, messages.yml and presets.yml."
+admin-reloaded: "&aReloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml and visitors.yml."
 # %player%
 admin-unknown-player: "&cNo player called %player% has played here."
 admin-no-garden: "&c%player% has no Garden yet."
@@ -140,4 +168,12 @@ admin-milestone-reset: "&aReset all of %player%'s milestones."
 admin-xp-usage: "&c/garden xp <player> <give|take|set> <amount> [silent]"
 # level placeholders + %player%
 admin-xp-done: "&a%player%'s Garden: level %level% (%xp% XP)."
-console-help: "&7From the console: garden xp|level|milestone|reset|unlock|lock|info|reload …"
+admin-visitor-usage: "&c/garden visitor <player> add [visitor] | clear | stats | reset-stats"
+# %player% %visitor% %visitor_name%
+admin-visitor-added: "&aSent %visitor_name% &ato %player%."
+admin-visitor-none: "&cNo visitor could be sent — check the id, or that visitors.yml has any."
+admin-visitor-cleared: "&aSent all of %player%'s visitors away."
+admin-visitor-reset: "&aReset %player%'s visitor stats."
+# %player% %served% %refused% %unique% %total_visitors% %copper_earned% %waiting% %max_queue% %next%
+admin-visitor-stats: "&a%player%&7: served %served% (%unique%/%total_visitors% different), refused %refused%, %copper_earned% Copper earned. Waiting: %waiting%/%max_queue%, next in %next%."
+console-help: "&7From the console: garden xp|level|milestone|visitor|reset|unlock|lock|info|reload …"

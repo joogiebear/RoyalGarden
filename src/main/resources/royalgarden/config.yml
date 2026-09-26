@@ -235,6 +235,16 @@ menu:
         - "&7and the tiers it has earned."
         - ""
         - "&eClick to view."
+    # Opens the Visitors page (visitors.yml).
+    visitors:
+      column: 7
+      material: villager_spawn_egg
+      name: "&aVisitors"
+      lore:
+        - "&7Who is waiting at the barn,"
+        - "&7what they want, and SkyMart."
+        - ""
+        - "&eClick to view."
     # %unlocked% %total% %limit% %size% and the Garden level ones from levels.yml:
     # %level% %level_roman% %max_level% %xp% %next% %remaining% %percent% %bar%
     summary:

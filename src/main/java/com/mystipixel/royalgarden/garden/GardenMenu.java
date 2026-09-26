@@ -38,6 +38,7 @@ public final class GardenMenu {
     private final UnlockService unlocks;
     private final PresetService presetService;
     private Consumer<Player> milestones;
+    private Consumer<Player> visitors;
     private java.util.function.Function<java.util.UUID, String[]> levelPlaceholders = owner -> new String[0];
     private Menu menu;
 
@@ -64,6 +65,12 @@ public final class GardenMenu {
     /** Add the Crop Milestones button, opening this page when clicked. */
     public void setMilestones(Consumer<Player> open) {
         this.milestones = open;
+        this.menu = build();
+    }
+
+    /** Add the Visitors button, opening this page when clicked. */
+    public void setVisitors(Consumer<Player> open) {
+        this.visitors = open;
         this.menu = build();
     }
 
@@ -101,17 +108,8 @@ public final class GardenMenu {
         builder.setSlot(rows, 5, Slot.builder((player, shown) -> summary(player)).build());
         used[rows][5] = true;
 
-        if (milestones != null) {
-            int column = Math.clamp(config.yaml().getInt("menu.items.milestones.column", 3), 1, 9);
-            if (!used[rows][column]) {
-                Consumer<Player> open = milestones;
-                builder.setSlot(rows, column, Slot.builder(ItemSpec.build(section(items(), "milestones"),
-                                Material.GOLDEN_HOE))
-                        .onLeftClick((event, slot, clicked) -> open.accept((Player) event.getWhoClicked()))
-                        .build());
-                used[rows][column] = true;
-            }
-        }
+        button(builder, used, rows, "milestones", 3, Material.GOLDEN_HOE, milestones);
+        button(builder, used, rows, "visitors", 7, Material.VILLAGER_SPAWN_EGG, visitors);
 
         ItemStack filler = filler();
         if (filler != null) {
@@ -124,6 +122,22 @@ public final class GardenMenu {
             }
         }
         return builder.build();
+    }
+
+    /** A bottom-row button from {@code menu.items.<key>}, in its column if that is free. */
+    private void button(MenuBuilder builder, boolean[][] used, int rows, String key, int defaultColumn,
+                        Material fallback, Consumer<Player> open) {
+        if (open == null) {
+            return;
+        }
+        int column = Math.clamp(config.yaml().getInt("menu.items." + key + ".column", defaultColumn), 1, 9);
+        if (used[rows][column]) {
+            return;
+        }
+        builder.setSlot(rows, column, Slot.builder(ItemSpec.build(section(items(), key), fallback))
+                .onLeftClick((event, slot, clicked) -> open.accept((Player) event.getWhoClicked()))
+                .build());
+        used[rows][column] = true;
     }
 
     private ItemStack filler() {

@@ -1,0 +1,22 @@
+# Copper for RoyalGarden's visitors — an EcoBits currency.
+# Add this entry to the `currencies:` list in plugins/EcoBits/config.yml and
+# restart. Its id must match `copper.currency` in RoyalGarden's visitors.yml.
+currencies:
+  - id: copper
+    name: "Copper"
+    symbol: "⛁"
+    prefix: ""
+    default: 0
+    max: -1
+    payable: false
+    decimal: false
+    max-decimals: 0
+    vault: false
+    local: false
+    balance-shorthand: true
+    format: "&c%amount% %currency%"
+    format-short: "&c%amount% %symbol%"
+    decimal-format: "#,##0"
+    decimal-format-short: "#,##0"
+    commands:
+      - copper

@@ -10,6 +10,10 @@ import com.mystipixel.royalgarden.level.GardenLevels;
 import com.mystipixel.royalgarden.milestone.MilestoneCrop;
 import com.mystipixel.royalgarden.milestone.MilestoneMenu;
 import com.mystipixel.royalgarden.milestone.MilestoneService;
+import com.mystipixel.royalgarden.visitor.Offer;
+import com.mystipixel.royalgarden.visitor.VisitorMenu;
+import com.mystipixel.royalgarden.visitor.VisitorService;
+import com.mystipixel.royalgarden.visitor.VisitorType;
 import com.willfp.eco.core.EcoPlugin;
 import com.willfp.eco.core.command.impl.PluginCommand;
 import org.bukkit.Bukkit;
@@ -56,7 +60,7 @@ public final class CommandGarden extends PluginCommand {
 
     private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
             "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info", "milestones", "milestone",
-            "xp", "level");
+            "xp", "level", "visitors", "visitor");
 
     private final GardenWorlds worlds;
     private final Messages messages;
@@ -65,6 +69,8 @@ public final class CommandGarden extends PluginCommand {
     private MilestoneService milestones;
     private MilestoneMenu milestoneMenu;
     private GardenLevels levels;
+    private VisitorService visitors;
+    private VisitorMenu visitorMenu;
 
     public CommandGarden(EcoPlugin plugin, String name, GardenWorlds worlds, Messages messages,
                          Runnable reload, Supplier<Location> evacuateTo) {
@@ -87,6 +93,12 @@ public final class CommandGarden extends PluginCommand {
         this.levels = levels;
     }
 
+    /** Give the command its Visitors subcommands. */
+    public void setVisitors(VisitorService service, VisitorMenu menu) {
+        this.visitors = service;
+        this.visitorMenu = menu;
+    }
+
     /**
      * The console's way in. Players are handled by {@link #onExecute(Player, List)}; from the console
      * only the admin tools that need no player to stand anywhere are available — the ones other plugins
@@ -103,6 +115,7 @@ public final class CommandGarden extends PluginCommand {
             case "xp" -> xp(sender, args);
             case "level" -> showLevel(sender, arg);
             case "milestone" -> setMilestone(sender, args);
+            case "visitor" -> visitor(sender, args);
             case "reset" -> reset(sender, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
             case "unlock", "lock" -> setLock(sender, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
             case "info" -> info(sender, arg);
@@ -131,6 +144,10 @@ public final class CommandGarden extends PluginCommand {
             milestoneMenu.open(player, player.getUniqueId(), player.getName());
             return;
         }
+        if (args.get(0).equalsIgnoreCase("visitors") && visitorMenu != null) {
+            visitorMenu.open(player);
+            return;
+        }
         admin(player, args);
     }
 
@@ -141,7 +158,7 @@ public final class CommandGarden extends PluginCommand {
                 return List.of();
             }
             String typed = args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT);
-            List<String> own = new ArrayList<>(List.of("milestones", "level"));
+            List<String> own = new ArrayList<>(List.of("milestones", "level", "visitors"));
             own.removeIf(option -> !option.startsWith(typed));
             return own;
         }
@@ -159,13 +176,19 @@ public final class CommandGarden extends PluginCommand {
                             options.add("bedrock");
                         }
                     }
-                    case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone", "xp", "level" -> {
+                    case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone", "xp", "level",
+                         "visitor" -> {
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             options.add(online.getName());
                         }
                     }
                     default -> {
                     }
+                }
+            } else if (args.size() == 4 && verb.equals("visitor") && args.get(2).equalsIgnoreCase("add")
+                    && visitors != null) {
+                for (VisitorType type : visitors.config().visitors()) {
+                    options.add(type.id());
                 }
             } else if (args.size() == 3) {
                 if (verb.equals("unlock") || verb.equals("lock")) {
@@ -178,6 +201,8 @@ public final class CommandGarden extends PluginCommand {
                     options.add("world");
                 } else if (verb.equals("xp")) {
                     options.addAll(List.of("give", "take", "set"));
+                } else if (verb.equals("visitor")) {
+                    options.addAll(List.of("add", "clear", "stats", "reset-stats"));
                 } else if (verb.equals("milestone") && milestones != null) {
                     for (MilestoneCrop crop : milestones.config().crops()) {
                         options.add(crop.id());
@@ -242,6 +267,7 @@ public final class CommandGarden extends PluginCommand {
             case "milestone" -> setMilestone(player, args);
             case "xp" -> xp(player, args);
             case "level" -> showLevel(player, arg);
+            case "visitor" -> visitor(player, args);
             default -> messages.send(player, "admin-help");
         }
     }
@@ -351,6 +377,9 @@ public final class CommandGarden extends PluginCommand {
             return;
         }
         String who = target.getName() == null ? name : target.getName();
+        if (visitors != null) {
+            visitors.clear(target.getUniqueId());       // a reset Garden has nobody waiting at it
+        }
         worlds.reset(target.getUniqueId(), wipeWorld, evacuateTo.get()).whenComplete((ignored, error) -> {
             if (error != null) {
                 getPlugin().getLogger().log(Level.WARNING, "Resetting the Garden of " + who + " failed", error);
@@ -493,6 +522,59 @@ public final class CommandGarden extends PluginCommand {
         all[placeholders.length] = "%player%";
         all[placeholders.length + 1] = who;
         messages.send(sender, "admin-xp-done", all);
+    }
+
+    /**
+     * {@code /garden visitor <player> add [visitor]} sends a visitor now, ignoring the clock, the queue
+     * limit and level requirements; {@code clear} sends everyone waiting away; {@code stats} shows the
+     * counts and {@code reset-stats} zeroes them.
+     */
+    private void visitor(CommandSender sender, List<String> args) {
+        if (visitors == null || args.size() < 3) {
+            messages.send(sender, "admin-visitor-usage");
+            return;
+        }
+        OfflinePlayer target = target(sender, args.get(1));
+        if (target == null) {
+            return;
+        }
+        UUID owner = target.getUniqueId();
+        String who = target.getName() == null ? args.get(1) : target.getName();
+        switch (args.get(2).toLowerCase(Locale.ROOT)) {
+            case "add" -> {
+                Offer offer = visitors.summon(target, args.size() > 3 ? args.get(3) : null);
+                if (offer == null) {
+                    messages.send(sender, "admin-visitor-none");
+                } else {
+                    messages.send(sender, "admin-visitor-added", withPlayer(visitors.placeholders(owner, offer), who));
+                }
+            }
+            case "clear" -> {
+                visitors.clear(owner);
+                messages.send(sender, "admin-visitor-cleared", "%player%", who);
+            }
+            case "stats" -> messages.send(sender, "admin-visitor-stats",
+                    withPlayer(visitors.statPlaceholders(owner), who));
+            case "reset-stats" -> {
+                if (!visitors.store().readOnly(owner)) {
+                    visitors.store().get(owner).resetStats();
+                    visitors.store().save(owner);
+                }
+                messages.send(sender, "admin-visitor-reset", "%player%", who);
+            }
+            default -> messages.send(sender, "admin-visitor-usage");
+        }
+        if (!target.isOnline()) {
+            visitors.store().unload(owner);              // looked up for this command only
+        }
+    }
+
+    private static String[] withPlayer(String[] placeholders, String who) {
+        String[] all = new String[placeholders.length + 2];
+        System.arraycopy(placeholders, 0, all, 0, placeholders.length);
+        all[placeholders.length] = "%player%";
+        all[placeholders.length + 1] = who;
+        return all;
     }
 
     private void viewMilestones(Player sender, String name) {
