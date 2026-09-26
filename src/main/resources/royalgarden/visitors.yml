@@ -1,0 +1,515 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RoyalGarden  ·  visitors.yml  —  Visitors and Copper
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Visitors turn up at the barn over time and ask for crops. Right-click one (or
+#  use the Visitors button on the desk, or /garden visitors) to see what they
+#  want and what they pay; accept to hand the items over, or refuse.
+#
+#  They pay Copper, Garden XP and any commands you like. Copper is an EcoBits
+#  currency, paid by a console command below, and spent in an EcoShop shop
+#  ("SkyMart") — see the README for both files. Reload with /garden reload.
+#
+#  Durations: 2d, 4h, 30m, 45s, 1h30m.  Amounts: 64, or a range like 32-64.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+enabled: true
+
+# ── Arrivals ───────────────────────────────────────────────────────────────────
+arrivals:
+  # One visitor per interval while the player is online.
+  interval: 15m
+  # How soon a player's very first visitor comes.
+  first-arrival: 1m
+  # Most visitors waiting at once. While the queue is full no time is counted.
+  max-queue: 5
+  # A bigger queue at higher Garden levels (levels.yml): the highest level
+  # reached wins.
+  max-queue-by-level:
+    5: 6
+    10: 7
+  # How much offline time counts toward arrivals: 1.0 all of it, 0.5 half,
+  # 0 none (visitors only come while you play).
+  offline-rate: 0.5
+  # Only players who have been to their Garden get visitors.
+  require-garden: true
+  # Whether the same visitor can be waiting twice at once.
+  allow-duplicates: false
+  check-every-seconds: 5
+  sound: "entity.villager.ambient"
+
+accept-sound: "entity.villager.yes"
+refuse-sound: "entity.villager.no"
+
+# ── Scaling ────────────────────────────────────────────────────────────────────
+# Requests grow with Garden level: amounts × (1 + per-level × (level - 1)),
+# capped at max-multiplier (0 = no cap). With rewards: true the Copper and
+# Garden XP a visitor pays grow by the same multiplier.
+scaling:
+  per-level: 0.05
+  max-multiplier: 2.0
+  rewards: true
+
+# ── Copper ─────────────────────────────────────────────────────────────────────
+# Paid with this console command. %player% %uuid% %amount% %currency%
+copper:
+  enabled: true
+  currency: copper
+  give-command: "ecobits givesilent %player% %currency% %amount%"
+
+# ── SkyMart ────────────────────────────────────────────────────────────────────
+# The button on the Visitors page that opens the Copper shop. With EcoShop, a
+# shop whose `command:` is skymart opens with the command below. Run as the
+# player unless as-console is true (then use %player% in it).
+skymart:
+  enabled: true
+  command: "skymart"
+  as-console: false
+
+# ── Where visitors stand ───────────────────────────────────────────────────────
+# "x, z, yaw" or "x, y, z, yaw", measured from the middle of the farmhouse plot
+# (the barn doors face +z; the spawn point is at 0.5, 9.5). Without y they stand
+# on the ground. Visitors beyond the number of spots still wait — on the
+# Visitors page. yaw: 0 faces +z, 90 faces -x, -90 faces +x, 180 faces -z.
+spots:
+  - "-3.5, 8.5, -90"
+  - "4.5, 8.5, 90"
+  - "-3.5, 11.5, -90"
+  - "4.5, 11.5, 90"
+  - "-6.5, 10, -90"
+  - "7.5, 10, 90"
+  - "0.5, 14.5, 180"
+
+# Name shown above a visitor. Visitor placeholders (see messages.yml).
+npc-name: "%visitor_name% &8[%rarity_name%&8]"
+
+# ── Rewards ────────────────────────────────────────────────────────────────────
+# Stacked. Serving a visitor gives its offer's Copper and Garden XP, then the
+# commands and messages of: every-visit, first-visit (the first time you serve
+# that visitor), by-served.<n> (your n-th visitor in total), the visitor's
+# rarity, and the visitor itself.
+# Placeholders: %player% %uuid% %visitor% %visitor_name% %rarity% %rarity_name%
+#               %copper% %xp% %currency% %served% %visitor_served% %unique%
+rewards:
+  every-visit:
+    commands: []
+    messages: []
+  first-visit:
+    commands: []
+    messages:
+      - "&6&lNEW VISITOR! &f%visitor_name% &7— %unique% different visitors served."
+  by-served: {}
+  #  100:
+  #    commands: ["broadcast %player% has served 100 visitors!"]
+
+# ── Rarities ───────────────────────────────────────────────────────────────────
+# weight: how likely a visitor of this rarity is to come (a visitor's own
+#         weight: overrides it)
+# rewards: copper and garden-xp ADD to each visitor's own, plus commands and
+#          messages
+rarities:
+  uncommon:
+    name: "&aUncommon"
+    weight: 100
+  rare:
+    name: "&9Rare"
+    weight: 35
+    rewards:
+      copper: 5
+  legendary:
+    name: "&6Legendary"
+    weight: 8
+    rewards:
+      copper: 15
+      garden-xp: 10
+  mythic:
+    name: "&dMythic"
+    weight: 2
+    rewards:
+      copper: 40
+      garden-xp: 25
+
+# ── Visitors ───────────────────────────────────────────────────────────────────
+#    name, rarity, weight (optional), garden-level (the level they start
+#    visiting at), permission (optional)
+#    icon            : the item shown for them in menus
+#    head            : their face in the Visitor Log once served — a skin
+#                      texture (the base64 "textures" value, e.g. from a
+#                      head database) or a player name whose skin to borrow
+#                      (MHF_Villager, MHF_Pig, …). Blank for a plain head.
+#    entity          : what they are drawn as — villager, wandering_trader,
+#                      piglin, zombie_villager, witch… (any living mob)
+#    profession      : for villagers — farmer, librarian, cleric, nitwit…
+#    villager-type   : for villagers — plains, desert, jungle, savanna, snow,
+#                      swamp, taiga
+#    dialogue        : lines on their offer
+#    requests        : what they may ask for — one is picked by weight each
+#                      visit. Items are an item and an amount: "wheat 64",
+#                      "carrot 32-64", "ecoitems:enchanted_wheat 2-4". Or
+#                      {item: ..., amount: ..., name: "&aShown name"}.
+#    rewards         : copper, garden-xp (numbers or ranges), commands,
+#                      messages, and lore (extra lines shown under the rewards
+#                      on their offer, for what the commands give)
+visitors:
+  jerry:
+    name: "&fJerry"
+    rarity: uncommon
+    garden-level: 1
+    icon: wheat
+    head: MHF_Villager
+    entity: villager
+    profession: farmer
+    villager-type: plains
+    dialogue:
+      - "&7\"The bakery's out of flour again."
+      - "&7 Could you spare some wheat?\""
+    requests:
+      - weight: 3
+        items: ["wheat 48-96"]
+      - weight: 1
+        items: ["wheat 32-64", "hay_block 4-8"]
+    rewards:
+      copper: 8-12
+      garden-xp: 5
+
+  bunny:
+    name: "&fBunny"
+    rarity: uncommon
+    garden-level: 1
+    icon: carrot
+    head: MHF_Villager
+    entity: villager
+    profession: butcher
+    villager-type: taiga
+    dialogue: "&7\"Carrots! Crunchy, orange, glorious carrots!\""
+    requests:
+      - items: ["carrot 64-128"]
+    rewards:
+      copper: 8-12
+      garden-xp: 5
+
+  spud:
+    name: "&fSpud"
+    rarity: uncommon
+    garden-level: 1
+    icon: potato
+    head: MHF_Villager
+    entity: villager
+    profession: farmer
+    villager-type: swamp
+    dialogue: "&7\"Mash, chips, roast — I'm not fussy.\""
+    requests:
+      - weight: 2
+        items: ["potato 64-128"]
+      - weight: 1
+        items: ["potato 48-64", "baked_potato 16-32"]
+    rewards:
+      copper: 8-12
+      garden-xp: 5
+
+  beatrice:
+    name: "&fBeatrice"
+    rarity: uncommon
+    garden-level: 2
+    icon: beetroot
+    head: MHF_Villager
+    entity: villager
+    profession: cleric
+    villager-type: plains
+    dialogue: "&7\"Borscht season waits for no one.\""
+    requests:
+      - items: ["beetroot 48-96"]
+    rewards:
+      copper: 10-14
+      garden-xp: 6
+
+  sandy:
+    name: "&eSandy"
+    rarity: rare
+    garden-level: 3
+    icon: sugar_cane
+    head: MHF_Villager
+    entity: villager
+    profession: librarian
+    villager-type: desert
+    dialogue:
+      - "&7\"Paper for the library, sugar for the tea."
+      - "&7 Either way, I need cane.\""
+    requests:
+      - weight: 2
+        items: ["sugar_cane 96-192"]
+      - weight: 1
+        items: ["sugar_cane 64", "paper 32-64"]
+    rewards:
+      copper: 12-18
+      garden-xp: 8
+
+  melvin:
+    name: "&aMelvin"
+    rarity: rare
+    garden-level: 3
+    icon: melon_slice
+    head: MHF_Villager
+    entity: villager
+    profession: farmer
+    villager-type: jungle
+    dialogue: "&7\"It's a hot one. Got any melon?\""
+    requests:
+      - items: ["melon_slice 160-320"]
+      - items: ["melon 24-48"]
+    rewards:
+      copper: 12-18
+      garden-xp: 8
+
+  jack:
+    name: "&6Jack"
+    rarity: rare
+    garden-level: 4
+    icon: pumpkin
+    head: MHF_Villager
+    entity: villager
+    profession: mason
+    villager-type: savanna
+    dialogue: "&7\"I carve. You grow. We both win.\""
+    requests:
+      - items: ["pumpkin 32-64"]
+    rewards:
+      copper: 14-20
+      garden-xp: 9
+
+  cacti:
+    name: "&2Prickles"
+    rarity: rare
+    garden-level: 5
+    icon: cactus
+    head: MHF_Villager
+    entity: villager
+    profession: leatherworker
+    villager-type: desert
+    dialogue: "&7\"Don't hug me. Just give me cactus.\""
+    requests:
+      - items: ["cactus 64-128"]
+    rewards:
+      copper: 14-20
+      garden-xp: 9
+
+  cocoa:
+    name: "&6Coco"
+    rarity: legendary
+    garden-level: 6
+    icon: cocoa_beans
+    head: MHF_Villager
+    entity: wandering_trader
+    dialogue: "&7\"From far away I came, for beans of brown.\""
+    requests:
+      - items: ["cocoa_beans 64-128"]
+      - items: ["cocoa_beans 48-64", "cookie 32-64"]
+    rewards:
+      copper: 20-30
+      garden-xp: 15
+
+  fungus:
+    name: "&cShroomy"
+    rarity: legendary
+    garden-level: 8
+    icon: red_mushroom
+    head: MHF_MushroomCow
+    entity: mooshroom
+    dialogue: "&7\"Moo. (Mushrooms, please.)\""
+    requests:
+      - items: ["red_mushroom 32-64", "brown_mushroom 32-64"]
+    rewards:
+      copper: 20-30
+      garden-xp: 15
+
+  wart:
+    name: "&4Grunt"
+    rarity: legendary
+    garden-level: 10
+    icon: nether_wart
+    head: MHF_PigZombie
+    entity: piglin
+    dialogue: "&7\"Wart. Now. Gold later, maybe.\""
+    requests:
+      - items: ["nether_wart 96-192"]
+    rewards:
+      copper: 25-35
+      garden-xp: 20
+
+  royal_chef:
+    name: "&dThe Royal Chef"
+    rarity: mythic
+    garden-level: 12
+    icon: golden_carrot
+    head: MHF_Villager
+    entity: villager
+    profession: cleric
+    villager-type: snow
+    dialogue:
+      - "&7\"The Queen requests a feast."
+      - "&7 You will not disappoint her.\""
+    requests:
+      - items: ["golden_carrot 16-32", "pumpkin_pie 16-32", "bread 32-64"]
+    rewards:
+      copper: 60-80
+      garden-xp: 40
+      # commands: ["eco give %player% 25000"]
+      # lore: ["&8+&625,000 coins"]
+
+  # A visitor asking for an EcoItems item:
+  #  baker:
+  #    name: "&eThe Baker"
+  #    rarity: rare
+  #    requests:
+  #      - items:
+  #          - "ecoitems:enchanted_wheat 2-4"
+  #          - { item: "ecoitems:enchanted_hay", amount: 1, name: "&aEnchanted Hay Bale" }
+  #    rewards:
+  #      copper: 30
+
+# ── Menus ──────────────────────────────────────────────────────────────────────
+menu:
+  title: "&8Visitors"
+  filler: black_stained_glass_pane
+  # One line of %items%. %item% %amount% %have% %check%
+  item-line: "&8- &f%amount%x %item% %check%"
+  # Lines of %rewards%. The visitor's rewards.lore lines follow them.
+  reward-copper: "&8+&c%copper% Copper"
+  reward-xp: "&8+&2%xp% Garden XP"
+  # A waiting visitor; its material is the visitor's icon.
+  # Visitor placeholders plus %items% %rewards%
+  entry:
+    name: "%visitor_name%"
+    lore:
+      - "%rarity_name%"
+      - ""
+      - "&7Wants:"
+      - "%items%"
+      - ""
+      - "&7Rewards:"
+      - "%rewards%"
+      - ""
+      - "&eClick to see the offer."
+  # Shown when nobody is waiting. %next% %waiting% %max_queue% …
+  empty:
+    material: gray_stained_glass_pane
+    name: "&7Nobody is waiting"
+    lore:
+      - "&7The next visitor arrives in &e%next%&7."
+  # Bottom row. %served% %refused% %unique% %total_visitors% %copper_earned%
+  #             %waiting% %max_queue% %next%
+  stats:
+    column: 5
+    material: book
+    name: "&aYour visitors"
+    lore:
+      - "&7Served: &e%served%"
+      - "&7Different visitors: &e%unique%&7/&e%total_visitors%"
+      - "&7Refused: &e%refused%"
+      - "&7Copper earned: &c%copper_earned%"
+      - ""
+      - "&7Waiting: &e%waiting%&7/&e%max_queue%"
+      - "&7Next visitor: &e%next%"
+  # Opens the Visitor Log. Same placeholders as stats.
+  log-button:
+    column: 3
+    material: writable_book
+    name: "&aVisitor Log"
+    lore:
+      - "&7Every visitor you have met,"
+      - "&7and how often they came."
+      - ""
+      - "&7Met: &e%unique%&7/&e%total_visitors%"
+      - ""
+      - "&eClick to view."
+  skymart:
+    column: 9
+    material: copper_ingot
+    name: "&cSkyMart"
+    lore:
+      - "&7Spend your Copper on"
+      - "&7farming gear and upgrades."
+      - ""
+      - "&eClick to open."
+  back:
+    column: 1
+    material: arrow
+    name: "&7Back to the desk"
+  # The Visitor Log: every visitor in the order above. Served ones show their
+  # head; the rest are locked.
+  # %visitor% %visitor_name% %rarity% %rarity_name% %visitor_served%
+  # %garden_level% (the level they start visiting at) %requirement%
+  log:
+    title: "&8Visitor Log (%page%/%pages%)"
+    served:
+      name: "%visitor_name%"
+      lore:
+        - "%rarity_name%"
+        - ""
+        - "&7Visited &e%visitor_served% &7times."
+    locked:
+      material: gray_dye
+      name: "&7???"
+      lore:
+        - "%rarity_name%"
+        - ""
+        - "&7You have not served this"
+        - "&7visitor yet."
+        - "%requirement%"
+    # Shown as %requirement% while the Garden is below the visitor's level.
+    requirement: "&cNeeds Garden level %garden_level%"
+    # Bottom row. Same placeholders as stats above.
+    progress:
+      column: 5
+      material: book
+      name: "&aVisitors met: &e%unique%&7/&e%total_visitors%"
+      lore:
+        - "&7Served in total: &e%served%"
+    back:
+      column: 1
+      material: arrow
+      name: "&7Back"
+    previous:
+      column: 4
+      material: arrow
+      name: "&7Previous page"
+    next:
+      column: 6
+      material: arrow
+      name: "&7Next page"
+  offer:
+    title: "&8%visitor_name%"
+    # The visitor; its material is the visitor's icon. Also %dialogue%.
+    visitor:
+      name: "%visitor_name%"
+      lore:
+        - "%rarity_name%"
+        - ""
+        - "%dialogue%"
+        - ""
+        - "&7Served &e%visitor_served% &7times."
+    # Each requested item is shown as itself, with these lines added.
+    # %item% %amount% %have% %status%
+    item:
+      name: ""            # "" keeps the item's own name
+      lore:
+        - ""
+        - "&7Wanted: &e%amount%"
+        - "%status%"
+    # Visitor placeholders plus %rewards% and (accept only) %status%
+    accept:
+      material: lime_terracotta
+      name: "&aAccept offer"
+      lore:
+        - "&7Rewards:"
+        - "%rewards%"
+        - ""
+        - "%status%"
+    refuse:
+      material: red_terracotta
+      name: "&cRefuse offer"
+      lore:
+        - "&7%visitor_name% &7leaves with nothing,"
+        - "&7and someone new can arrive."
+    back:
+      material: arrow
+      name: "&7Back"

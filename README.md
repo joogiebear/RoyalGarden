@@ -148,6 +148,7 @@ reloaded with `/garden reload` (or RoyalSkyblock's own reload):
 | `config.yml` | board shape, generation speed, plot costs / requirements / rewards, preset rules, world rules, protection switches, Sam, command names, menu icons |
 | `levels.yml` | Garden Levels: XP curve, XP sources, level rewards |
 | `milestones.yml` | Crop Milestones: crops, tier curves, rewards, the milestones menu |
+| `visitors.yml` | Visitors: arrival timing, rarities, visitors and their requests, rewards, Copper, SkyMart, where they stand, the menus |
 | `messages.yml` | every player-facing line (`&` codes, `&#rrggbb` hex; `""` switches a message off) |
 | `presets.yml` | which captured presets players may choose, with name, icon, cost, cooldown and permission; and the default preset new Gardens generate from |
 
@@ -195,8 +196,56 @@ things: `garden-level:` on a plot's unlock terms (`default`, `by-count`, `by-plo
 run `/garden level <player>` and `/garden xp <player> give|take|set <amount>` (`take` and `set` pay
 nothing). XP is saved with the Garden, so `/garden reset` clears it too.
 
-The console can also run `/garden xp`, `level`, `milestone`, `reset`, `unlock`, `lock`, `info` and
-`reload`.
+The console can also run `/garden xp`, `level`, `milestone`, `visitor`, `reset`, `unlock`, `lock`,
+`info` and `reload`.
+
+### Visitors and Copper
+
+`visitors.yml` sends visitors to the barn over time: one per `arrivals.interval` while the player is
+online, up to `arrivals.max-queue` waiting at once (bigger at higher Garden levels with
+`max-queue-by-level`). While the queue is full the clock stops. Time offline counts at
+`arrivals.offline-rate` (1 = all of it, 0 = none), including server downtime.
+
+Each arrival is picked by weight from the visitors the Garden's level allows (`garden-level:`), with a
+visitor's own `weight` or its rarity's. A visitor has one or more `requests`, one picked by weight per
+visit; items are written `wheat 64`, `carrot 32-64` or `ecoitems:enchanted_wheat 2-4` (any eco item
+lookup). Amounts grow with Garden level by `scaling.per-level`, capped at `scaling.max-multiplier`, and
+with `scaling.rewards` so do the Copper and Garden XP paid. Everything is rolled when the visitor
+arrives and saved with them, so reopening an offer never re-rolls it.
+
+Visitors stand at the `spots` outside the barn as no-AI mobs (any living mob: `entity: villager`,
+`wandering_trader`, `piglin`…; villagers take a `profession` and `villager-type`). They are tagged
+like Sam, so they survive restarts without duplicating; more visitors than spots still wait on the
+Visitors page. Right-click one, click **Visitors** on the desk, or run `/garden visitors` to see an
+offer: accept to hand the items over, or refuse to send them away.
+
+Serving pays the offer's Copper and Garden XP, then stacked rewards: `rewards.every-visit`,
+`rewards.first-visit` (the first time a player serves that visitor), `rewards.by-served.<n>` (their
+n-th visitor), the rarity's `rewards`, and the visitor's own. Served, refused, different visitors
+served and Copper earned are kept per player in `visitors/<uuid>.yml`.
+
+**Copper** is an EcoBits currency, paid by `copper.give-command` (default
+`ecobits givesilent %player% copper %amount%`). **SkyMart** — the Copper shop — is an EcoShop shop;
+the button on the Visitors page runs `skymart.command`. Ready-made files for both are in
+[`examples/`](examples): add `examples/EcoBits/copper.yml`'s currency to EcoBits' `currencies:`,
+and copy `examples/EcoShop/shops/skymart.yml` and `examples/EcoShop/categories/skymart.yml` into
+`plugins/EcoShop/`. Visitors need the `CUSTOM`
+spawn reason in `world.allowed-spawn-reasons` (it is there by default), as Sam does.
+
+The **Visitor Log** (a button on the Visitors page, or `/garden visitors log`) lists every visitor in
+`visitors.yml`: the ones a player has served show as their head (`head:` — a base64 skin texture or a
+player name like `MHF_Villager`) with how many times they have visited, and the rest are locked grey
+dye, with the Garden level they need if the Garden is not there yet.
+
+**Placeholders** (with PlaceholderAPI installed): `%royalgarden_visitors_served%`,
+`_visitors_unique` (different visitors served), `_visitors_total` (visitors configured),
+`_visitors_refused`, `_visitors_copper` (earned), `_visitors_waiting`, `_visitors_max_queue`,
+`_visitors_next` (time to the next arrival), and `%royalgarden_visitor_<id>_served%` per visitor.
+Values are plain numbers, for use in conditions, and work for offline players too.
+
+Admins: `/garden visitor <player> add [visitor]` sends one now (ignoring the clock, queue size and
+level), `clear` sends everyone waiting away, `stats` shows the counts, `reset-stats` zeroes them. The
+console can run it too. `/garden reset` also sends a Garden's waiting visitors away.
 
 ### Permissions
 
@@ -214,7 +263,8 @@ The console can also run `/garden xp`, `level`, `milestone`, `reset`, `unlock`, 
 `/garden capture <id>` · `apply <id>` · `flat` · `bedrock` · `default [id]` · `delete <id>` · `presets` ·
 `reload` · `reset <player> [world]` · `unlock <player> <plot>` · `lock <player> <plot>` ·
 `visit <player>` · `info <player>` · `milestones <player>` · `milestone <player> <crop> <amount>|reset` ·
-`level <player>` · `xp <player> give|take|set <amount>`
+`level <player>` · `xp <player> give|take|set <amount>` ·
+`visitor <player> add [visitor]|clear|stats|reset-stats`
 
 `reset` forgets a player's unlocks and presets (the state file is moved aside, not deleted); with
 `world` it also deletes their Garden world so the next `/garden` builds a fresh one — the contest reset.

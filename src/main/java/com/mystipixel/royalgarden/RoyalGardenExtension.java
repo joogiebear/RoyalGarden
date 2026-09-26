@@ -14,6 +14,7 @@ import com.mystipixel.royalgarden.garden.PresetLibrary;
 import com.mystipixel.royalgarden.garden.PresetService;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.mystipixel.royalgarden.garden.UnlockService;
+import com.mystipixel.royalgarden.hooks.RoyalGardenExpansion;
 import com.mystipixel.royalgarden.level.GardenLevels;
 import com.mystipixel.royalgarden.level.LevelConfig;
 import com.mystipixel.royalgarden.milestone.MilestoneConfig;
@@ -22,6 +23,12 @@ import com.mystipixel.royalgarden.milestone.MilestoneMenu;
 import com.mystipixel.royalgarden.milestone.MilestoneService;
 import com.mystipixel.royalgarden.milestone.MilestoneStore;
 import com.mystipixel.royalgarden.milestone.PlacedBlocks;
+import com.mystipixel.royalgarden.visitor.VisitorConfig;
+import com.mystipixel.royalgarden.visitor.VisitorMenu;
+import com.mystipixel.royalgarden.visitor.VisitorNpcs;
+import com.mystipixel.royalgarden.visitor.VisitorPlaceholders;
+import com.mystipixel.royalgarden.visitor.VisitorService;
+import com.mystipixel.royalgarden.visitor.VisitorStore;
 import com.mystipixel.royalskyblock.RoyalSkyblockPlugin;
 import com.mystipixel.royalskyblock.currency.CurrencyService;
 import com.mystipixel.royalskyblock.data.Storage;
@@ -55,8 +62,9 @@ import java.util.function.Supplier;
  * no error, so the console is the only confirmation a build actually took.
  *
  * <p>Everything tunable lives in {@code plugins/RoyalSkyblock/extensions/RoyalGarden/}:
- * {@code config.yml} (the board, costs, rewards, rules, menus), {@code messages.yml} and
- * {@code presets.yml}. The host's reload reloads them too.
+ * {@code config.yml} (the board, costs, rewards, rules, menus), {@code messages.yml},
+ * {@code presets.yml}, {@code milestones.yml}, {@code levels.yml} and {@code visitors.yml}. The host's
+ * reload reloads them too.
  */
 public final class RoyalGardenExtension extends Extension {
 
@@ -82,6 +90,11 @@ public final class RoyalGardenExtension extends Extension {
     private PlacedBlocks placedBlocks;
     private BukkitTask milestoneSaver;
     private BukkitTask milestoneSweeper;
+    private VisitorConfig visitorConfig;
+    private VisitorService visitors;
+    private VisitorNpcs visitorNpcs;
+    private BukkitTask visitorTicker;
+    private Object expansion;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -156,9 +169,12 @@ public final class RoyalGardenExtension extends Extension {
         presets.reload();
         milestoneConfig.reload();
         levelConfig.reload();
+        visitorConfig.reload();
         menu.reload();
         scheduleMilestoneSaves();
-        getLogger().info("Reloaded config.yml, messages.yml, presets.yml and milestones.yml.");
+        scheduleVisitorArrivals();
+        visitorNpcs.syncAll();
+        getLogger().info("Reloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml and visitors.yml.");
     }
 
     /**
@@ -263,10 +279,36 @@ public final class RoyalGardenExtension extends Extension {
         scheduleMilestoneSaves();
         this.milestoneSweeper = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneListener::clearStale, 20L, 20L);
 
+        // Visitors: NPCs at the barn asking for crops, paying Copper, Garden XP and rewards.
+        this.visitorConfig = new VisitorConfig(data, getLogger());
+        VisitorStore visitorStore = new VisitorStore(data, getLogger());
+        this.visitors = new VisitorService(visitorConfig, visitorStore, messages, getLogger());
+        visitors.setLevels(levels::level, (owner, amount) -> levels.give(owner, amount, "level-source-visitor"));
+        visitors.setHasGarden(gardens::hasGarden);
+        VisitorMenu visitorMenu = new VisitorMenu(visitors, messages, menu::open);
+        this.visitorNpcs = new VisitorNpcs(getPlugin(), visitors, messages, visitorMenu::openOffer);
+        visitors.onChange(visitorNpcs::sync);
+        menu.setVisitors(visitorMenu::open);
+        Sam desk = sam;
+        VisitorNpcs outside = visitorNpcs;
+        gardens.onPrepared(world -> {
+            desk.ensureWhenLoaded(world);
+            outside.sync(world);
+        });
+        Bukkit.getPluginManager().registerEvents(visitors, getPlugin());
+        Bukkit.getPluginManager().registerEvents(visitorNpcs, getPlugin());
+        for (org.bukkit.entity.Player online : Bukkit.getOnlinePlayers()) {
+            visitors.welcome(online);                   // online across an extension reload
+        }
+        scheduleVisitorArrivals();
+        visitorNpcs.syncAll();
+        registerExpansion(new VisitorPlaceholders(visitors));
+
         CommandGarden garden = new CommandGarden(getPlugin(), config.commandName("garden", "garden"), gardens,
                 messages, this::reloadFiles, () -> evacuationPoint(host));
         garden.setMilestones(milestones, milestoneMenu);
         garden.setLevels(levels);
+        garden.setVisitors(visitors, visitorMenu);
         this.gardenCommand = garden;
         this.deskCommand = new CommandDesk(getPlugin(), config.commandName("desk", "desk"), menu);
         gardenCommand.register();
@@ -284,6 +326,39 @@ public final class RoyalGardenExtension extends Extension {
         }
         long period = milestoneConfig.saveIntervalSeconds() * 20L;
         milestoneSaver = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneStore::saveAll, period, period);
+    }
+
+    /**
+     * Register {@code %royalgarden_...%} with PlaceholderAPI, if it is enabled.
+     *
+     * <p>The expansion class extends a PlaceholderAPI type, so it is only touched behind the enabled
+     * check, and held as an {@code Object} so this class never needs PlaceholderAPI to load. A failure
+     * costs the placeholders, never the extension.
+     */
+    private void registerExpansion(VisitorPlaceholders visitorPlaceholders) {
+        if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            getLogger().info("PlaceholderAPI not found — %royalgarden_...% placeholders are off.");
+            return;
+        }
+        try {
+            RoyalGardenExpansion created = new RoyalGardenExpansion(getVersion(), visitorPlaceholders::resolve);
+            if (created.register()) {
+                this.expansion = created;
+            } else {
+                getLogger().warning("PlaceholderAPI refused the royalgarden expansion.");
+            }
+        } catch (LinkageError unusable) {
+            getLogger().warning("Could not register %royalgarden_...% placeholders: " + unusable);
+        }
+    }
+
+    /** Check for visitor arrivals every {@code arrivals.check-every-seconds}. */
+    private void scheduleVisitorArrivals() {
+        if (visitorTicker != null) {
+            visitorTicker.cancel();
+        }
+        long period = visitorConfig.checkTicks();
+        visitorTicker = Bukkit.getScheduler().runTaskTimer(getPlugin(), visitors::tickAll, period, period);
     }
 
     /** Where players standing in a Garden go when it is deleted. */
@@ -373,6 +448,29 @@ public final class RoyalGardenExtension extends Extension {
         if (placedBlocks != null) {
             HandlerList.unregisterAll(placedBlocks);
             placedBlocks = null;
+        }
+        if (visitorTicker != null) {
+            visitorTicker.cancel();
+            visitorTicker = null;
+        }
+        if (expansion != null) {
+            // persist() keeps it across PlaceholderAPI reloads, so it must be removed by hand here or an
+            // extension reload would leave the old one answering from a dead service.
+            try {
+                ((RoyalGardenExpansion) expansion).unregister();
+            } catch (LinkageError ignored) {
+                // PlaceholderAPI went away first; nothing is left to unregister from
+            }
+            expansion = null;
+        }
+        if (visitors != null) {
+            visitors.shutdown();
+            HandlerList.unregisterAll(visitors);
+            visitors = null;
+        }
+        if (visitorNpcs != null) {
+            HandlerList.unregisterAll(visitorNpcs);
+            visitorNpcs = null;
         }
         if (sam != null) {
             HandlerList.unregisterAll(sam);

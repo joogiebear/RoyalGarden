@@ -1,0 +1,25 @@
+# SkyMart — the Copper shop. Copy to plugins/EcoShop/shops/skymart.yml.
+# `command: skymart` is what RoyalGarden's Visitors page runs (skymart.command
+# in visitors.yml). A single-page shop: it opens straight onto its category.
+title: "SkyMart"
+command: skymart
+direct-category: skymart
+
+buy-broadcasts:
+  enabled: false
+  message: ""
+
+click-sound:
+  sound: block_stone_button_click_on
+  pitch: 1
+  volume: 1
+
+buy-sound:
+  sound: entity_player_levelup
+  pitch: 2
+  volume: 1
+
+sell-sound:
+  sound: block_amethyst_block_place
+  pitch: 1.5
+  volume: 1

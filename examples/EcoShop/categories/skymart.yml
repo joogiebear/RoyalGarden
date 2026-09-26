@@ -1,0 +1,87 @@
+# SkyMart's stock, priced in Copper. Copy to plugins/EcoShop/categories/skymart.yml.
+# `type: copper` is the EcoBits currency from examples/EcoBits/copper.yml.
+# Swap in your own items — EcoItems ids work: item: ecoitems:garden_hoe
+item: copper_ingot name:"&cSkyMart"
+lore: []
+
+gui:
+  rows: 4
+  title: "SkyMart"
+  forwards-arrow:
+    item: arrow name:"&fNext Page"
+    row: 4
+    column: 6
+  backwards-arrow:
+    item: arrow name:"&fPrevious Page"
+    row: 4
+    column: 4
+  pages:
+    - page: 1
+      mask:
+        items:
+          - orange_stained_glass_pane
+          - black_stained_glass_pane
+        pattern:
+          - "222222222"
+          - "200000002"
+          - "200000002"
+          - "221111122"
+
+items:
+  - id: bone_meal
+    item: bone_meal
+    gui: { column: 2, row: 2, page: 1 }
+    buy:
+      value: 1
+      type: copper
+      display: "&c%value% Copper"
+      amount: 16
+
+  - id: composter
+    item: composter
+    gui: { column: 3, row: 2, page: 1 }
+    buy:
+      value: 5
+      type: copper
+      display: "&c%value% Copper"
+
+  - id: diamond_hoe
+    item: diamond_hoe
+    gui: { column: 4, row: 2, page: 1 }
+    buy:
+      value: 40
+      type: copper
+      display: "&c%value% Copper"
+
+  - id: efficiency_book
+    item: enchanted_book efficiency:4
+    gui: { column: 5, row: 2, page: 1 }
+    buy:
+      value: 75
+      type: copper
+      display: "&c%value% Copper"
+
+  - id: fortune_book
+    item: enchanted_book fortune:3
+    gui: { column: 6, row: 2, page: 1 }
+    buy:
+      value: 150
+      type: copper
+      display: "&c%value% Copper"
+
+  - id: honey_bottle
+    item: honey_bottle
+    gui: { column: 7, row: 2, page: 1 }
+    buy:
+      value: 2
+      type: copper
+      display: "&c%value% Copper"
+
+  - id: sniffer_egg
+    item: sniffer_egg
+    gui: { column: 8, row: 2, page: 1 }
+    buy:
+      value: 300
+      type: copper
+      display: "&c%value% Copper"
+      limit: 1
