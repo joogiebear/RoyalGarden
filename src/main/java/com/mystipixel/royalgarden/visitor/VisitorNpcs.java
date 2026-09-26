@@ -28,10 +28,12 @@ import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,15 @@ import java.util.function.BiConsumer;
  *
  * <p>Like Sam, syncing waits for the spots' chunks to have their entities loaded: Paper loads those
  * after the blocks, and looking earlier would find nobody and spawn a second copy.
+ *
+ * <h2>The line</h2>
+ *
+ * <p>With {@code line:} in {@code visitors.yml} the spots are a single file leading to the barn's
+ * drive-through window, front first. Visitors <em>walk</em> between them rather than jumping: a newcomer
+ * walks in from behind the line, and when the one at the window is served the rest step up. They have no
+ * AI to walk with — that would bring a villager's whole brain along, beds and workstations included — so
+ * they are moved a little every tick instead, facing the way they go. The client animates their legs
+ * from the movement, so from the outside it is walking.
  */
 public final class VisitorNpcs implements Listener {
 
@@ -59,12 +70,27 @@ public final class VisitorNpcs implements Listener {
     private final VisitorService service;
     private final Messages messages;
     private final BiConsumer<Player, String> open;
+    private final Plugin plugin;
+
+    /** Visitors on their way somewhere: entity id to where they are going. */
+    private final Map<UUID, Location> walking = new HashMap<>();
+    private BukkitTask walker;
 
     public VisitorNpcs(Plugin plugin, VisitorService service, Messages messages, BiConsumer<Player, String> open) {
         this.key = new NamespacedKey(plugin, TAG);
         this.service = service;
         this.messages = messages;
         this.open = open;
+        this.plugin = plugin;
+    }
+
+    /** Stop walking anyone; the next sync sends them on again. */
+    public void shutdown() {
+        if (walker != null) {
+            walker.cancel();
+            walker = null;
+        }
+        walking.clear();
     }
 
     /** Bring the visitors at this owner's Garden in line with their queue, if the Garden is loaded. */
@@ -91,8 +117,13 @@ public final class VisitorNpcs implements Listener {
             return;
         }
         List<Location> spots = spots(world);
+        Location entrance = entrance(world);
+        List<Location> watched = new ArrayList<>(spots);
+        if (entrance != null) {
+            watched.add(entrance);
+        }
         Set<Chunk> chunks = new LinkedHashSet<>();
-        for (Location spot : spots) {
+        for (Location spot : watched) {
             int cx = spot.getBlockX() >> 4;
             int cz = spot.getBlockZ() >> 4;
             if (!world.isChunkLoaded(cx, cz)) {
@@ -122,7 +153,7 @@ public final class VisitorNpcs implements Listener {
                     continue;
                 }
                 present.add(id);
-                entity.teleport(spots.get(index));
+                walk(entity, spots.get(index));
                 dress(entity, owner, offer, type);
             }
         }
@@ -134,8 +165,85 @@ public final class VisitorNpcs implements Listener {
             VisitorType type = service.config().visitor(offer.visitor());
             EntityType entityType = entityType(type);
             java.util.function.Consumer<Entity> dresser = entity -> dress(entity, owner, offer, type);
-            world.spawn(spots.get(entry.getValue()), entityType.getEntityClass(), dresser);
+            Location spot = spots.get(entry.getValue());
+            boolean walksIn = entrance != null && service.config().walkSpeed() > 0;
+            Entity spawned = world.spawn(walksIn ? facing(entrance, spot) : spot, entityType.getEntityClass(),
+                    dresser);
+            if (walksIn) {
+                walk(spawned, spot);
+            }
         }
+    }
+
+    // ── walking ────────────────────────────────────────────────────────────────
+
+    /** Send a visitor to a spot: walking if they are near and walking is on, otherwise straight there. */
+    private void walk(Entity entity, Location to) {
+        double speed = service.config().walkSpeed();
+        Location at = entity.getLocation();
+        // Far off means a moved line or a spot list edited under them, not a walk worth watching.
+        if (speed <= 0 || !at.getWorld().equals(to.getWorld()) || at.distanceSquared(to) > 40 * 40) {
+            walking.remove(entity.getUniqueId());
+            place(entity, to);
+            return;
+        }
+        if (at.distanceSquared(to) < 0.0001) {
+            walking.remove(entity.getUniqueId());
+            face(entity, to.getYaw());
+            return;
+        }
+        walking.put(entity.getUniqueId(), to.clone());
+        if (walker == null) {
+            walker = Bukkit.getScheduler().runTaskTimer(plugin, this::step, 1L, 1L);
+        }
+    }
+
+    /** Move every walking visitor one step, and stop the task once nobody is walking. */
+    private void step() {
+        double speed = service.config().walkSpeed();
+        Iterator<Map.Entry<UUID, Location>> it = walking.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, Location> next = it.next();
+            Entity entity = Bukkit.getEntity(next.getKey());
+            Location to = next.getValue();
+            if (entity == null || !entity.isValid() || !entity.getWorld().equals(to.getWorld())) {
+                it.remove();
+                continue;
+            }
+            Location at = entity.getLocation();
+            double dx = to.getX() - at.getX();
+            double dz = to.getZ() - at.getZ();
+            double distance = Math.sqrt(dx * dx + dz * dz);
+            if (speed <= 0 || distance <= speed) {
+                place(entity, to);
+                it.remove();
+                continue;
+            }
+            float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+            place(entity, new Location(to.getWorld(), at.getX() + dx / distance * speed, to.getY(),
+                    at.getZ() + dz / distance * speed, yaw, 0f));
+        }
+        if (walking.isEmpty() && walker != null) {
+            walker.cancel();
+            walker = null;
+        }
+    }
+
+    private static void place(Entity entity, Location to) {
+        entity.teleport(to);
+        face(entity, to.getYaw());
+    }
+
+    /** Turn body and head: an AI-less mob's head does not follow a teleport on its own. */
+    private static void face(Entity entity, float yaw) {
+        entity.setRotation(yaw, 0f);
+    }
+
+    /** {@code from}, turned to look at {@code to}. */
+    private static Location facing(Location from, Location to) {
+        Location out = from.clone();
+        out.setYaw((float) Math.toDegrees(Math.atan2(-(to.getX() - from.getX()), to.getZ() - from.getZ())));
+        return out;
     }
 
     /** Offer id to spot index, for the visitors that get a spot: the first in the queue. */
@@ -154,10 +262,20 @@ public final class VisitorNpcs implements Listener {
     private List<Location> spots(World world) {
         List<Location> out = new ArrayList<>();
         for (VisitorConfig.Spot spot : service.config().spots()) {
-            out.add(new Location(world, spot.x(), spot.hasY() ? spot.y() : GardenLayout.groundY() + 1, spot.z(),
-                    spot.yaw(), 0f));
+            out.add(location(world, spot));
         }
         return out;
+    }
+
+    /** Where newcomers walk into the line from; null without a line. */
+    private Location entrance(World world) {
+        VisitorConfig.Spot entry = service.config().entry();
+        return entry == null ? null : location(world, entry);
+    }
+
+    private static Location location(World world, VisitorConfig.Spot spot) {
+        return new Location(world, spot.x(), spot.hasY() ? spot.y() : GardenLayout.groundY() + 1, spot.z(),
+                spot.yaw(), 0f);
     }
 
     /** The configured entity type if it is a living thing that can be spawned; a villager otherwise. */
@@ -241,7 +359,12 @@ public final class VisitorNpcs implements Listener {
             }
         }
         Chunk chunk = event.getChunk();
-        for (Location spot : spots(world)) {
+        List<Location> watched = spots(world);
+        Location entrance = entrance(world);
+        if (entrance != null) {
+            watched.add(entrance);
+        }
+        for (Location spot : watched) {
             if (spot.getBlockX() >> 4 == chunk.getX() && spot.getBlockZ() >> 4 == chunk.getZ()) {
                 ours = true;
                 break;

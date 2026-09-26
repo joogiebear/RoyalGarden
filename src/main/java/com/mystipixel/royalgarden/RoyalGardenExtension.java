@@ -640,6 +640,7 @@ public final class RoyalGardenExtension extends Extension {
             visitors = null;
         }
         if (visitorNpcs != null) {
+            visitorNpcs.shutdown();
             HandlerList.unregisterAll(visitorNpcs);
             visitorNpcs = null;
         }

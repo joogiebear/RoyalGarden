@@ -66,10 +66,31 @@ skymart:
   as-console: false
 
 # ── Where visitors stand ───────────────────────────────────────────────────────
-# "x, z, yaw" or "x, y, z, yaw", measured from the middle of the farmhouse plot
-# (the barn doors face +z; the spawn point is at 0.5, 9.5). Without y they stand
-# on the ground. Visitors beyond the number of spots still wait — on the
-# Visitors page. yaw: 0 faces +z, 90 faces -x, -90 faces +x, 180 faces -z.
+# Positions are "x, z, yaw" or "x, y, z, yaw", measured from the middle of the
+# farmhouse plot (the barn doors face +z; the spawn point is at 0.5, 9.5).
+# Without y they stand on the ground. yaw: 0 faces +z, 90 faces -x, -90 faces
+# +x, 180 faces -z. Visitors beyond the number of places still wait — on the
+# Visitors page.
+
+# The drive-through: visitors queue in single file at the window in the front
+# of the barn, east of the doors, and walk up the line as the one at the window
+# is served. Newcomers walk in from the back of the line.
+line:
+  enabled: true
+  # Where the visitor at the window stands, and which way they face. The
+  # default is square in the barn's window; move it and the window stays put.
+  front: "6, 6.5, 180"
+  # Which way the line runs back from the window: north, south, east or west.
+  direction: south
+  # Blocks between two visitors in the line.
+  spacing: 1.5
+  # How many visitors stand in the line.
+  length: 7
+  # Walking speed, blocks per tick. 0 = they appear in place instead.
+  walk-speed: 0.1
+
+# Used instead of the line when line.enabled is false: one visitor per spot,
+# in queue order.
 spots:
   - "-3.5, 8.5, -90"
   - "4.5, 8.5, 90"

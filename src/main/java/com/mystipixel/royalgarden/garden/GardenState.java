@@ -36,6 +36,7 @@ public final class GardenState {
     private final Map<Integer, Integer> overgrowth = new HashMap<>();
     private final Map<Integer, int[]> clearing = new HashMap<>();
     private boolean legacyWallsCleared;
+    private int barnVersion = 1;
     private long xp;
     private boolean readOnly;
 
@@ -265,6 +266,15 @@ public final class GardenState {
 
     public void setXp(long xp) {
         this.xp = Math.max(0, xp);
+    }
+
+    /** Which {@link GardenBuilder#BARN_VERSION} this Garden's barn was built or last renovated to. */
+    public int barnVersion() {
+        return barnVersion;
+    }
+
+    public void setBarnVersion(int version) {
+        this.barnVersion = version;
     }
 
     public boolean legacyWallsCleared() {
