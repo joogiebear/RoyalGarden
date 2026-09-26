@@ -56,6 +56,14 @@ preset-status-cooldown: "&cAvailable in %time%"
 preset-status-no-permission: "&cLocked"
 menu-presets-hint: "&eRight-click to choose a preset."
 
+# ── Crop Milestones ──────────────────────────────────────────────────────────
+# %crop_name% %tier% %tier_roman% %max_tier% %total% %next% %remaining% %percent% %bar%
+milestone-progress: "&6%crop_name% &e%total% &7/ &e%next%"
+milestone-tier-up: "&6&lMILESTONE! &f%crop_name% &e%tier_roman% &7— %total% harvested."
+# Also %player%. Only sent with broadcast-tier-ups: true in milestones.yml.
+milestone-broadcast: "&6%player% &freached &6%crop_name% &e%tier_roman%&f!"
+milestone-maxed: "max"
+
 # ── Protection (shown in the action bar) ─────────────────────────────────────
 # %plot%
 deny-locked: "&cPlot %plot% is locked. Open the desk to unlock it."
@@ -66,7 +74,7 @@ deny-visitor: "&cThis is not your Garden."
 
 # ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>"
+admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -105,3 +113,7 @@ admin-unchanged: "&7%plot% was already like that for %player%."
 admin-bad-plot: "&c'%plot%' is not a plot on this board."
 # %player% %unlocked% %total% %plots% %loaded% %readonly%
 admin-info: "&a%player%&7: %unlocked%/%total% plots (%plots%). Loaded: %loaded%. Read-only: %readonly%."
+admin-milestone-usage: "&c/garden milestone <player> <crop> <amount>  — or —  /garden milestone <player> reset"
+# %player% %crop_name% %total% %tier%
+admin-milestone-set: "&aSet %player%'s %crop_name% to %total% (tier %tier%). No rewards were given."
+admin-milestone-reset: "&aReset all of %player%'s milestones."

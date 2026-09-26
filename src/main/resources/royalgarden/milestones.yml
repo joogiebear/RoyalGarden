@@ -1,0 +1,155 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RoyalGarden  ·  milestones.yml  —  Crop Milestones
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Every player has a lifetime total per crop. Totals climb through tiers; each
+#  tier reached pays its rewards once. Shown at the desk (Milestones button) and
+#  with /garden milestones. Reload with /garden reload.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+enabled: true
+
+# blocks — each harvested block adds the crop's `points` (default 1).
+# drops  — the crop items that actually drop are added, so Fortune counts.
+#          Plugins that pocket drops before they fall (telekinesis, auto-pickup)
+#          hide them from this mode — keep `blocks` if you run those.
+counting: blocks
+
+# Count only in Garden worlds. Set false to count in the `worlds` below instead
+# (* is a wildcard).
+gardens-only: true
+worlds: []
+
+# Show "+ Wheat 1,234 / 1,500" in the action bar on each counted harvest.
+action-bar-progress: true
+# Announce tier-ups to the whole server (messages.yml: milestone-broadcast).
+broadcast-tier-ups: false
+tier-up-sound: "entity.player.levelup"
+# Progress is written to disk this often, when a player leaves, and on shutdown.
+save-interval-seconds: 60
+
+progress-bar:
+  length: 20
+  filled: "&a|"
+  empty: "&7|"
+
+# ── Tiers ──────────────────────────────────────────────────────────────────────
+# Used by any crop without its own `tiers:`. Two ways to write them:
+#   Curve  — first: how much tier 1 needs; growth: each next tier needs this
+#            many times more than the last; count: how many tiers; round-to.
+#   List   — amounts: [30, 80, 160, ...]  running totals, one per tier.
+default-tiers:
+  first: 30
+  growth: 1.35
+  count: 30
+  round-to: 10
+
+# ── Rewards ────────────────────────────────────────────────────────────────────
+# Stacked, like plot unlock rewards: reaching a tier gives every-tier, plus
+# by-tier.<n>, plus the crop's own every-tier and by-tier.<n> (under crops.<id>.rewards).
+# Placeholders: %player% %uuid% %crop% %crop_name% %tier% %tier_roman% %max_tier%
+#               %total% %next% %remaining% %percent%
+rewards:
+  every-tier:
+    commands: []
+    #  - "eco give %player% %tier%00"
+    #  - "ecoskills xp %player% farming %tier%0"
+    messages: []
+  by-tier: {}
+  #  10:
+  #    commands: ["eco give %player% garden_trophy 1"]
+  #    messages: ["&6You reached %crop_name% X — a trophy is yours!"]
+
+# ── Crops ──────────────────────────────────────────────────────────────────────
+#    display-name, icon
+#    blocks        : blocks that are this crop when broken
+#    drops         : items counted in `drops` counting
+#    points        : amount per block in `blocks` counting (default 1)
+#    require-ripe  : only fully grown blocks count (default true) — off for cane
+#                    and cactus, whose "age" is a growth timer
+#    natural-only  : player-placed blocks never count (default true)
+#    stacked       : blocks of this crop above the broken one fall with it and count
+#    tiers         : this crop's own tiers (same forms as default-tiers)
+#    rewards       : this crop's own every-tier / by-tier, on top of the global ones
+crops:
+  wheat:
+    display-name: "Wheat"
+    icon: wheat
+    blocks: [wheat]
+    drops: [wheat]
+  carrot:
+    display-name: "Carrot"
+    icon: carrot
+    blocks: [carrots]
+    drops: [carrot]
+  potato:
+    display-name: "Potato"
+    icon: potato
+    blocks: [potatoes]
+    drops: [potato]
+  beetroot:
+    display-name: "Beetroot"
+    icon: beetroot
+    blocks: [beetroots]
+    drops: [beetroot]
+  nether_wart:
+    display-name: "Nether Wart"
+    icon: nether_wart
+    blocks: [nether_wart]
+    drops: [nether_wart]
+  melon:
+    display-name: "Melon"
+    icon: melon_slice
+    blocks: [melon]
+    drops: [melon_slice]
+    # A melon block drops 3–7 slices; count each block as 5 so it keeps pace.
+    points: 5
+  pumpkin:
+    display-name: "Pumpkin"
+    icon: pumpkin
+    blocks: [pumpkin]
+    drops: [pumpkin]
+  sugar_cane:
+    display-name: "Sugar Cane"
+    icon: sugar_cane
+    blocks: [sugar_cane]
+    drops: [sugar_cane]
+    require-ripe: false
+    stacked: true
+  cactus:
+    display-name: "Cactus"
+    icon: cactus
+    blocks: [cactus]
+    drops: [cactus]
+    require-ripe: false
+    stacked: true
+  cocoa:
+    display-name: "Cocoa Beans"
+    icon: cocoa_beans
+    blocks: [cocoa]
+    drops: [cocoa_beans]
+  mushroom:
+    display-name: "Mushroom"
+    icon: red_mushroom
+    blocks: [red_mushroom, brown_mushroom]
+    drops: [red_mushroom, brown_mushroom]
+
+# ── Menu ───────────────────────────────────────────────────────────────────────
+# Placeholders as for rewards, plus %player% in the title.
+menu:
+  title: "&8Crop Milestones"
+  entry:
+    name: "&6%crop_name% &e%tier_roman%"
+    lore:
+      - "&7Tier &f%tier%&7/&f%max_tier%"
+      - "&7Total: &e%total%"
+      - ""
+      - "&7Next tier at &e%next% &7(%remaining% to go)"
+      - "%bar% &7%percent%%"
+  entry-maxed:
+    name: "&6%crop_name% &e%tier_roman% &a✔"
+    lore:
+      - "&7Total: &e%total%"
+      - "&aEvery tier reached!"
+  back:
+    material: arrow
+    name: "&7Back to the desk"

@@ -146,6 +146,7 @@ reloaded with `/garden reload` (or RoyalSkyblock's own reload):
 | File | What it holds |
 |---|---|
 | `config.yml` | board shape, generation speed, plot costs / requirements / rewards, preset rules, world rules, protection switches, Sam, command names, menu icons |
+| `milestones.yml` | Crop Milestones: crops, tier curves, rewards, the milestones menu |
 | `messages.yml` | every player-facing line (`&` codes, `&#rrggbb` hex; `""` switches a message off) |
 | `presets.yml` | which captured presets players may choose, with name, icon, cost, cooldown and permission; and the default preset new Gardens generate from |
 
@@ -162,6 +163,24 @@ entry in `presets.yml`. Players right-click a plot at the desk to choose one; it
 says, has a per-plot cooldown and needs a confirming second click. By default crops paste at age 0
 and melons/pumpkins are never pasted, so a preset is a planted farm rather than a free harvest.
 
+### Crop Milestones
+
+`milestones.yml` gives every player a lifetime total per crop, climbing through tiers. Each tier
+pays once, and rewards stack: `rewards.every-tier`, then `rewards.by-tier.<n>`, then the crop's own
+`every-tier` and `by-tier.<n>`. Tiers come from a growth curve (`first`, `growth`, `count`,
+`round-to`) or an explicit list of totals, either shared (`default-tiers`) or per crop.
+
+Only ripe, naturally grown crops count, and only in Gardens by default. Placed blocks are tracked in
+chunk data and follow pistons. Sugar cane and cactus count the whole column that falls. `counting:
+blocks` adds each crop's `points` per block. `counting: drops` counts the items that drop, so Fortune
+counts.
+
+Players open milestones with the **Milestones** button on the desk or `/garden milestones`. Admins
+can use `/garden milestones <player>` to view someone's progress, and
+`/garden milestone <player> <crop> <amount>` or `/garden milestone <player> reset` to correct it
+(no rewards are given). Progress saves every `save-interval-seconds`, when a player leaves, and on
+shutdown.
+
 ### Permissions
 
 | Node | Default | |
@@ -177,7 +196,7 @@ and melons/pumpkins are never pasted, so a preset is a planted farm rather than 
 
 `/garden capture <id>` · `apply <id>` · `flat` · `bedrock` · `default [id]` · `delete <id>` · `presets` ·
 `reload` · `reset <player> [world]` · `unlock <player> <plot>` · `lock <player> <plot>` ·
-`visit <player>` · `info <player>`
+`visit <player>` · `info <player>` · `milestones <player>` · `milestone <player> <crop> <amount>|reset`
 
 `reset` forgets a player's unlocks and presets (the state file is moved aside, not deleted); with
 `world` it also deletes their Garden world so the next `/garden` builds a fresh one — the contest reset.

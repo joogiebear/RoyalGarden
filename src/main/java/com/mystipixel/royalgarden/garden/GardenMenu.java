@@ -17,6 +17,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * The desk menu: the board, drawn as itself — and, from any plot you own, the preset picker.
@@ -36,6 +37,7 @@ public final class GardenMenu {
     private final GardenWorlds worlds;
     private final UnlockService unlocks;
     private final PresetService presetService;
+    private Consumer<Player> milestones;
     private Menu menu;
 
     public GardenMenu(GardenConfig config, Messages messages, GardenWorlds worlds, UnlockService unlocks,
@@ -50,6 +52,12 @@ public final class GardenMenu {
 
     /** Rebuild the menu from the current config. */
     public void reload() {
+        this.menu = build();
+    }
+
+    /** Add the Crop Milestones button, opening this page when clicked. */
+    public void setMilestones(Consumer<Player> open) {
+        this.milestones = open;
         this.menu = build();
     }
 
@@ -86,6 +94,18 @@ public final class GardenMenu {
 
         builder.setSlot(rows, 5, Slot.builder((player, shown) -> summary(player)).build());
         used[rows][5] = true;
+
+        if (milestones != null) {
+            int column = Math.clamp(config.yaml().getInt("menu.items.milestones.column", 3), 1, 9);
+            if (!used[rows][column]) {
+                Consumer<Player> open = milestones;
+                builder.setSlot(rows, column, Slot.builder(ItemSpec.build(section(items(), "milestones"),
+                                Material.GOLDEN_HOE))
+                        .onLeftClick((event, slot, clicked) -> open.accept((Player) event.getWhoClicked()))
+                        .build());
+                used[rows][column] = true;
+            }
+        }
 
         ItemStack filler = filler();
         if (filler != null) {
