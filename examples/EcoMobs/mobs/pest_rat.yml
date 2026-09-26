@@ -1,0 +1,84 @@
+# Rat — a RoyalGarden pest, as an EcoMobs mob. Copy to plugins/EcoMobs/mobs/pest_rat.yml.
+# RoyalGarden spawns it with `ecomobs spawn pest_rat …` (pests.yml, pests.rat.command),
+# finds it by this id (`mob: pest_rat`), keeps it on its plot and pays for it.
+#
+# It drops nothing and its kill effects are empty on purpose: RoyalGarden pays
+# the Copper, Garden XP and rewards in pests.yml. Pay here instead and set those
+# to 0 there, so nothing is paid twice.
+mob: rabbit health:10 speed:0.45
+
+category: garden_pests
+
+display-name: "&6Rat &7| &c%health%♥"
+
+integrations:
+  levelled-mobs:
+    can-level: false
+
+custom-ai:
+  clear: false
+  target-goals: [ ]
+  entity-goals: [ ]
+
+effects:
+  permanent-effects: [ ]
+  spawn:
+    - id: spawn_particle
+      args:
+        particle: cloud
+        amount: 8
+  despawn: [ ]
+  interact: [ ]
+  melee-attack: [ ]
+  ranged-attack: [ ]
+  any-attack: [ ]
+  take-damage: [ ]
+  damage-player: [ ]
+  kill-player: [ ]
+  death:
+    - id: spawn_particle
+      args:
+        particle: poof
+        amount: 10
+  kill: [ ]
+
+# Pests stay until they are killed or cleared.
+lifespan: -1
+
+defence:
+  can-mount: false
+  damage-modifiers:
+    hot_floor: 1
+    fire_tick: 1
+    lava: 1
+    suffocation: 0
+    drowning: 1
+    entity_explosion: 1
+    block_explosion: 1
+
+drops:
+  experience: 0
+  items: [ ]
+
+boss-bar:
+  enabled: false
+  color: white
+  style: progress
+  radius: 32
+
+spawn:
+  totem:
+    enabled: false
+    top: netherite_block
+    middle: iron_block
+    bottom: magma_block
+    conditions: [ ]
+  egg:
+    enabled: false
+    conditions: [ ]
+    item: rabbit_spawn_egg
+    name: "&6Rat&f Spawn Egg"
+    lore: [ ]
+    craftable: false
+    shapeless: false
+    recipe: [ ]

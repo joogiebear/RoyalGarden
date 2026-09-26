@@ -265,6 +265,16 @@ menu:
         - "&7what they want, and SkyMart."
         - ""
         - "&eClick to view."
+    # Opens the Pests page (pests.yml).
+    pests:
+      column: 8
+      material: iron_sword
+      name: "&cPests"
+      lore:
+        - "&7Which plots have pests,"
+        - "&7and your Pest Log."
+        - ""
+        - "&eClick to view."
     # %unlocked% %total% %limit% %size% and the Garden level ones from levels.yml:
     # %level% %level_roman% %max_level% %xp% %next% %remaining% %percent% %bar%
     summary:

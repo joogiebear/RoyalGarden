@@ -32,13 +32,23 @@ public final class MilestoneListener implements Listener {
     private record Pending(Player player, MilestoneCrop crop, int stackedAbove) {
     }
 
+    /** Told about every break that counts — how a harvest can bring a pest. */
+    public interface HarvestHook {
+        void harvested(Player player, Block block, MilestoneCrop crop);
+    }
+
     private final MilestoneService milestones;
     private final PlacedBlocks placed;
     private final Map<Long, Pending> pending = new HashMap<>();
+    private HarvestHook hook = (player, block, crop) -> { };
 
     public MilestoneListener(MilestoneService milestones, PlacedBlocks placed) {
         this.milestones = milestones;
         this.placed = placed;
+    }
+
+    public void onHarvest(HarvestHook hook) {
+        this.hook = hook == null ? (player, block, crop) -> { } : hook;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -67,6 +77,7 @@ public final class MilestoneListener implements Listener {
         } else {
             milestones.record(player, crop, (long) crop.points() * (1 + stacked));
         }
+        hook.harvested(player, block, crop);
     }
 
     private int stackedAbove(Block block, MilestoneCrop crop) {

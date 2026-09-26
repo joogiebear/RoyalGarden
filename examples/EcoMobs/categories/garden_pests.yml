@@ -1,0 +1,7 @@
+# Garden pests — an EcoMobs category. Copy to plugins/EcoMobs/categories/garden_pests.yml.
+# RoyalGarden spawns pests itself (pests.yml), so EcoMobs never spawns them
+# naturally, and they stay until killed.
+spawning:
+  type: none
+
+persistent: true
