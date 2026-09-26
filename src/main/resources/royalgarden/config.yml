@@ -235,6 +235,16 @@ menu:
         - "&7and the tiers it has earned."
         - ""
         - "&eClick to view."
+    # Opens the Crop Upgrades page (upgrades.yml).
+    upgrades:
+      column: 4
+      material: anvil
+      name: "&aCrop Upgrades"
+      lore:
+        - "&7Spend Copper to upgrade"
+        - "&7each of your crops."
+        - ""
+        - "&eClick to view."
     # Opens the Visitors page (visitors.yml).
     visitors:
       column: 7

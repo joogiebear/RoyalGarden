@@ -112,6 +112,18 @@ visitor-check-yes: "&a✔"
 visitor-check-no: "&c✘"
 level-source-visitor: "visitor"
 
+# ── Crop Upgrades ────────────────────────────────────────────────────────────
+# Placeholders: %crop% %crop_name% %level% %level_roman% %max_level% %value%
+#               %next_value% %next_cost% %player%
+# Also %cost% (what was paid).
+upgrade-bought: "&aUpgraded &f%crop_name%&a to level &e%level%&a for %cost%&a."
+upgrade-cannot-afford: "&cThe next %crop_name% upgrade costs %next_cost%&c."
+upgrade-maxed-message: "&7%crop_name% is fully upgraded."
+upgrade-maxed: "&6Maxed"
+upgrade-unreadable: "&cYour crop upgrades could not be read. Please contact staff — nothing has been lost."
+upgrades-disabled: "&cCrop upgrades are switched off."
+level-source-upgrade: "crop upgrade"
+
 # ── Protection (shown in the action bar) ─────────────────────────────────────
 # %plot%
 deny-locked: "&cPlot %plot% is locked. Open the desk to unlock it."
@@ -122,7 +134,7 @@ deny-visitor: "&cThis is not your Garden."
 
 # ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats"
+admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -146,7 +158,7 @@ admin-presets-header: "&aPresets:"
 admin-presets-line: "&f  %preset%%flags%"
 admin-presets-default: " &e(default)"
 admin-presets-selectable: " &b(players)"
-admin-reloaded: "&aReloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml and visitors.yml."
+admin-reloaded: "&aReloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, visitors.yml and upgrades.yml."
 # %player%
 admin-unknown-player: "&cNo player called %player% has played here."
 admin-no-garden: "&c%player% has no Garden yet."
@@ -176,4 +188,8 @@ admin-visitor-cleared: "&aSent all of %player%'s visitors away."
 admin-visitor-reset: "&aReset %player%'s visitor stats."
 # %player% %served% %refused% %unique% %total_visitors% %copper_earned% %waiting% %max_queue% %next%
 admin-visitor-stats: "&a%player%&7: served %served% (%unique%/%total_visitors% different), refused %refused%, %copper_earned% Copper earned. Waiting: %waiting%/%max_queue%, next in %next%."
-console-help: "&7From the console: garden xp|level|milestone|visitor|reset|unlock|lock|info|reload …"
+admin-upgrade-usage: "&c/garden upgrade <player> <crop> <level>  — or —  /garden upgrade <player> reset"
+# upgrade placeholders + %player%
+admin-upgrade-set: "&aSet %player%'s %crop_name% upgrade to level %level%. Nothing was charged."
+admin-upgrade-reset: "&aReset all of %player%'s crop upgrades."
+console-help: "&7From the console: garden xp|level|milestone|visitor|upgrade|reset|unlock|lock|info|reload …"

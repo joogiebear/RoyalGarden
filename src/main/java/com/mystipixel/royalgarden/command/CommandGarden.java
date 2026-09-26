@@ -10,6 +10,8 @@ import com.mystipixel.royalgarden.level.GardenLevels;
 import com.mystipixel.royalgarden.milestone.MilestoneCrop;
 import com.mystipixel.royalgarden.milestone.MilestoneMenu;
 import com.mystipixel.royalgarden.milestone.MilestoneService;
+import com.mystipixel.royalgarden.upgrade.UpgradeMenu;
+import com.mystipixel.royalgarden.upgrade.UpgradeService;
 import com.mystipixel.royalgarden.visitor.Offer;
 import com.mystipixel.royalgarden.visitor.VisitorMenu;
 import com.mystipixel.royalgarden.visitor.VisitorService;
@@ -60,7 +62,7 @@ public final class CommandGarden extends PluginCommand {
 
     private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
             "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info", "milestones", "milestone",
-            "xp", "level", "visitors", "visitor");
+            "xp", "level", "visitors", "visitor", "upgrades", "upgrade");
 
     private final GardenWorlds worlds;
     private final Messages messages;
@@ -71,6 +73,8 @@ public final class CommandGarden extends PluginCommand {
     private GardenLevels levels;
     private VisitorService visitors;
     private VisitorMenu visitorMenu;
+    private UpgradeService upgrades;
+    private UpgradeMenu upgradeMenu;
 
     public CommandGarden(EcoPlugin plugin, String name, GardenWorlds worlds, Messages messages,
                          Runnable reload, Supplier<Location> evacuateTo) {
@@ -99,6 +103,12 @@ public final class CommandGarden extends PluginCommand {
         this.visitorMenu = menu;
     }
 
+    /** Give the command its Crop Upgrades subcommands. */
+    public void setUpgrades(UpgradeService service, UpgradeMenu menu) {
+        this.upgrades = service;
+        this.upgradeMenu = menu;
+    }
+
     /**
      * The console's way in. Players are handled by {@link #onExecute(Player, List)}; from the console
      * only the admin tools that need no player to stand anywhere are available — the ones other plugins
@@ -116,6 +126,7 @@ public final class CommandGarden extends PluginCommand {
             case "level" -> showLevel(sender, arg);
             case "milestone" -> setMilestone(sender, args);
             case "visitor" -> visitor(sender, args);
+            case "upgrade" -> upgrade(sender, args);
             case "reset" -> reset(sender, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
             case "unlock", "lock" -> setLock(sender, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
             case "info" -> info(sender, arg);
@@ -144,6 +155,10 @@ public final class CommandGarden extends PluginCommand {
             milestoneMenu.open(player, player.getUniqueId(), player.getName());
             return;
         }
+        if (args.get(0).equalsIgnoreCase("upgrades") && upgradeMenu != null) {
+            upgradeMenu.open(player);
+            return;
+        }
         if (args.get(0).equalsIgnoreCase("visitors") && visitorMenu != null) {
             if (args.size() > 1 && args.get(1).equalsIgnoreCase("log")) {
                 visitorMenu.openLog(player, 1);
@@ -165,7 +180,7 @@ public final class CommandGarden extends PluginCommand {
                 return List.of();
             }
             String typed = args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT);
-            List<String> own = new ArrayList<>(List.of("milestones", "level", "visitors"));
+            List<String> own = new ArrayList<>(List.of("milestones", "level", "visitors", "upgrades"));
             own.removeIf(option -> !option.startsWith(typed));
             return own;
         }
@@ -184,7 +199,7 @@ public final class CommandGarden extends PluginCommand {
                         }
                     }
                     case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone", "xp", "level",
-                         "visitor" -> {
+                         "visitor", "upgrade" -> {
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             options.add(online.getName());
                         }
@@ -210,6 +225,11 @@ public final class CommandGarden extends PluginCommand {
                     options.addAll(List.of("give", "take", "set"));
                 } else if (verb.equals("visitor")) {
                     options.addAll(List.of("add", "clear", "stats", "reset-stats"));
+                } else if (verb.equals("upgrade") && upgrades != null) {
+                    for (MilestoneCrop crop : upgrades.crops()) {
+                        options.add(crop.id());
+                    }
+                    options.add("reset");
                 } else if (verb.equals("milestone") && milestones != null) {
                     for (MilestoneCrop crop : milestones.config().crops()) {
                         options.add(crop.id());
@@ -275,6 +295,7 @@ public final class CommandGarden extends PluginCommand {
             case "xp" -> xp(player, args);
             case "level" -> showLevel(player, arg);
             case "visitor" -> visitor(player, args);
+            case "upgrade" -> upgrade(player, args);
             default -> messages.send(player, "admin-help");
         }
     }
@@ -573,6 +594,49 @@ public final class CommandGarden extends PluginCommand {
         }
         if (!target.isOnline()) {
             visitors.store().unload(owner);              // looked up for this command only
+        }
+    }
+
+    /**
+     * {@code /garden upgrade <player> <crop> <level>} sets a crop's upgrade level; {@code /garden upgrade
+     * <player> reset} clears them all. Neither charges nor pays anything — they are corrections.
+     */
+    private void upgrade(CommandSender sender, List<String> args) {
+        if (upgrades == null || args.size() < 3) {
+            messages.send(sender, "admin-upgrade-usage");
+            return;
+        }
+        OfflinePlayer target = target(sender, args.get(1));
+        if (target == null) {
+            return;
+        }
+        UUID owner = target.getUniqueId();
+        String who = target.getName() == null ? args.get(1) : target.getName();
+        if (args.get(2).equalsIgnoreCase("reset")) {
+            for (MilestoneCrop crop : upgrades.crops()) {
+                upgrades.set(owner, crop, 0);
+            }
+            messages.send(sender, "admin-upgrade-reset", "%player%", who);
+        } else {
+            MilestoneCrop crop = upgrades.crop(args.get(2));
+            int level;
+            try {
+                level = Integer.parseInt(args.size() > 3 ? args.get(3) : "");
+            } catch (NumberFormatException notANumber) {
+                level = -1;
+            }
+            if (crop == null || level < 0) {
+                messages.send(sender, "admin-upgrade-usage");
+                return;
+            }
+            if (!upgrades.set(owner, crop, level)) {
+                messages.send(sender, "upgrade-unreadable");
+                return;
+            }
+            messages.send(sender, "admin-upgrade-set", withPlayer(upgrades.placeholders(owner, crop), who));
+        }
+        if (!target.isOnline()) {
+            upgrades.store().unload(owner);              // looked up for this command only
         }
     }
 
