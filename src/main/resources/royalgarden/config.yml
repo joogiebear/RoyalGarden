@@ -245,6 +245,16 @@ menu:
         - "&7each of your crops."
         - ""
         - "&eClick to view."
+    # Opens the Composter (composter.yml).
+    composter:
+      column: 6
+      material: composter
+      name: "&aComposter"
+      lore:
+        - "&7Turn crops and fuel"
+        - "&7into Compost over time."
+        - ""
+        - "&eClick to open."
     # Opens the Visitors page (visitors.yml).
     visitors:
       column: 7

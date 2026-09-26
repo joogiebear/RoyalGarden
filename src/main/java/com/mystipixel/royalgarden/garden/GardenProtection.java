@@ -74,11 +74,20 @@ public final class GardenProtection implements Listener {
     private final GardenWorlds worlds;
     private final GardenConfig config;
     private final Messages messages;
+    private java.util.function.Predicate<Block> machines = block -> false;
 
     public GardenProtection(GardenWorlds worlds, GardenConfig config, Messages messages) {
         this.worlds = worlds;
         this.config = config;
         this.messages = messages;
+    }
+
+    /**
+     * Blocks another listener opens on right-click, such as the Composter. Right-clicks on them are left
+     * to it: it cancels the vanilla use itself, and a refusal here would talk over its menu.
+     */
+    public void setMachines(java.util.function.Predicate<Block> machines) {
+        this.machines = machines == null ? block -> false : machines;
     }
 
     // ── the rules ──────────────────────────────────────────────────────────────
@@ -308,7 +317,7 @@ public final class GardenProtection implements Listener {
             }
             return;
         }
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || machines.test(block)) {
             return;
         }
         boolean allowed = config.interactAllowed().contains(block.getType());

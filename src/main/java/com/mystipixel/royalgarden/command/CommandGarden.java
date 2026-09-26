@@ -1,5 +1,7 @@
 package com.mystipixel.royalgarden.command;
 
+import com.mystipixel.royalgarden.composter.ComposterMenu;
+import com.mystipixel.royalgarden.composter.ComposterService;
 import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalgarden.garden.GardenBuilder;
 import com.mystipixel.royalgarden.garden.GardenLayout;
@@ -62,7 +64,7 @@ public final class CommandGarden extends PluginCommand {
 
     private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
             "delete", "presets", "reload", "reset", "unlock", "lock", "visit", "info", "milestones", "milestone",
-            "xp", "level", "visitors", "visitor", "upgrades", "upgrade");
+            "xp", "level", "visitors", "visitor", "upgrades", "upgrade", "composter");
 
     private final GardenWorlds worlds;
     private final Messages messages;
@@ -75,6 +77,8 @@ public final class CommandGarden extends PluginCommand {
     private VisitorMenu visitorMenu;
     private UpgradeService upgrades;
     private UpgradeMenu upgradeMenu;
+    private ComposterService composter;
+    private ComposterMenu composterMenu;
 
     public CommandGarden(EcoPlugin plugin, String name, GardenWorlds worlds, Messages messages,
                          Runnable reload, Supplier<Location> evacuateTo) {
@@ -109,6 +113,12 @@ public final class CommandGarden extends PluginCommand {
         this.upgradeMenu = menu;
     }
 
+    /** Give the command its Composter subcommands. */
+    public void setComposter(ComposterService service, ComposterMenu menu) {
+        this.composter = service;
+        this.composterMenu = menu;
+    }
+
     /**
      * The console's way in. Players are handled by {@link #onExecute(Player, List)}; from the console
      * only the admin tools that need no player to stand anywhere are available — the ones other plugins
@@ -127,6 +137,7 @@ public final class CommandGarden extends PluginCommand {
             case "milestone" -> setMilestone(sender, args);
             case "visitor" -> visitor(sender, args);
             case "upgrade" -> upgrade(sender, args);
+            case "composter" -> composter(sender, args);
             case "reset" -> reset(sender, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
             case "unlock", "lock" -> setLock(sender, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
             case "info" -> info(sender, arg);
@@ -159,6 +170,12 @@ public final class CommandGarden extends PluginCommand {
             upgradeMenu.open(player);
             return;
         }
+        // Their own Composter; with a name it is the admin tool.
+        if (args.get(0).equalsIgnoreCase("composter") && composterMenu != null
+                && (args.size() == 1 || !player.hasPermission(ADMIN))) {
+            composterMenu.open(player);
+            return;
+        }
         if (args.get(0).equalsIgnoreCase("visitors") && visitorMenu != null) {
             if (args.size() > 1 && args.get(1).equalsIgnoreCase("log")) {
                 visitorMenu.openLog(player, 1);
@@ -180,7 +197,7 @@ public final class CommandGarden extends PluginCommand {
                 return List.of();
             }
             String typed = args.isEmpty() ? "" : args.get(0).toLowerCase(Locale.ROOT);
-            List<String> own = new ArrayList<>(List.of("milestones", "level", "visitors", "upgrades"));
+            List<String> own = new ArrayList<>(List.of("milestones", "level", "visitors", "upgrades", "composter"));
             own.removeIf(option -> !option.startsWith(typed));
             return own;
         }
@@ -199,7 +216,7 @@ public final class CommandGarden extends PluginCommand {
                         }
                     }
                     case "reset", "unlock", "lock", "visit", "info", "milestones", "milestone", "xp", "level",
-                         "visitor", "upgrade" -> {
+                         "visitor", "upgrade", "composter" -> {
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             options.add(online.getName());
                         }
@@ -225,6 +242,8 @@ public final class CommandGarden extends PluginCommand {
                     options.addAll(List.of("give", "take", "set"));
                 } else if (verb.equals("visitor")) {
                     options.addAll(List.of("add", "clear", "stats", "reset-stats"));
+                } else if (verb.equals("composter")) {
+                    options.addAll(List.of("give-matter", "give-fuel", "collect", "reset"));
                 } else if (verb.equals("upgrade") && upgrades != null) {
                     for (MilestoneCrop crop : upgrades.crops()) {
                         options.add(crop.id());
@@ -296,6 +315,7 @@ public final class CommandGarden extends PluginCommand {
             case "level" -> showLevel(player, arg);
             case "visitor" -> visitor(player, args);
             case "upgrade" -> upgrade(player, args);
+            case "composter" -> composter(player, args);
             default -> messages.send(player, "admin-help");
         }
     }
@@ -637,6 +657,62 @@ public final class CommandGarden extends PluginCommand {
         }
         if (!target.isOnline()) {
             upgrades.store().unload(owner);              // looked up for this command only
+        }
+    }
+
+    /**
+     * {@code /garden composter <player> give-matter|give-fuel <amount>} fills a Composter (up to its
+     * capacity), {@code collect} collects it into the player's inventory (they must be online), and
+     * {@code reset} empties it and forgets its upgrades. None of them charges anything.
+     */
+    private void composter(CommandSender sender, List<String> args) {
+        if (composter == null || args.size() < 3) {
+            messages.send(sender, "admin-composter-usage");
+            return;
+        }
+        OfflinePlayer target = target(sender, args.get(1));
+        if (target == null) {
+            return;
+        }
+        UUID owner = target.getUniqueId();
+        String who = target.getName() == null ? args.get(1) : target.getName();
+        String action = args.get(2).toLowerCase(Locale.ROOT);
+        switch (action) {
+            case "give-matter", "give-fuel" -> {
+                double amount;
+                try {
+                    amount = Double.parseDouble(args.size() > 3 ? args.get(3).replace(",", "").replace("_", "") : "");
+                } catch (NumberFormatException notANumber) {
+                    messages.send(sender, "admin-composter-usage");
+                    return;
+                }
+                ComposterService.Kind kind = action.equals("give-matter")
+                        ? ComposterService.Kind.MATTER : ComposterService.Kind.FUEL;
+                double added = composter.give(owner, kind, amount);
+                if (added < 0) {
+                    messages.send(sender, "composter-unreadable");
+                } else {
+                    messages.send(sender, "admin-composter-given", withPlayer(composter.placeholders(owner), who));
+                }
+            }
+            case "collect" -> {
+                Player online = target.getPlayer();
+                if (online == null) {
+                    messages.send(sender, "admin-composter-offline", "%player%", who);
+                    return;
+                }
+                if (composter.collect(online)) {
+                    messages.send(sender, "admin-composter-collected", "%player%", who);
+                }
+            }
+            case "reset" -> {
+                composter.reset(owner);
+                messages.send(sender, "admin-composter-reset", "%player%", who);
+            }
+            default -> messages.send(sender, "admin-composter-usage");
+        }
+        if (!target.isOnline()) {
+            composter.store().unload(owner);             // looked up for this command only
         }
     }
 

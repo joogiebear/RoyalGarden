@@ -149,6 +149,7 @@ reloaded with `/garden reload` (or RoyalSkyblock's own reload):
 | `levels.yml` | Garden Levels: XP curve, XP sources, level rewards |
 | `milestones.yml` | Crop Milestones: crops, tier curves, rewards, the milestones menu |
 | `upgrades.yml` | Crop Upgrades: level costs, the libreforge effects each level grants, rewards, the menu |
+| `composter.yml` | the Composter: organic matter and fuel values, Compost timing and caps, output, upgrades, rewards, the barn block, the menu |
 | `visitors.yml` | Visitors: arrival timing, rarities, visitors and their requests, rewards, Copper, SkyMart, where they stand, the menus |
 | `messages.yml` | every player-facing line (`&` codes, `&#rrggbb` hex; `""` switches a message off) |
 | `presets.yml` | which captured presets players may choose, with name, icon, cost, cooldown and permission; and the default preset new Gardens generate from |
@@ -197,7 +198,7 @@ things: `garden-level:` on a plot's unlock terms (`default`, `by-count`, `by-plo
 run `/garden level <player>` and `/garden xp <player> give|take|set <amount>` (`take` and `set` pay
 nothing). XP is saved with the Garden, so `/garden reset` clears it too.
 
-The console can also run `/garden xp`, `level`, `milestone`, `visitor`, `upgrade`, `reset`, `unlock`, `lock`,
+The console can also run `/garden xp`, `level`, `milestone`, `visitor`, `upgrade`, `composter`, `reset`, `unlock`, `lock`,
 `info` and `reload`.
 
 ### Visitors and Copper
@@ -277,6 +278,46 @@ blocks such as pumpkins unless they are on its whitelist.
 Placeholders: `%royalgarden_upgrade_<crop>_level%` and `%royalgarden_upgrade_<crop>_value%`. Admins:
 `/garden upgrade <player> <crop> <level>` or `/garden upgrade <player> reset` (nothing is charged).
 
+### The Composter
+
+`composter.yml` gives every player a Composter that turns **organic matter** (crops) and **fuel** into
+**Compost** over time. It makes one Compost every `compost.time` (10 minutes by default) while it
+holds `compost.organic-matter` and `compost.fuel` for one and has room to keep it (`compost.max-stored`),
+using them as each Compost finishes. It keeps working while the player is offline or their Garden is
+unloaded: nothing ticks for them, and the Composter catches up from its saved `last-tick` the next
+time it is opened, clicked or read. While it is out of matter or fuel, or full, the clock stops, so
+refilling it starts a fresh Compost rather than paying out the time it sat empty.
+
+Organic matter is every crop's drops from `milestones.yml`, at `organic-matter.crop-value` each or a
+per-crop value under `organic-matter.crops`, plus anything in `organic-matter.items`
+(`"<item> <value>"`, any eco lookup, so `ecoitems:enchanted_wheat 160` works and is matched before
+plain wheat). Fuel is `fuel.items` in the same form. Both are held up to a cap.
+
+Open it by right-clicking the composter in the barn (`block:` — by default one the barn already has,
+on its east side; it is marked in the chunk so the other composters stay scenery, and put back if it
+goes missing), the **Composter** button on the desk, or `/garden composter`. Left-click the matter or
+fuel icon to put in one stack, right-click to put in everything that counts. Collecting gives
+`output.item` (bone meal by default; `examples/EcoItems/items/compost.yml` is a Compost item that
+grows crops when used on them — set `output.item: ecoitems:compost`), runs `output.commands`, pays
+`garden-xp.per-compost` and `rewards.collect`. What does not fit in the inventory stays in the
+Composter.
+
+**Upgrades** are bought in the menu with any host currency (Copper by default): `speed` (+% speed),
+`multi-drop` (+% chance of a bonus Compost that uses nothing), `matter-cap` and `fuel-cap` (more
+storage) and `cost-reduction` (-% matter and fuel per Compost). Each has its own `costs` (one per
+level), `per-level` and icons. They are properties of the machine rather than player buffs, so they
+are plain numbers here rather than libreforge effects. Buying one pays `garden-xp.upgrade` and
+`rewards.upgrade`. A Composter belongs to the player, like crop upgrades, so `/garden reset` keeps it.
+
+Data is in `composter/<uuid>.yml`, written on every change. Placeholders:
+`%royalgarden_composter_matter%`, `_fuel`, `_stored`, `_next` (time to the next Compost, blank while
+stopped), `_matter_cap`, `_fuel_cap`, `_made` and `%royalgarden_composter_<upgrade>_level%`
+(`speed`, `multi_drop`, `matter_cap`, `fuel_cap`, `cost_reduction`). They are projected to the
+current moment for offline players too, without bonus Compost, which is only rolled when the
+Composter is actually caught up. Admins: `/garden composter <player> give-matter|give-fuel <amount>`,
+`collect` (into their inventory, so they must be online) and `reset` (empties it and forgets its
+upgrades; the file is moved aside). The console can run it too.
+
 ### Permissions
 
 | Node | Default | |
@@ -294,7 +335,8 @@ Placeholders: `%royalgarden_upgrade_<crop>_level%` and `%royalgarden_upgrade_<cr
 `reload` · `reset <player> [world]` · `unlock <player> <plot>` · `lock <player> <plot>` ·
 `visit <player>` · `info <player>` · `milestones <player>` · `milestone <player> <crop> <amount>|reset` ·
 `level <player>` · `xp <player> give|take|set <amount>` ·
-`visitor <player> add [visitor]|clear|stats|reset-stats` · `upgrade <player> <crop> <level>|reset`
+`visitor <player> add [visitor]|clear|stats|reset-stats` · `upgrade <player> <crop> <level>|reset` ·
+`composter <player> give-matter|give-fuel <amount>|collect|reset`
 
 `reset` forgets a player's unlocks and presets (the state file is moved aside, not deleted); with
 `world` it also deletes their Garden world so the next `/garden` builds a fresh one — the contest reset.

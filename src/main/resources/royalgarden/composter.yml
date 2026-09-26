@@ -1,0 +1,327 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  RoyalGarden  ·  composter.yml  —  the Composter
+# ═══════════════════════════════════════════════════════════════════════════════
+#  The Composter turns ORGANIC MATTER (crops) and FUEL into Compost over time.
+#  Feed it at the composter in the barn, the Composter button on the desk, or
+#  /garden composter. It makes one Compost every `compost.time` while it holds
+#  enough of both and has room, and it keeps working while its owner is
+#  offline or their Garden is unloaded — it catches up when next opened.
+#
+#  Its upgrades are machine properties (how fast it works, how much it holds),
+#  bought with Copper. They are not player buffs, so they are plain numbers
+#  here rather than libreforge effects.
+#
+#  Reload with /garden reload.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+enabled: true
+
+# ── Organic matter ─────────────────────────────────────────────────────────────
+# What each item is worth when put in.
+organic-matter:
+  # Every crop's drops from milestones.yml count, at crop-value each unless
+  # crops.<crop id> says otherwise.
+  from-crops: true
+  crop-value: 1
+  crops:
+    melon: 0.25
+    pumpkin: 4
+    mushroom: 2
+    cactus: 2
+    sugar_cane: 1
+    nether_wart: 1
+  # Any other item, or a different value for one: "<item> <value>". Items are
+  # eco lookups, so EcoItems work (ecoitems:enchanted_wheat 160). These are
+  # checked before the crops, so a custom item made from wheat is not taken
+  # as wheat.
+  items:
+    - hay_block 9
+    - melon 2.25
+    - dried_kelp 0.5
+    - sweet_berries 0.5
+  #  - ecoitems:enchanted_wheat 160
+
+# ── Fuel ───────────────────────────────────────────────────────────────────────
+# "<item> <value>", as above.
+fuel:
+  items:
+    - coal 50
+    - charcoal 50
+    - coal_block 450
+    - dried_kelp_block 80
+    - blaze_rod 120
+
+# ── Making Compost ─────────────────────────────────────────────────────────────
+compost:
+  # Time per Compost: 10m, 1h30m, 45s…
+  time: 10m
+  # Organic matter and fuel used per Compost.
+  organic-matter: 160
+  fuel: 100
+  # How much organic matter and fuel it holds before upgrades.
+  max-organic-matter: 20000
+  max-fuel: 10000
+  # Finished Compost it holds before it stops; 0 for no limit.
+  max-stored: 1000
+  # How often online players' Composters are caught up, in seconds (menus and
+  # placeholders always show them up to date).
+  check-every-seconds: 30
+  # Tell a player when their Composter stops (out of matter, out of fuel, full).
+  notify-stopped: true
+
+# ── Compost ────────────────────────────────────────────────────────────────────
+output:
+  # What collecting gives: any eco item lookup, e.g. ecoitems:compost (see
+  # examples/EcoItems/). Leave blank ("") to give nothing and only run
+  # `commands`.
+  item: bone_meal
+  # What menus and messages call it.
+  name: "Compost"
+  # Console commands run on collecting. %amount% (with separators),
+  # %amount_raw%, and the Composter placeholders below.
+  commands: []
+  #  - "ecobits givesilent %player% compost %amount_raw%"
+
+# ── Rewards ────────────────────────────────────────────────────────────────────
+garden-xp:
+  # Garden XP per Compost collected.
+  per-compost: 2
+  # Garden XP for buying an upgrade level: base + per-level × the level bought.
+  upgrade:
+    base: 5
+    per-level: 5
+# Commands and messages. `collect` has %amount%; `upgrade` has the upgrade
+# placeholders below plus %cost%.
+rewards:
+  collect:
+    commands: []
+    messages: []
+  upgrade:
+    commands: []
+    messages: []
+
+# ── Upgrades ───────────────────────────────────────────────────────────────────
+# One entry per level in `costs` (any currency from RoyalSkyblock's
+# `currencies:` — Copper must be added there, see examples/RoyalSkyblock/).
+# `per-level` is what one level adds:
+#   speed           +% speed      (100 = twice as fast)
+#   multi-drop      +% chance of a bonus Compost that uses nothing
+#   matter-cap      + organic matter it holds
+#   fuel-cap        + fuel it holds
+#   cost-reduction  -% organic matter and fuel per Compost
+# `enabled: false` removes one. Icons: row/column in the menu, and icon-maxed
+# at the top level.
+# Placeholders: %upgrade_name% %level% %level_roman% %max_level% %value%
+#               %next_value% %next_cost%, plus the Composter ones.
+upgrades:
+  speed:
+    name: "Composter Speed"
+    per-level: 20
+    costs: [10 copper, 25 copper, 50 copper, 100 copper, 200 copper, 400 copper, 800 copper, 1500 copper, 2500 copper, 4000 copper]
+    icon:
+      row: 5
+      column: 3
+      material: clock
+      name: "&a%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Level &e%level%&7/&e%max_level%"
+        - "&7Speed: &a+%value%% &8→ &a+%next_value%%"
+        - "&7One Compost every &f%time%"
+        - ""
+        - "&7Next level: %next_cost%"
+        - "&eClick to upgrade!"
+    icon-maxed:
+      row: 5
+      column: 3
+      material: clock
+      name: "&6%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Speed: &a+%value%%"
+        - "&7One Compost every &f%time%"
+        - ""
+        - "&6Maxed!"
+  multi-drop:
+    name: "Multi Drop"
+    per-level: 3
+    costs: [10 copper, 25 copper, 50 copper, 100 copper, 200 copper, 400 copper, 800 copper, 1500 copper, 2500 copper, 4000 copper]
+    icon:
+      row: 5
+      column: 4
+      material: bone_meal
+      name: "&a%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Level &e%level%&7/&e%max_level%"
+        - "&7Bonus Compost chance: &a%value%% &8→ &a%next_value%%"
+        - ""
+        - "&7Next level: %next_cost%"
+        - "&eClick to upgrade!"
+    icon-maxed:
+      row: 5
+      column: 4
+      material: bone_meal
+      name: "&6%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Bonus Compost chance: &a%value%%"
+        - ""
+        - "&6Maxed!"
+  matter-cap:
+    name: "Organic Matter Cap"
+    per-level: 5000
+    costs: [10 copper, 25 copper, 50 copper, 100 copper, 200 copper, 400 copper, 800 copper, 1500 copper, 2500 copper, 4000 copper]
+    icon:
+      row: 5
+      column: 5
+      material: hay_block
+      name: "&a%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Level &e%level%&7/&e%max_level%"
+        - "&7Holds &a%matter_cap% &7organic matter"
+        - "&7Next level: &a+%next_value% &7in total"
+        - ""
+        - "&7Next level: %next_cost%"
+        - "&eClick to upgrade!"
+    icon-maxed:
+      row: 5
+      column: 5
+      material: hay_block
+      name: "&6%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Holds &a%matter_cap% &7organic matter"
+        - ""
+        - "&6Maxed!"
+  fuel-cap:
+    name: "Fuel Cap"
+    per-level: 2000
+    costs: [10 copper, 25 copper, 50 copper, 100 copper, 200 copper, 400 copper, 800 copper, 1500 copper, 2500 copper, 4000 copper]
+    icon:
+      row: 5
+      column: 6
+      material: coal_block
+      name: "&a%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Level &e%level%&7/&e%max_level%"
+        - "&7Holds &a%fuel_cap% &7fuel"
+        - "&7Next level: &a+%next_value% &7in total"
+        - ""
+        - "&7Next level: %next_cost%"
+        - "&eClick to upgrade!"
+    icon-maxed:
+      row: 5
+      column: 6
+      material: coal_block
+      name: "&6%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Holds &a%fuel_cap% &7fuel"
+        - ""
+        - "&6Maxed!"
+  cost-reduction:
+    name: "Cost Reduction"
+    per-level: 1
+    costs: [10 copper, 25 copper, 50 copper, 100 copper, 200 copper, 400 copper, 800 copper, 1500 copper, 2500 copper, 4000 copper]
+    icon:
+      row: 5
+      column: 7
+      material: emerald
+      name: "&a%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Level &e%level%&7/&e%max_level%"
+        - "&7Costs &a-%value%% &8→ &a-%next_value%%"
+        - "&7Per Compost: &f%matter_cost% &7matter, &f%fuel_cost% &7fuel"
+        - ""
+        - "&7Next level: %next_cost%"
+        - "&eClick to upgrade!"
+    icon-maxed:
+      row: 5
+      column: 7
+      material: emerald
+      name: "&6%upgrade_name% &7%level_roman%"
+      lore:
+        - "&7Costs &a-%value%%"
+        - "&7Per Compost: &f%matter_cost% &7matter, &f%fuel_cost% &7fuel"
+        - ""
+        - "&6Maxed!"
+
+# ── The block in the barn ──────────────────────────────────────────────────────
+# Right-click it to open the Composter. x and z are world coordinates, y is
+# the height above the plot surface. The default is one of the composters the
+# barn already has, on its east side. It is marked in the chunk, so the barn's
+# other composters stay scenery; with place: true it is put back if missing.
+block:
+  enabled: true
+  material: composter
+  place: true
+  x: 6
+  y: 1
+  z: -1
+
+sounds:
+  insert: "block.composter.fill"
+  collect: "entity.item.pickup"
+  upgrade: "block.anvil.use"
+
+# ── The menu ───────────────────────────────────────────────────────────────────
+# Placeholders everywhere below: %matter% %matter_cap% %matter_percent%
+#   %matter_bar% %fuel% %fuel_cap% %fuel_percent% %fuel_bar% %stored%
+#   %max_stored% %status% %next% %time% %matter_cost% %fuel_cost%
+#   %bonus_chance% %made% %collected% %compost% %player%
+progress-bar:
+  length: 20
+  filled: "&a|"
+  empty: "&7|"
+menu:
+  title: "&8Composter"
+  rows: 6
+  filler: black_stained_glass_pane
+  matter:
+    row: 2
+    column: 3
+    material: wheat
+    name: "&aOrganic Matter"
+    lore:
+      - "%matter_bar%"
+      - "&f%matter% &7/ &f%matter_cap% &8(%matter_percent%%)"
+      - ""
+      - "&7Crops go in here. Each Compost"
+      - "&7uses &f%matter_cost%&7."
+      - ""
+      - "&eLeft-click to put in a stack."
+      - "&eRight-click to put in everything."
+  fuel:
+    row: 2
+    column: 7
+    material: coal
+    name: "&6Fuel"
+    lore:
+      - "%fuel_bar%"
+      - "&f%fuel% &7/ &f%fuel_cap% &8(%fuel_percent%%)"
+      - ""
+      - "&7Each Compost uses &f%fuel_cost%&7."
+      - ""
+      - "&eLeft-click to put in a stack."
+      - "&eRight-click to put in everything."
+  status:
+    row: 2
+    column: 5
+    material: composter
+    name: "&aComposter"
+    lore:
+      - "%status%"
+      - "&7Next %compost%: &f%next%"
+      - "&7One every &f%time%"
+      - "&7Bonus chance: &f%bonus_chance%%"
+      - ""
+      - "&7Made so far: &f%made%"
+  collect:
+    row: 3
+    column: 5
+    material: bone_meal
+    name: "&aCollect %compost%"
+    lore:
+      - "&7Waiting: &f%stored%&7/&f%max_stored%"
+      - ""
+      - "&eClick to collect!"
+  back:
+    row: 6
+    column: 5
+    material: arrow
+    name: "&7Back to the desk"

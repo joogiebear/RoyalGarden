@@ -124,6 +124,46 @@ upgrade-unreadable: "&cYour crop upgrades could not be read. Please contact staf
 upgrades-disabled: "&cCrop upgrades are switched off."
 level-source-upgrade: "crop upgrade"
 
+# ── The Composter ────────────────────────────────────────────────────────────
+# Placeholders: %matter% %matter_cap% %matter_percent% %fuel% %fuel_cap%
+#               %fuel_percent% %stored% %max_stored% %status% %next% %time%
+#               %matter_cost% %fuel_cost% %bonus_chance% %made% %collected%
+#               %compost% %player%
+# %tank% %items% %added%
+composter-inserted: "&aPut &f%items%&a items in: &f+%added% %tank%&a. &7(%matter% matter, %fuel% fuel)"
+# %tank%
+composter-tank-full: "&cThe Composter's %tank% is full."
+composter-nothing-to-insert: "&7You have nothing that counts as %tank%."
+composter-matter-name: "organic matter"
+composter-fuel-name: "fuel"
+# %amount%
+composter-collected: "&aCollected &f%amount% %compost%&a."
+composter-collected-some: "&aCollected &f%amount% %compost%&a — your inventory is full, the rest is still in the Composter."
+composter-nothing-to-collect: "&7There is no %compost% to collect yet."
+composter-inventory-full: "&cYour inventory is full."
+# %item%
+composter-bad-output: "&cThe Composter makes '%item%', which does not exist here. Please tell staff."
+composter-save-failed: "&cThe Composter could not be saved, so nothing was changed. Please tell staff."
+composter-unreadable: "&cYour Composter could not be read. Please contact staff — nothing has been lost."
+composter-disabled: "&cThe Composter is switched off."
+composter-not-yours: "&cThis Composter belongs to the Garden's owner."
+composter-stopped-no-matter: "&eYour Composter has run out of organic matter."
+composter-stopped-no-fuel: "&eYour Composter has run out of fuel."
+composter-stopped-full: "&eYour Composter is full — collect your %compost%."
+composter-status-running: "&aComposting…"
+composter-status-no-matter: "&cNeeds organic matter"
+composter-status-no-fuel: "&cNeeds fuel"
+composter-status-full: "&6Full — collect it!"
+composter-next-stopped: "&7stopped"
+composter-no-limit: "∞"
+# Upgrades: %upgrade_name% %level% %level_roman% %max_level% %value% %next_value%
+#           %next_cost%, and %cost% (what was paid) when bought.
+composter-upgrade-bought: "&aUpgraded &f%upgrade_name%&a to level &e%level%&a for %cost%&a."
+composter-upgrade-cannot-afford: "&cThe next %upgrade_name% level costs %next_cost%&c."
+composter-upgrade-maxed-message: "&7%upgrade_name% is fully upgraded."
+composter-upgrade-maxed: "&6Maxed"
+level-source-composter: "Composter"
+
 # ── Protection (shown in the action bar) ─────────────────────────────────────
 # %plot%
 deny-locked: "&cPlot %plot% is locked. Open the desk to unlock it."
@@ -134,7 +174,7 @@ deny-visitor: "&cThis is not your Garden."
 
 # ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset"
+admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. &7/garden composter&8 — &7your Composter. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -158,7 +198,7 @@ admin-presets-header: "&aPresets:"
 admin-presets-line: "&f  %preset%%flags%"
 admin-presets-default: " &e(default)"
 admin-presets-selectable: " &b(players)"
-admin-reloaded: "&aReloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, visitors.yml and upgrades.yml."
+admin-reloaded: "&aReloaded config.yml, messages.yml, presets.yml, milestones.yml, levels.yml, visitors.yml, upgrades.yml and composter.yml."
 # %player%
 admin-unknown-player: "&cNo player called %player% has played here."
 admin-no-garden: "&c%player% has no Garden yet."
@@ -192,4 +232,11 @@ admin-upgrade-usage: "&c/garden upgrade <player> <crop> <level>  — or —  /ga
 # upgrade placeholders + %player%
 admin-upgrade-set: "&aSet %player%'s %crop_name% upgrade to level %level%. Nothing was charged."
 admin-upgrade-reset: "&aReset all of %player%'s crop upgrades."
-console-help: "&7From the console: garden xp|level|milestone|visitor|upgrade|reset|unlock|lock|info|reload …"
+admin-composter-usage: "&c/garden composter <player> give-matter <amount> | give-fuel <amount> | collect | reset"
+# Composter placeholders + %player%
+admin-composter-given: "&a%player%'s Composter now holds %matter%/%matter_cap% organic matter and %fuel%/%fuel_cap% fuel."
+# %player%
+admin-composter-collected: "&aCollected %player%'s Composter into their inventory."
+admin-composter-offline: "&c%player% must be online to collect into their inventory."
+admin-composter-reset: "&aEmptied %player%'s Composter and reset its upgrades."
+console-help: "&7From the console: garden xp|level|milestone|visitor|upgrade|composter|reset|unlock|lock|info|reload …"
