@@ -37,6 +37,7 @@ public final class GardenState {
     private final Map<Integer, int[]> clearing = new HashMap<>();
     private boolean legacyWallsCleared;
     private int barnVersion = 1;
+    private String farmhouse;
     private long xp;
     private boolean readOnly;
 
@@ -275,6 +276,18 @@ public final class GardenState {
 
     public void setBarnVersion(int version) {
         this.barnVersion = version;
+    }
+
+    /**
+     * Which {@link Farmhouse#id} the farmhouse plot was built with. Gardens from before schematics were
+     * recorded have none, and read as the built-in barn at their {@link #barnVersion}.
+     */
+    public String farmhouse() {
+        return farmhouse != null ? farmhouse : "generated-" + barnVersion;
+    }
+
+    public void setFarmhouse(String id) {
+        this.farmhouse = id;
     }
 
     public boolean legacyWallsCleared() {

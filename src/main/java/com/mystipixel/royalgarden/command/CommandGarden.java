@@ -4,6 +4,7 @@ import com.mystipixel.royalgarden.composter.ComposterMenu;
 import com.mystipixel.royalgarden.composter.ComposterService;
 import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalgarden.garden.ClearingService;
+import com.mystipixel.royalgarden.garden.Farmhouse;
 import com.mystipixel.royalgarden.garden.GardenBuilder;
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenState;
@@ -68,7 +69,7 @@ public final class CommandGarden extends PluginCommand {
     public static final String ADMIN = "royalgarden.admin";
 
     private static final List<String> VERBS = List.of("capture", "apply", "flat", "bedrock", "default",
-            "delete", "presets", "reload", "reset", "unlock", "lock", "clear", "visit", "info", "milestones", "milestone",
+            "delete", "presets", "reload", "reset", "unlock", "lock", "clear", "farmhouse", "visit", "info", "milestones", "milestone",
             "xp", "level", "visitors", "visitor", "upgrades", "upgrade", "composter", "pests");
 
     private final GardenWorlds worlds;
@@ -239,6 +240,7 @@ public final class CommandGarden extends PluginCommand {
             String verb = args.get(0).toLowerCase(Locale.ROOT);
             if (args.size() == 2) {
                 switch (verb) {
+                    case "farmhouse" -> options.addAll(List.of("set", "unset"));
                     case "apply", "default", "delete" -> {
                         options.addAll(worlds.presets().ids());
                         if (verb.equals("apply")) {
@@ -280,6 +282,8 @@ public final class CommandGarden extends PluginCommand {
                     }
                 } else if (verb.equals("reset")) {
                     options.add("world");
+                } else if (verb.equals("farmhouse")) {
+                    options.addAll(Farmhouse.SPOTS);
                 } else if (verb.equals("xp")) {
                     options.addAll(List.of("give", "take", "set"));
                 } else if (verb.equals("visitor")) {
@@ -352,6 +356,7 @@ public final class CommandGarden extends PluginCommand {
             case "reset" -> reset(player, arg, args.size() > 2 && args.get(2).equalsIgnoreCase("world"));
             case "unlock", "lock" -> setLock(player, verb.equals("unlock"), arg, args.size() > 2 ? args.get(2) : null);
             case "clear" -> clear(player, arg, args.size() > 2 ? args.get(2) : null);
+            case "farmhouse" -> farmhouse(player, args);
             case "visit" -> adminVisit(player, arg);
             case "info" -> info(player, arg);
             case "milestones" -> viewMilestones(player, arg);
@@ -515,6 +520,60 @@ public final class CommandGarden extends PluginCommand {
         String who = target.getName() == null ? name : target.getName();
         messages.send(sender, changed ? (unlock ? "admin-unlocked" : "admin-locked") : "admin-unchanged",
                 "%player%", who, "%plot%", GardenLayout.plotName(plot[0], plot[1]));
+    }
+
+    /**
+     * {@code /garden farmhouse set|unset <spot>} and {@code /garden farmhouse} to list them. A spot is taken
+     * from where the admin stands and faces; the Composter's from the block they are looking at.
+     */
+    private void farmhouse(Player player, List<String> args) {
+        String action = args.size() > 1 ? args.get(1).toLowerCase(Locale.ROOT) : "";
+        String spot = args.size() > 2 ? args.get(2).toLowerCase(Locale.ROOT) : "";
+        if (action.isEmpty()) {
+            Farmhouse farmhouse = Farmhouse.current();
+            List<String> lines = new ArrayList<>();
+            for (String name : Farmhouse.SPOTS) {
+                Farmhouse.Anchor at = farmhouse.anchor(name);
+                String source = Farmhouse.setSpots().containsKey(name) ? "set" : at != null ? "sign" : "default";
+                lines.add(name + " (" + source + (at == null ? "" : String.format(Locale.ROOT, " %.1f %.1f %.1f",
+                        at.x(), at.y(), at.z())) + ")");
+            }
+            messages.send(player, "admin-farmhouse-info", "%farmhouse%",
+                    farmhouse.isSchematic() ? farmhouse.file() : "built-in barn", "%spots%", String.join(", ", lines));
+            return;
+        }
+        if (!(action.equals("set") || action.equals("unset")) || !Farmhouse.SPOTS.contains(spot)) {
+            messages.send(player, "admin-farmhouse-usage");
+            return;
+        }
+        if (!GardenWorlds.isGarden(player.getWorld())) {
+            messages.send(player, "admin-stand-in-garden");
+            return;
+        }
+        Farmhouse.Anchor anchor = null;
+        if (action.equals("set")) {
+            if (spot.equals("composter")) {
+                org.bukkit.block.Block target = player.getTargetBlockExact(6);
+                if (target == null) {
+                    messages.send(player, "admin-farmhouse-look");
+                    return;
+                }
+                anchor = new Farmhouse.Anchor(target.getX() + 0.5, target.getY(), target.getZ() + 0.5, 0f);
+            } else {
+                Location at = player.getLocation();
+                float yaw = Math.round(at.getYaw() / 45f) * 45f;     // squared up, so a line runs straight
+                anchor = new Farmhouse.Anchor(at.getBlockX() + 0.5, at.getBlockY(), at.getBlockZ() + 0.5, yaw);
+            }
+        }
+        try {
+            Farmhouse.setSpot(spot, anchor);
+        } catch (java.io.IOException failed) {
+            getPlugin().getLogger().log(Level.WARNING, "Could not save farmhouse-spots.yml", failed);
+            messages.send(player, "admin-farmhouse-failed");
+            return;
+        }
+        worlds.refreshSpots();
+        messages.send(player, anchor == null ? "admin-farmhouse-unset" : "admin-farmhouse-set", "%spot%", spot);
     }
 
     /** Mark a plot as cleared of its debris, whatever is left on it. */

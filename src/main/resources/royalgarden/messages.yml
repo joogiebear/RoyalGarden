@@ -205,7 +205,7 @@ clearing-done: "&aPlot &f%plot%&a is clear — you can build on it now."
 
 # ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. &7/garden composter&8 — &7your Composter. &7/garden pests&8 — &7your pests. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock|clear <player> <plot>, visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset, pests <player> spawn [pest] [plot]|clear|stats|reset-stats"
+admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. &7/garden composter&8 — &7your Composter. &7/garden pests&8 — &7your pests. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock|clear <player> <plot>, farmhouse [set|unset <spot>], visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset, pests <player> spawn [pest] [plot]|clear|stats|reset-stats"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -240,6 +240,13 @@ admin-reset-failed: "&cResetting %player%'s Garden failed: %error%"
 # %player% %plot%
 admin-unlocked: "&aUnlocked %plot% for %player%."
 admin-locked: "&aLocked %plot% for %player%."
+# /garden farmhouse
+admin-farmhouse-info: "&aFarmhouse: &f%farmhouse%&a. Spots: &7%spots%"
+admin-farmhouse-usage: "&c/garden farmhouse set|unset sam|spawn|window|composter  &7— stand where it goes, facing the way it should face (for the composter, look at the block)."
+admin-farmhouse-look: "&cLook at the block the Composter should be."
+admin-farmhouse-set: "&aSet the farmhouse's &f%spot%&a spot. Every Garden uses it now."
+admin-farmhouse-unset: "&aForgot the farmhouse's &f%spot%&a spot; it falls back to a sign or the default."
+admin-farmhouse-failed: "&cCould not save farmhouse-spots.yml — see the console."
 admin-cleared: "&aMarked %plot% as cleared for %player%."
 admin-not-clearing: "&7%plot% is not being cleared for %player%."
 admin-unchanged: "&7%plot% was already like that for %player%."

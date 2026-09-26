@@ -51,8 +51,20 @@ public final class ComposterBlock implements Listener {
         return ((block.getY() + 4096) << 8) | ((block.getX() & 15) << 4) | (block.getZ() & 15);
     }
 
-    /** The configured spot in a Garden world. */
+    /**
+     * Where the Composter goes: a farmhouse schematic's {@code [composter]} sign if it has one, the
+     * configured spot for the built-in barn, or nowhere — a schematic without the sign would otherwise get
+     * a composter put wherever the built-in barn had one, likely in a wall.
+     */
     private Block spot(World world) {
+        com.mystipixel.royalgarden.garden.Farmhouse farmhouse = com.mystipixel.royalgarden.garden.Farmhouse.current();
+        com.mystipixel.royalgarden.garden.Farmhouse.Anchor marked = farmhouse.anchor("composter");
+        if (marked != null) {
+            return marked.block(world);
+        }
+        if (farmhouse.isSchematic()) {
+            return null;
+        }
         int[] at = config.blockSpot();
         return world.getBlockAt(at[0], GardenLayout.groundY() + at[1], at[2]);
     }
@@ -63,6 +75,9 @@ public final class ComposterBlock implements Listener {
             return;
         }
         Block block = spot(world);
+        if (block == null) {
+            return;
+        }
         if (config.placeBlock() && block.getType() != config.blockMaterial()) {
             block.setType(config.blockMaterial(), false);
         }

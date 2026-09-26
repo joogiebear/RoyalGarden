@@ -313,7 +313,7 @@ public final class GardenWorlds {
         return worlds.createIsland(name)
                 .thenCompose(world -> onMain(() -> {
                     long started = System.nanoTime();
-                    GardenBuilder.build(world, palette());
+                    GardenBuilder.build(world, palette(), logger);
                     UUID owner = ownerOf(world);
                     if (owner != null) {
                         // A new world has no walls from older versions to clear; say so now so the
@@ -321,6 +321,7 @@ public final class GardenWorlds {
                         GardenState state = store.get(owner);
                         state.setLegacyWallsCleared(true);
                         state.setBarnVersion(GardenBuilder.BARN_VERSION);
+                        state.setFarmhouse(Farmhouse.current().id());
                         store.save(state);
                     }
                     logger.info("Built Garden '" + name + "' in "
@@ -353,17 +354,84 @@ public final class GardenWorlds {
             store.save(state);
         }
 
-        if (state != null && !state.readOnly() && state.barnVersion() < GardenBuilder.BARN_VERSION) {
-            GardenBuilder.renovate(world, state.barnVersion());
-            logger.info("Garden '" + world.getName() + "': renovated the barn from version "
-                    + state.barnVersion() + " to " + GardenBuilder.BARN_VERSION + ".");
-            state.setBarnVersion(GardenBuilder.BARN_VERSION);
-            store.save(state);
-        }
+        refreshFarmhouse(world, state);
 
         sync(world);
         resumePending(world, state);
         onPrepared.accept(world);
+    }
+
+    /**
+     * Bring the farmhouse plot up to the farmhouse in use.
+     *
+     * <p>The built-in barn at an older version is renovated in place — its changes are additions. Anything
+     * else (a schematic added, changed or taken away) means a different building, so the plot is cleared
+     * and built again: the old one's walls would otherwise stand through the new one. Only the farmhouse
+     * plot is touched, and it is read-only to players, so nothing of theirs is on it to lose.
+     */
+    private void refreshFarmhouse(World world, GardenState state) {
+        if (state == null || state.readOnly()) {
+            return;
+        }
+        String want = Farmhouse.current().id();
+        String have = state.farmhouse();
+        if (want.equals(have)) {
+            return;
+        }
+        if (want.startsWith("generated-") && have.startsWith("generated-")) {
+            GardenBuilder.renovate(world, state.barnVersion());
+            logger.info("Garden '" + world.getName() + "': renovated the barn from version "
+                    + state.barnVersion() + " to " + GardenBuilder.BARN_VERSION + ".");
+            state.setBarnVersion(GardenBuilder.BARN_VERSION);
+            state.setFarmhouse(want);
+            store.save(state);
+            return;
+        }
+        int centre = GardenLayout.centre();
+        if (queue.isBuilding(world.getName(), centre, centre)) {
+            return;                                   // already being rebuilt
+        }
+        logger.info("Garden '" + world.getName() + "': rebuilding the farmhouse plot (" + have + " -> " + want + ").");
+        int ceiling = Math.max(GardenBuilder.ceiling(config.maxTemplateHeight()), Farmhouse.current().top() + 8);
+        queue.submit(new BuildQueue.Job(world.getName(), centre, centre, null, GardenBuilder.Base.FLAT, palette(),
+                pasteRules(), true, ceiling, 0L, outcome -> {
+                    if (outcome != BuildQueue.Outcome.DONE) {
+                        return;                       // not recorded, so the next load tries again
+                    }
+                    Farmhouse farmhouse = Farmhouse.current();
+                    farmhouse.build(world, logger);
+                    GardenState now = stateOf(world);
+                    if (now != null) {
+                        now.setFarmhouse(farmhouse.id());
+                        store.save(now);
+                    }
+                    for (Player player : world.getPlayers()) {
+                        if (GardenLayout.isCentre(GardenLayout.plotAt(player.getLocation().getBlockX()),
+                                GardenLayout.plotAt(player.getLocation().getBlockZ()))) {
+                            player.teleport(GardenBuilder.spawn(world));   // not left inside a new wall
+                        }
+                    }
+                    onPrepared.accept(world);          // Sam, the Composter and visitors to their new spots
+                }));
+    }
+
+    /** Send Sam, the Composter and the visitors to their spots again in every loaded Garden — after a spot moved. */
+    public void refreshSpots() {
+        for (World world : Bukkit.getWorlds()) {
+            if (isGarden(world)) {
+                world.setSpawnLocation(GardenBuilder.spawn(world));
+                onPrepared.accept(world);
+            }
+        }
+    }
+
+    /** {@link #refreshFarmhouse} for every Garden loaded now — after a reload changed the farmhouse. */
+    public void refreshFarmhouses() {
+        for (World world : Bukkit.getWorlds()) {
+            if (isGarden(world)) {
+                refreshFarmhouse(world, stateOf(world));
+            }
+        }
     }
 
     /** Border, difficulty and gamerules, from {@code world:} in the config. */

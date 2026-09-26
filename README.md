@@ -168,6 +168,26 @@ entry in `presets.yml`. Players right-click a plot at the desk to choose one; it
 says, has a per-plot cooldown and needs a confirming second click. By default crops paste at age 0
 and melons/pumpkins are never pasted, so a preset is a planted farm rather than a free harvest.
 
+### The farmhouse
+
+The centre plot's building is the built-in barn, or a WorldEdit schematic named by `farmhouse.schematic`
+in `config.yml` and placed in the extension's folder. RoyalGarden reads the `.schem` itself — WorldEdit
+does not need to be on the server — and pastes it centred on the plot, its ground layer on the surface.
+
+- **Spots.** Sam, the spawn point, the front of the visitors' line and the Composter each go at a spot.
+  Set one in-game by standing there, facing the right way, and running `/garden farmhouse set
+  sam|spawn|window|composter` (for the Composter, look at the block). Or put a sign in the schematic whose
+  first line is `[sam]`, `[spawn]`, `[window]` or `[composter]`: it is removed on pasting, and whatever
+  goes there faces the way its writing does. In-game spots win over signs, live in `farmhouse-spots.yml`,
+  and apply to every Garden at once. `/garden farmhouse` lists where each one is and where it came from.
+- **What is pasted.** Block states, sign text, banner patterns, heads and decorated pots. Containers are
+  pasted empty, as presets are, so a farmhouse can never duplicate items.
+- **Changing it.** Each Garden records the farmhouse it was built with. A different one — a schematic
+  added, edited or removed — clears and rebuilds the farmhouse plot: loaded Gardens on `/garden reload`,
+  the rest when they next load. The farmhouse plot is read-only to players, so nothing of theirs is on it.
+- **Doors.** The owner can open doors, trapdoors and gates on the farmhouse plot; everything else on it
+  stays protected.
+
 ### Clearing plots
 
 Locked plots are **overgrown** — trees, boulders, bushes, fallen logs and undergrowth (`clearing:` in
