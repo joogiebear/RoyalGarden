@@ -24,6 +24,7 @@ import com.mystipixel.royalgarden.garden.UnlockService;
 import com.mystipixel.royalgarden.hooks.RoyalGardenExpansion;
 import com.mystipixel.royalgarden.level.GardenLevels;
 import com.mystipixel.royalgarden.level.LevelConfig;
+import com.mystipixel.royalgarden.level.LevelPlaceholders;
 import com.mystipixel.royalgarden.milestone.MilestoneConfig;
 import com.mystipixel.royalgarden.milestone.MilestoneListener;
 import com.mystipixel.royalgarden.milestone.MilestoneMenu;
@@ -409,8 +410,12 @@ public final class RoyalGardenExtension extends Extension {
         ComposterService composterLookup = composter;
         PestService pestLookup = pests;
         ClearingPlaceholders clearingLookup = new ClearingPlaceholders(gardens, clearing, messages);
+        LevelPlaceholders levelPlaceholders = new LevelPlaceholders(levels);
         registerExpansion((player, key) -> {
-            String value = visitorPlaceholders.resolve(player, key);
+            String value = levelPlaceholders.resolve(player, key);
+            if (value == null) {
+                value = visitorPlaceholders.resolve(player, key);
+            }
             if (value == null) {
                 value = upgradeLookup.resolve(player, key);
             }

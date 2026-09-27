@@ -262,6 +262,9 @@ things: `garden-level:` on a plot's unlock terms (`default`, `by-count`, `by-plo
 run `/garden level <player>` and `/garden xp <player> give|take|set <amount>` (`take` and `set` pay
 nothing). XP is saved with the Garden, so `/garden reset` clears it too.
 
+Placeholders: `%royalgarden_level%`, `%royalgarden_xp%` and `%royalgarden_max_level%` — plain numbers,
+so gear and conditions can scale with them. Offline players read `0`.
+
 The console can also run `/garden xp`, `level`, `milestone`, `visitor`, `upgrade`, `composter`, `reset`, `unlock`, `lock`,
 `info` and `reload`.
 
