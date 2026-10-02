@@ -127,6 +127,9 @@ public final class Farmhouse {
             return;
         }
         File file = new File(dataFolder, name);
+        if (!file.exists()) {
+            extractBundled(name, file, logger);
+        }
         if (!file.isFile()) {
             logger.warning("farmhouse.schematic: " + file + " does not exist; using the built-in barn.");
             current = new Farmhouse(null, "", 0, generatedId());
@@ -159,6 +162,24 @@ public final class Farmhouse {
             logger.warning("farmhouse.schematic: " + name + " could not be read (" + unusable.getMessage()
                     + "); using the built-in barn.");
             current = new Farmhouse(null, "", 0, generatedId());
+        }
+    }
+
+    /**
+     * Write out the schematic of that name shipped in the jar, if there is one, so the default farmhouse
+     * needs no setup. Only ever fills a gap: a file already on disk, edited or not, is never overwritten.
+     */
+    private static void extractBundled(String name, File target, Logger logger) {
+        if (name.contains("/") || name.contains("\\")) {
+            return;
+        }
+        try (InputStream in = Farmhouse.class.getClassLoader().getResourceAsStream("royalgarden/" + name)) {
+            if (in != null) {
+                Files.copy(in, target.toPath());
+                logger.info("Farmhouse: wrote the bundled " + name + " to " + target + ".");
+            }
+        } catch (IOException | RuntimeException failed) {
+            logger.warning("Farmhouse: could not write the bundled " + name + " (" + failed.getMessage() + ").");
         }
     }
 

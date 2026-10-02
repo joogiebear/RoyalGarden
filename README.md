@@ -170,8 +170,9 @@ and melons/pumpkins are never pasted, so a preset is a planted farm rather than 
 
 ### The farmhouse
 
-The centre plot's building is the built-in barn, or a WorldEdit schematic named by `farmhouse.schematic`
-in `config.yml` and placed in the extension's folder. RoyalGarden reads the `.schem` itself — WorldEdit
+The centre plot's building is the bundled barn (`farmbarn.schem`, written to the extension's folder the
+first time it is needed), the plain built-in barn when `farmhouse.schematic` is blank, or any WorldEdit
+schematic named by `farmhouse.schematic` in `config.yml` and placed in the extension's folder. RoyalGarden reads the `.schem` itself — WorldEdit
 does not need to be on the server — and pastes it centred on the plot, its ground layer on the surface.
 
 - **Spots.** Sam, the spawn point, the front of the visitors' line and the Composter each go at a spot.

@@ -95,8 +95,10 @@ unlock:
   by-plot: {}
 
 # ── The farmhouse ─────────────────────────────────────────────────────────────
-# What stands on the centre plot. Blank = the built-in barn. Or name a WorldEdit
-# schematic (//schem save) placed in this folder, e.g. "farmhouse.schem".
+# What stands on the centre plot. The default is the bundled barn, farmbarn.schem,
+# which is written to this folder the first time it is needed. Blank = the plain
+# built-in barn. Or name your own WorldEdit schematic (//schem save) placed in
+# this folder, e.g. "farmhouse.schem".
 #
 # It is pasted centred on the plot, its ground on the Garden's surface. Mark
 # spots in the build with signs whose first line is one of these — they are
@@ -110,7 +112,7 @@ unlock:
 # Containers are pasted empty. Changing this rebuilds every Garden's farmhouse
 # plot — loaded ones on /garden reload, the rest when they next load.
 farmhouse:
-  schematic: ""
+  schematic: "farmbarn.schem"
   # Which layer of the schematic is the ground. auto = the highest layer that
   # is at least half grass, dirt, stone and the like.
   ground-layer: auto
