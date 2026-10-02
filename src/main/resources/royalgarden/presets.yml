@@ -101,17 +101,19 @@ presets:
     display-name: "&2Melons"
     icon: melon_slice
     lore:
-      - "&7Stems either side of a fruit row, watered"
-      - "&7by a covered channel. Melons grow beside"
-      - "&7the stems; harvest them from the channel."
+      - "&7A snake of two-wide walkways. Stems grow"
+      - "&7against a fence over water, and the melons"
+      - "&7can only grow into the walkway. Walk it,"
+      - "&7chop as you go, and turn at the end."
     cost: 0 coins
     selectable: true
   pumpkin:
     display-name: "&6Pumpkins"
     icon: pumpkin
     lore:
-      - "&7Stems either side of a fruit row, watered"
-      - "&7by a covered channel. Pumpkins grow beside"
-      - "&7the stems; harvest them from the channel."
+      - "&7A snake of two-wide walkways. Stems grow"
+      - "&7against a fence over water, and the pumpkins"
+      - "&7can only grow into the walkway. Walk it,"
+      - "&7chop as you go, and turn at the end."
     cost: 0 coins
     selectable: true

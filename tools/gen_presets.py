@@ -173,24 +173,87 @@ def mushroom():
     return rows_of(MYCELIUM, lambda x, z: "minecraft:red_mushroom" if (x + z) % 2 else "minecraft:brown_mushroom")
 
 
-def stems(stem):
-    """S F S between channels, period four: each stem's one free side is the fruit column beside it,
-    and every fruit column is fed by the stems on both sides."""
+def fence(east, west):
+    return "minecraft:oak_fence[east=%s,north=false,south=false,waterlogged=false,west=%s]" % (
+        "true" if east else "false", "true" if west else "false")
+
+
+def snake_stems(stem):
+    """The Hypixel Garden melon/pumpkin farm: a snake of two-wide walkways.
+
+    Across the plot, repeating every five rows:   P P S W S
+        P  walkway, two wide, grass underfoot
+        S  a row of stems on farmland; every stem has a stem either side of it and the wall behind it,
+           so the only free side is the walkway, and that is where its fruit has to grow
+        W  the wall: a fence over a water source, which hydrates the stem rows either side of it
+
+    A stem only grows fruit onto an adjacent air block over dirt, grass or farmland, so the walkway is
+    the whole harvest: walk along it chopping as you go. Each divider (S W S) stops short of the plot
+    edge at alternating ends, with the gap laid as path so no fruit grows in it, which joins one walkway
+    to the next and makes the whole plot one long snake.
+    """
     plot = Plot()
     plot.base()
-    lanes = [2 + 4 * k for k in range(23)]                         # 2, 6 ... 90
-    for x in range(1, SIZE - 1):
-        for z in range(1, SIZE - 1):
-            if cross(z):
+    walk_rows = [1 + 5 * k for k in range(19)]                     # first row of each walkway, 19 walkways
+    for first in walk_rows:
+        for z in (first, first + 1):
+            for x in range(1, SIZE - 1):
+                plot.set(x, 3, z, GRASS)
+    for j in range(len(walk_rows) - 1):
+        z0 = walk_rows[j] + 2                                      # S, then W, then S
+        if j % 2 == 0:
+            lo, hi = 1, 90                                         # open at the east end
+            gap = range(91, SIZE - 1)
+        else:
+            lo, hi = 5, SIZE - 2                                   # open at the west end
+            gap = range(1, 5)
+        for x in range(lo, hi + 1):
+            plot.set(x, 3, z0, FARMLAND)
+            plot.set(x, 4, z0, stem)
+            plot.set(x, 3, z0 + 1, WATER)
+            plot.set(x, 4, z0 + 1, fence(x < hi, x > lo))
+            plot.set(x, 3, z0 + 2, FARMLAND)
+            plot.set(x, 4, z0 + 2, stem)
+        for x in gap:
+            for z in (z0, z0 + 1, z0 + 2):
                 plot.set(x, 3, z, PATH)
-                continue
-            if x in lanes:
-                plot.set(x, 3, z, WATER)
-                plot.set(x, 4, z, TRAPDOOR)
-            elif x >= 3 and x <= 93:
-                plot.set(x, 3, z, FARMLAND)
-                if (x - 2) % 4 in (1, 3):
-                    plot.set(x, 4, z, stem)
+    return plot
+
+
+def check_snake(plot, fruit_soil=("minecraft:grass_block", "minecraft:dirt", "minecraft:farmland")):
+    """Prove the layout does what it claims: every stem has exactly one place to put fruit, and the
+    walkable tiles form one connected snake with no branches."""
+    def soil(x, z):
+        return plot.get(x, 3, z).split("[")[0] in fruit_soil and plot.get(x, 4, z) == AIR
+
+    stems = [(x, z) for x in range(SIZE) for z in range(SIZE) if plot.get(x, 4, z).endswith("_stem[age=0]")]
+    assert stems, "no stems"
+    for x, z in stems:
+        free = [(x + dx, z + dz) for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)) if soil(x + dx, z + dz)]
+        assert len(free) == 1, "stem at %s has %d places for fruit" % ((x, z), len(free))
+        fx, fz = free[0]
+        assert plot.get(fx, 3, fz).startswith("minecraft:grass_block"), "fruit would land at %s" % ((fx, fz),)
+    walk = {(x, z) for x in range(1, SIZE - 1) for z in range(1, SIZE - 1)
+            if plot.get(x, 4, z) == AIR and plot.get(x, 3, z).split("[")[0] in ("minecraft:grass_block", PATH.split("[")[0])}
+    start = (1, 1)
+    seen, todo = {start}, [start]
+    while todo:
+        x, z = todo.pop()
+        for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            n = (x + dx, z + dz)
+            if n in walk and n not in seen:
+                seen.add(n)
+                todo.append(n)
+    grass_walk = {p for p in walk if plot.get(p[0], 3, p[1]).startswith("minecraft:grass_block")}
+    unreachable = {p for p in grass_walk if p not in seen and p[1] <= 92}
+    assert not unreachable, "%d walkway tiles cannot be reached from the entrance" % len(unreachable)
+    return len(stems)
+
+
+def stems(stem):
+    plot = snake_stems(stem)
+    count = check_snake(plot)
+    print("  %s: %d stems, each with exactly one place for fruit, one connected snake" % (stem.split("[")[0], count))
     return plot
 
 
