@@ -45,3 +45,73 @@ presets:
       - "&7Just the floor. Build anything."
     cost: 0 coins
     selectable: true
+
+  wheat:
+    display-name: "&6Wheat Fields"
+    icon: wheat
+    lore:
+      - "&7Ten watered stripes of wheat, a covered"
+      - "&7water channel down each one to walk along."
+      - "&7A cross path through the middle."
+    cost: 0 coins
+    selectable: true
+  carrot:
+    display-name: "&6Carrot Fields"
+    icon: carrot
+    lore:
+      - "&7Ten watered stripes of carrots, a covered"
+      - "&7water channel down each one to walk along."
+      - "&7A cross path through the middle."
+    cost: 0 coins
+    selectable: true
+  potato:
+    display-name: "&6Potato Fields"
+    icon: potato
+    lore:
+      - "&7Ten watered stripes of potatoes, a covered"
+      - "&7water channel down each one to walk along."
+      - "&7A cross path through the middle."
+    cost: 0 coins
+    selectable: true
+  sugar-cane:
+    display-name: "&aSugar Cane"
+    icon: sugar_cane
+    lore:
+      - "&7Cane on sand in bands where every plant"
+      - "&7touches water, with paths between bands."
+    cost: 0 coins
+    selectable: true
+  nether-wart:
+    display-name: "&cNether Wart"
+    icon: nether_wart
+    lore:
+      - "&7Soul sand rows, a path beside every"
+      - "&7eight, nothing to water."
+    cost: 0 coins
+    selectable: true
+  mushroom:
+    display-name: "&5Mushrooms"
+    icon: red_mushroom
+    lore:
+      - "&7Red and brown mushrooms on mycelium,"
+      - "&7which grows them in any light."
+    cost: 0 coins
+    selectable: true
+  melon:
+    display-name: "&2Melons"
+    icon: melon_slice
+    lore:
+      - "&7Stems either side of a fruit row, watered"
+      - "&7by a covered channel. Melons grow beside"
+      - "&7the stems; harvest them from the channel."
+    cost: 0 coins
+    selectable: true
+  pumpkin:
+    display-name: "&6Pumpkins"
+    icon: pumpkin
+    lore:
+      - "&7Stems either side of a fruit row, watered"
+      - "&7by a covered channel. Pumpkins grow beside"
+      - "&7the stems; harvest them from the channel."
+    cost: 0 coins
+    selectable: true

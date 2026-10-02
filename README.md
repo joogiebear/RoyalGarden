@@ -163,6 +163,8 @@ Rewards are console commands and messages.
 `unlock.by-count.<n>` (the n-th purchase), then `unlock.default` with optional `cost-scaling`.
 Rewards from every matching layer are all given.
 
+**Bundled presets.** A first install writes eight ready-made farms to `presets/` and lists them in `presets.yml`: `wheat`, `carrot`, `potato`, `sugar-cane`, `nether-wart`, `mushroom`, `melon` and `pumpkin`. They are for the default 96-block plot, and `tools/gen_presets.py` regenerates them. An existing server keeps its own catalogue: copy the `.preset` files from the jar's `royalgarden/presets/` into `presets/` and the entries from the shipped `presets.yml`.
+
 **Presets for players:** capture a plot with `/garden capture <id>`, then set `selectable: true` on its
 entry in `presets.yml`. Players right-click a plot at the desk to choose one; it costs what the entry
 says, has a per-plot cooldown and needs a confirming second click. By default crops paste at age 0
