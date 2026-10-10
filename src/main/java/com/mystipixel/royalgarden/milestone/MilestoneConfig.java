@@ -18,11 +18,8 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 /**
- * {@code milestones.yml}: which crops have milestones, how many tiers each has and how far apart, what
- * each tier pays, and how the menu looks.
- *
- * <p>Read without the shipped file as defaults — its {@code crops:} section is a list, and an entry the
- * admin deleted would otherwise keep coming back — so every setting here has its fallback in code.
+ * {@code milestones.yml}. Read without the shipped file as defaults (its {@code crops:} is a list, and a
+ * deleted entry would keep coming back), so every setting has its fallback in code.
  */
 public final class MilestoneConfig extends YamlFile {
 
@@ -89,7 +86,7 @@ public final class MilestoneConfig extends YamlFile {
         }
     }
 
-    /** Tiers from {@code amounts: [...]}, or from {@code first / growth / count / round-to}. */
+    // From amounts: [...], or from first / growth / count / round-to.
     private static long[] tiers(ConfigurationSection section) {
         if (section == null) {
             return new long[0];
@@ -121,8 +118,6 @@ public final class MilestoneConfig extends YamlFile {
         return out;
     }
 
-    // ── settings ───────────────────────────────────────────────────────────────
-
     public boolean enabled() {
         return yaml().getBoolean("enabled", true);
     }
@@ -141,12 +136,11 @@ public final class MilestoneConfig extends YamlFile {
         return yaml().getStringList("worlds");
     }
 
-    /** Whether each counted harvest shows progress in the action bar. */
     public boolean actionBarProgress() {
         return yaml().getBoolean("action-bar-progress", true);
     }
 
-    /** Whether a tier-up is announced to the whole server, not just the player. */
+    /** Announce tier-ups to the whole server, not just the player. */
     public boolean broadcastTierUps() {
         return yaml().getBoolean("broadcast-tier-ups", false);
     }
@@ -167,8 +161,6 @@ public final class MilestoneConfig extends YamlFile {
         return yaml().getString("tier-up-sound", "entity.player.levelup");
     }
 
-    // ── crops ──────────────────────────────────────────────────────────────────
-
     public MilestoneCrop crop(String id) {
         return id == null ? null : crops.get(id.toLowerCase(Locale.ROOT));
     }
@@ -181,13 +173,11 @@ public final class MilestoneConfig extends YamlFile {
         return Collections.unmodifiableCollection(crops.values());
     }
 
-    /** Whether placement of this block needs recording. */
     public boolean tracksPlacement(Material block) {
         MilestoneCrop crop = byBlock.get(block);
         return crop != null && crop.naturalOnly();
     }
 
-    /** Whether a world counts toward milestones. */
     public boolean counts(org.bukkit.World world) {
         if (gardensOnly()) {
             return com.mystipixel.royalgarden.garden.GardenWorlds.isGarden(world);

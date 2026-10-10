@@ -17,22 +17,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Which breaks count toward milestones.
- *
- * <p>A block counts if it is a milestone crop, broken in a counting world (every Garden by default), by
- * a player not in creative, fully grown if it has an age, and — for crops marked {@code natural-only} —
- * not placed by a player. Sugar cane and cactus count the column that falls with them.
- *
- * <p>{@code blocks} counting adds the crop's {@code points} per block. {@code drops} counting adds the
- * crop items that actually drop, so Fortune counts; a plugin that pockets drops before they fall
- * (telekinesis, auto-pickup) hides them from it, so {@code blocks} is the default.
+ * Which breaks count toward milestones: a milestone crop, in a counting world, by a non-creative player,
+ * fully grown if it has an age, and not player-placed for natural-only crops. Sugar cane and cactus count
+ * the column that falls with them. {@code drops} counting lets Fortune count, but auto-pickup plugins hide
+ * drops from it, so {@code blocks} is the default.
  */
 public final class MilestoneListener implements Listener {
 
     private record Pending(Player player, MilestoneCrop crop, int stackedAbove) {
     }
 
-    /** Told about every break that counts — how a harvest can bring a pest. */
+    /** Told about every break that counts; this is how a harvest can bring a pest. */
     public interface HarvestHook {
         void harvested(Player player, Block block, MilestoneCrop crop);
     }

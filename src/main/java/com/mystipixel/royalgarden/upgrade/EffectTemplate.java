@@ -6,13 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Fills an {@code effects:} template for one crop and level. Pure, so it can be tested without a
- * server.
- *
- * <p>The template is the YAML as parsed — maps, lists, strings, numbers — and is copied, never changed.
- * A string that is exactly a list variable ({@code "%blocks%"}) becomes that list, so a filter can be
- * written {@code blocks: "%blocks%"}; anywhere else, text variables ({@code %level%}, {@code %crop%})
- * are replaced inside strings. Keys and non-string values are left alone.
+ * Fills an effects: template for one crop and level. The template is copied, never changed. A string
+ * that is exactly a list variable ("%blocks%") becomes that list; text variables are replaced in strings.
  */
 public final class EffectTemplate {
 

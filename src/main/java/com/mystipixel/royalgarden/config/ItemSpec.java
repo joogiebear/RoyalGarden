@@ -22,15 +22,15 @@ import java.util.List;
  *     - "&amp;7Left-click to go here."
  * </pre>
  *
- * <p>Placeholders are filled before colouring. A lore line that is exactly a placeholder which fills to
- * nothing is dropped, so an optional line (a cost on a free plot, say) leaves no gap behind it.
+ * <p>A lore line that is exactly a placeholder which fills to nothing is dropped, so an optional line
+ * leaves no gap.
  */
 public final class ItemSpec {
 
     private ItemSpec() {
     }
 
-    /** Build the icon at {@code section}, or a stone placeholder named after the path if it is missing. */
+    /** A stone placeholder named after the path if {@code section} is missing. */
     public static ItemStack build(ConfigurationSection section, Material fallback, String... placeholders) {
         if (section == null) {
             return plain(fallback, "&c(missing menu item)", List.of());
@@ -59,7 +59,7 @@ public final class ItemSpec {
         return plain(material, name, lore);
     }
 
-    /** An item with a coloured name and lore, not italicised. */
+    /** Coloured name and lore, not italicised. */
     public static ItemStack plain(Material material, String name, List<String> lore) {
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();

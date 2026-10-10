@@ -41,18 +41,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Infested plots as libreforge effect holders — so what an infestation <em>does</em> is written in the
- * eco dialect ({@code infested-effects:} in {@code pests.yml}), not implemented here.
+ * Infested plots as libreforge effect holders, compiled from {@code infested-effects:} in
+ * {@code pests.yml} per plot and kept until a reload.
  *
- * <p>A player standing on a plot with at least {@code infested-at} pests holds one holder, compiled from
- * the template with {@code %pests%}, {@code %plot%}, {@code %crop%}, {@code %blocks%} and {@code %drops%}
- * filled in for that plot. Holders are compiled the first time a combination is needed and kept until a
- * reload. Only the Garden's owner is affected unless {@code infested-applies-to} says everyone.
- *
- * <p>The host refreshes holders on join and on changing world, but not on walking from plot to plot, so
- * this refreshes a player whenever they cross a plot edge or teleport inside a Garden, and everyone in a
- * Garden whenever its pests change. libreforge has no way to remove a provider, so on disable this one
- * is switched off rather than removed; a reload registers a fresh one.
+ * <p>The host refreshes holders on join and world change but not when walking between plots, so this
+ * refreshes on crossing a plot edge, on teleports inside a Garden, and when a Garden's pests change.
+ * libreforge cannot remove a provider, so on disable this one is switched off.
  */
 public final class PestHolders implements HolderProvider, Listener {
 
@@ -68,20 +62,19 @@ public final class PestHolders implements HolderProvider, Listener {
         this.crops = crops;
     }
 
-    /** Start providing. */
     public void register() {
         HolderProviderKt.registerHolderProvider(this);
         refreshAll();
     }
 
-    /** Stop providing, for good — this instance is never used again. */
+    /** Permanent: this instance is never used again. */
     public void disable() {
         active = false;
         compiled.clear();
         refreshAll();
     }
 
-    /** Forget every compiled holder, after {@code pests.yml} or {@code milestones.yml} changed. */
+    /** After {@code pests.yml} or {@code milestones.yml} changed. */
     public void compile() {
         compiled.clear();
     }
@@ -121,7 +114,7 @@ public final class PestHolders implements HolderProvider, Listener {
         return holder.map(List::of).orElse(List.of());
     }
 
-    /** The crop being farmed when the newest pest on a plot came, or blank. */
+    // The crop being farmed when the newest pest on a plot came, or blank.
     private static String newestCrop(PestStore.Data data, int plot) {
         PestStore.Alive newest = null;
         for (PestStore.Alive pest : data.alive().values()) {
@@ -168,9 +161,6 @@ public final class PestHolders implements HolderProvider, Listener {
         return out;
     }
 
-    // ── refreshing ─────────────────────────────────────────────────────────────
-
-    /** Crossing a plot edge in a Garden changes which plot's pests apply. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Location from = event.getFrom();
@@ -187,7 +177,7 @@ public final class PestHolders implements HolderProvider, Listener {
         }
     }
 
-    /** A teleport inside a Garden — to a plot from the Pests page, say. Refreshed once it has happened. */
+    // Refreshed after the teleport has happened.
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {
         Location to = event.getTo();
@@ -202,7 +192,7 @@ public final class PestHolders implements HolderProvider, Listener {
         });
     }
 
-    /** Refresh everyone in a Garden — after its pests changed. */
+    /** Call after a Garden's pests changed. */
     public static void refreshGarden(UUID owner) {
         World world = Bukkit.getWorld(GardenWorlds.worldName(owner));
         if (world == null) {
@@ -213,7 +203,7 @@ public final class PestHolders implements HolderProvider, Listener {
         }
     }
 
-    /** Make libreforge ask again for everyone online — after a reload. */
+    /** Call after a reload. */
     public static void refreshAll() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             RoyalHolders.refresh(player);

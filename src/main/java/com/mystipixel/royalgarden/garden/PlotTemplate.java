@@ -28,39 +28,23 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * One plot, captured as blocks, to be stamped onto other plots.
- *
- * <p>Build a plot the way you want it to look, capture it, and it can be stamped anywhere. This is the
- * schematic step done in-house: a plot is a known square box at a known height, so there is nothing to
- * select and no origin to get wrong, which is most of what a schematic format exists to record. It also
- * means no WorldEdit dependency — the extension can stamp plots on a server that has never heard of it.
- *
- * <h2>Format</h2>
- *
- * <p>Gzipped: a magic number, a version, the dimensions, the base height as an offset from
- * {@link GardenLayout#groundY()}, a palette of block-state strings, and one palette index per block.
- * A palette matters more than it looks: a farm plot is tens of distinct states repeated a hundred
- * thousand times, so indices compress to a rounding error.
- *
- * <p>Block states are stored as {@link BlockData#getAsString()} rather than as ids, so a template
- * survives a Minecraft version change as long as the blocks in it still exist. A state this version no
- * longer knows is pasted as air, and logged once when the template is first used.
- *
- * <p>Only block states are captured. Chest contents, sign text and spawner types are not, so a preset
- * can never be a way to duplicate items.
+ * One plot captured as blocks, to be stamped onto other plots. Gzipped: magic, version, dimensions,
+ * base offset from {@link GardenLayout#groundY()}, a palette of {@link BlockData#getAsString()} strings,
+ * and one palette index per block. A state this version does not know is pasted as air and logged once.
+ * Only block states are captured, never contents, so a preset cannot duplicate items.
  */
 public final class PlotTemplate {
 
     private static final int MAGIC = 0x52475054;      // "RGPT"
     private static final int VERSION = 1;
 
-    /** Lowest layer captured, relative to {@link GardenLayout#groundY()} — the floor course. */
+    // The floor course, relative to GardenLayout.groundY().
     private static final int BASE_OFFSET = -3;
 
-    /** Hard ceiling on a template read from disk, whatever the config says — the height of a world. */
+    // Hard ceiling on a template read from disk, whatever the config says: the height of a world.
     private static final int ABSOLUTE_MAX_HEIGHT = 384;
 
-    /** How a template is pasted: what to do about harvestable blocks. */
+    /** What to do about harvestable blocks when pasting. */
     public record PasteRules(boolean resetCropAge, Set<Material> neverPaste) {
         public static final PasteRules AS_CAPTURED = new PasteRules(false, Set.of());
     }
@@ -70,10 +54,10 @@ public final class PlotTemplate {
     private final String[] palette;
     private final short[] blocks;
 
-    /** Parsed BlockData for each palette entry, so a paste parses each state once, not once per block. */
+    // One parse per palette entry, not per block.
     private final BlockData[] parsed;
 
-    /** The parsed states after {@link PasteRules} are applied, for the rules they were applied with. */
+    // The parsed states after PasteRules are applied, for the rules they were applied with.
     private BlockData[] ruled;
     private PasteRules ruledFor;
 
@@ -98,14 +82,9 @@ public final class PlotTemplate {
         return (x * height + y) * size + z;
     }
 
-    // ── capture ────────────────────────────────────────────────────────────────
-
     /**
-     * Read a plot out of the world.
-     *
-     * <p>Captured height stops at the highest non-air block rather than at a fixed ceiling: a template
-     * of a flat field should cost four layers to stamp, not forty-eight, and the difference is paid on
-     * every plot it is stamped onto.
+     * Captured height stops at the highest non-air block, so a flat field costs four layers to stamp, not
+     * forty-eight.
      */
     public static PlotTemplate capture(World world, int px, int pz, int maxHeight) throws IOException {
         int size = GardenLayout.plotSize();
@@ -152,13 +131,9 @@ public final class PlotTemplate {
         return new PlotTemplate(size, height, palette.toArray(new String[0]), blocks);
     }
 
-    // ── paste ──────────────────────────────────────────────────────────────────
-
     /**
-     * Stamp one x-row of this template onto a plot. Returns the number of blocks written.
-     *
-     * <p>A row at a time because a whole plot is too much for one tick once a template has any height
-     * to it — the caller spends a fixed block budget per tick and comes back for the next row.
+     * Stamps one x-row and returns the blocks written. A whole plot is too much for one tick, so the caller
+     * spends a block budget per tick and comes back for the next row.
      */
     public int pasteRow(World world, int px, int pz, int row, PasteRules rules) {
         int baseY = GardenLayout.groundY() + BASE_OFFSET;
@@ -176,7 +151,7 @@ public final class PlotTemplate {
         return rowCost();
     }
 
-    /** The palette as it should be pasted under these rules, built once per set of rules. */
+    // Built once per set of rules.
     private synchronized BlockData[] ruled(PasteRules rules) {
         if (ruled != null && rules.equals(ruledFor)) {
             return ruled;
@@ -199,7 +174,7 @@ public final class PlotTemplate {
         return out;
     }
 
-    /** The parsed block state for a palette id; air if this version does not know it. */
+    // Air if this version does not know the state.
     private BlockData parsed(int id) {
         BlockData cached = parsed[id];
         if (cached != null) {
@@ -216,9 +191,7 @@ public final class PlotTemplate {
         return cached;
     }
 
-    // ── storage ────────────────────────────────────────────────────────────────
-
-    /** Save to a file, via a temporary one, so a crash mid-write cannot leave a truncated template. */
+    /** Via a temporary file, so a crash mid-write cannot leave a truncated template. */
     public void save(File file) throws IOException {
         Path target = file.toPath();
         Path temp = target.resolveSibling(target.getFileName() + ".tmp");
@@ -245,11 +218,8 @@ public final class PlotTemplate {
     }
 
     /**
-     * Read a template, or null if there isn't one saved. Throws if there is one and it is unusable.
-     *
-     * <p>Every number in the header is checked before it is trusted. A damaged file would otherwise
-     * surface later as an out-of-bounds read in the middle of a paste — on the server thread, once per
-     * tick — rather than here, once, with its name on it.
+     * Null if none is saved; throws if it is unusable. Every header number is checked here so a damaged file
+     * fails once, by name, not mid-paste on the main thread.
      */
     public static PlotTemplate load(File file) throws IOException {
         if (!file.exists()) {
@@ -266,8 +236,7 @@ public final class PlotTemplate {
             }
             int size = in.readInt();
             if (size != GardenLayout.plotSize()) {
-                // Plot size is baked into the data. Refusing beats stamping a template into a
-                // differently-sized plot and leaving a seam nobody can explain later.
+                // Plot size is baked into the data; stamping into a differently-sized plot would leave a seam.
                 throw new IOException("Plot template is " + size + " wide, but plots are now "
                         + GardenLayout.plotSize() + ". Recapture it.");
             }

@@ -20,15 +20,9 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The desk menu: the board, drawn as itself — and, from any plot you own, the preset picker.
- *
- * <p>A 5&times;5 grid of plots and a 9-wide inventory are a lucky fit — the board sits centred in the
- * top rows, and every slot is the plot it represents rather than a list entry describing one. Left-click
- * a plot you own to walk there, right-click it to choose a preset; click one you can buy to buy it.
- *
- * <p>Every icon, title and line comes from {@code menu:} and {@code preset-menu:} in {@code config.yml}.
- * The board menu is built once and rendered per player — each slot reads the viewer's own state — and
- * rebuilt by {@link #reload()} so edited icons show without a restart.
+ * The desk menu: the 5x5 board centred in the top rows, each slot the plot it represents, plus the
+ * preset picker. Every icon comes from {@code menu:} and {@code preset-menu:} in {@code config.yml}. The
+ * board is built once and rendered per viewer; {@link #reload()} rebuilds it.
  */
 public final class GardenMenu {
 
@@ -56,47 +50,40 @@ public final class GardenMenu {
         this.menu = build();
     }
 
-    /** Rebuild the menu from the current config. */
     public void reload() {
         this.menu = build();
     }
 
-    /** Give the summary item the Garden's level placeholders ({@code %level%}, {@code %xp%}, …). */
+    /** Placeholders for the summary item ({@code %level%}, {@code %xp%}, ...). */
     public void setLevelPlaceholders(java.util.function.Function<java.util.UUID, String[]> placeholders) {
         this.levelPlaceholders = placeholders;
     }
 
-    /** Add the Crop Milestones button, opening this page when clicked. */
     public void setMilestones(Consumer<Player> open) {
         this.milestones = open;
         this.menu = build();
     }
 
-    /** Add the Visitors button, opening this page when clicked. */
     public void setVisitors(Consumer<Player> open) {
         this.visitors = open;
         this.menu = build();
     }
 
-    /** Add the Crop Upgrades button, opening this page when clicked. */
     public void setUpgrades(Consumer<Player> open) {
         this.upgrades = open;
         this.menu = build();
     }
 
-    /** Add the Composter button, opening this page when clicked. */
     public void setComposter(Consumer<Player> open) {
         this.composter = open;
         this.menu = build();
     }
 
-    /** Add the Pests button, opening this page when clicked. */
     public void setPests(Consumer<Player> open) {
         this.pests = open;
         this.menu = build();
     }
 
-    /** Show plots still being cleared as such, with their progress. */
     public void setClearing(ClearingService clearing) {
         this.clearing = clearing;
     }
@@ -154,7 +141,7 @@ public final class GardenMenu {
         return builder.build();
     }
 
-    /** A bottom-row button from {@code menu.items.<key>}, in its column if that is free. */
+    // A bottom-row button from menu.items.<key>, in its column if that is free.
     private void button(MenuBuilder builder, boolean[][] used, int rows, String key, int defaultColumn,
                         Material fallback, Consumer<Player> open) {
         if (open == null) {
@@ -176,9 +163,6 @@ public final class GardenMenu {
         return material == null || !material.isItem() ? null : ItemSpec.plain(material, " ", List.of());
     }
 
-    // ── rendering ──────────────────────────────────────────────────────────────
-
-    /** The item for one plot, from this player's point of view. */
     private ItemStack icon(Player player, int px, int pz) {
         GardenState state = worlds.state(player.getUniqueId());
         String plot = GardenLayout.plotName(px, pz);
@@ -225,12 +209,10 @@ public final class GardenMenu {
         return ItemSpec.build(section(items, "locked"), Material.GRAY_STAINED_GLASS_PANE, "%plot%", plot);
     }
 
-    /** The counter at the bottom of the menu. */
     private ItemStack summary(Player player) {
         GardenState state = worlds.state(player.getUniqueId());
         String[] base = {
-                // Farmable plots only: the farmhouse is always there and cannot be farmed, so counting it
-                // made a full board read as 25 of 25 when there are 24 plots to earn.
+                // Farmable plots only: the farmhouse cannot be farmed, so a full board is 24, not 25.
                 "%unlocked%", String.valueOf(state.purchasedCount()),
                 "%total%", String.valueOf(GardenLayout.farmableCount()),
                 "%limit%", String.valueOf(unlocks.farmableLimit(player)),
@@ -245,8 +227,6 @@ public final class GardenMenu {
     private static ConfigurationSection section(ConfigurationSection parent, String key) {
         return parent == null ? null : parent.getConfigurationSection(key);
     }
-
-    // ── clicking ───────────────────────────────────────────────────────────────
 
     private void leftClick(Player player, Menu clicked, int px, int pz) {
         GardenState state = worlds.state(player.getUniqueId());
@@ -274,7 +254,7 @@ public final class GardenMenu {
         openPresets(player, px, pz);
     }
 
-    /** Walk the player to a plot, opening their Garden first if they are not standing in it. */
+    // Opens their Garden first if they are not standing in it.
     private void visit(Player player, int px, int pz) {
         player.closeInventory();
         World here = player.getWorld();
@@ -291,12 +271,7 @@ public final class GardenMenu {
         });
     }
 
-    /**
-     * Somewhere to stand at the middle of a plot: on top of whatever is built there.
-     *
-     * <p>The fixed surface height used to be the target, which put anyone visiting a plot with a farm
-     * on it inside the farm.
-     */
+    // On top of whatever is built there, so a visitor is not put inside a farm.
     static Location standingSpot(World world, int px, int pz) {
         Location centre = GardenLayout.plotCentre(world, px, pz);
         int top = world.getHighestBlockYAt(centre.getBlockX(), centre.getBlockZ());
@@ -306,9 +281,6 @@ public final class GardenMenu {
         return centre;
     }
 
-    // ── the preset picker ──────────────────────────────────────────────────────
-
-    /** Open the preset picker for one of the player's plots. */
     public void openPresets(Player player, int px, int pz) {
         List<PresetLibrary.Entry> entries = worlds.presets().selectable();
         if (entries.isEmpty()) {
@@ -319,7 +291,7 @@ public final class GardenMenu {
         int rows = Math.min(6, (shown + 8) / 9 + 1);
         String plot = GardenLayout.plotName(px, pz);
         MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(Messages.fill(
-                config.yaml().getString("preset-menu.title", "&8Presets — Plot %plot%"), "%plot%", plot)));
+                config.yaml().getString("preset-menu.title", "&8Presets - Plot %plot%"), "%plot%", plot)));
 
         for (int i = 0; i < shown; i++) {
             PresetLibrary.Entry entry = entries.get(i);

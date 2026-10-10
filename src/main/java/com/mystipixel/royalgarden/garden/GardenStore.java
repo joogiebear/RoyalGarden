@@ -20,23 +20,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Where Garden state lives: one small YAML per Garden, in the extension's own data folder.
- *
- * <p>Not in the host's {@code Storage}. That interface is entirely island-, profile- and bank-shaped —
- * there is no generic key-value on it — so putting Garden state there would mean changing
- * RoyalSkyblock's schema, which is exactly the coupling being an extension is meant to avoid.
- *
- * <p>Not in the world either, tempting as it is: a Garden world is already per-player, so its
- * persistent data container looks like the natural home. But SlimeWorlds persist through ASP's own
- * serialisation, and whether Paper's world PDC survives that round trip is not something to find out
- * by losing somebody's plots.
- *
- * <h2>Not losing it</h2>
- *
- * <p>Two things used to be able to wipe a Garden. A crash in the middle of a save left a truncated file;
- * and a file that failed to parse was read as empty, so the player's next unlock saved that emptiness
- * over it. Saves now go to a temporary file that is moved into place, and a file that does not parse is
- * copied aside and its Garden held read-only until an admin looks at it.
+ * Garden state: one YAML per Garden in the extension's own folder. Not in the host's {@code Storage}
+ * (island/profile/bank-shaped, no generic key-value) and not in world PDC (whether it survives ASP's
+ * SlimeWorld serialisation is unknown). Saves go through a temp file moved into place; a file that does
+ * not parse is copied aside and its Garden held read-only.
  */
 public final class GardenStore {
 
@@ -48,16 +35,15 @@ public final class GardenStore {
         this.dir = new File(dataFolder, "gardens");
         this.logger = logger;
         if (!dir.exists() && !dir.mkdirs()) {
-            logger.warning("Could not create " + dir + " — Garden unlocks will not persist.");
+            logger.warning("Could not create " + dir + "; Garden unlocks will not persist.");
         }
     }
 
-    /** A player's state, read from disk the first time and cached after. */
+    /** Read from disk the first time and cached after. */
     public GardenState get(UUID owner) {
         return cache.computeIfAbsent(owner, this::read);
     }
 
-    /** Whether a player has ever had a Garden saved. */
     public boolean exists(UUID owner) {
         return cache.containsKey(owner) || fileFor(owner).exists();
     }
@@ -126,7 +112,7 @@ public final class GardenStore {
         void accept(int key, Object value);
     }
 
-    /** Read a {@code plot-name: value} section, skipping names that are not on this board. */
+    // A plot-name: value section, skipping names that are not on this board.
     private static void readMap(ConfigurationSection section, Entry into) {
         if (section == null) {
             return;
@@ -152,12 +138,7 @@ public final class GardenStore {
         }
     }
 
-    /**
-     * Write a Garden's state to disk.
-     *
-     * <p>Called on every change rather than on a timer or at shutdown. One change is one small file
-     * write, and the alternative is a crash costing a player a plot they watched themselves buy.
-     */
+    /** Called on every change, so a crash never costs a player a plot they just bought. */
     public void save(GardenState state) {
         if (state.readOnly()) {
             logger.warning("Not saving Garden " + state.owner() + ": it could not be read, so saving would "
@@ -199,10 +180,8 @@ public final class GardenStore {
     }
 
     /**
-     * Forget a Garden: its state file and the cached copy. The next {@link #get} starts it afresh.
-     *
-     * <p>The file is renamed rather than deleted, so a reset run on the wrong player can be undone by
-     * moving it back.
+     * Forget a Garden's state file and cached copy; the next {@link #get} starts afresh. The file is
+     * renamed, not deleted, so a reset on the wrong player can be undone.
      */
     public void reset(UUID owner) {
         cache.remove(owner);
@@ -212,18 +191,18 @@ public final class GardenStore {
             if (!file.renameTo(aside)) {
                 logger.warning("Could not move " + file + " aside; deleting it instead.");
                 if (!file.delete()) {
-                    logger.severe("Could not delete " + file + " either — the reset will not stick.");
+                    logger.severe("Could not delete " + file + " either; the reset will not stick.");
                 }
             }
         }
     }
 
-    /** Drop every cached state, so the next read of each comes from disk. */
+    /** The next read of each Garden comes from disk. */
     public void invalidate() {
         cache.clear();
     }
 
-    /** Write a file so that a crash leaves either the old contents or the new, never half of each. */
+    /** A crash leaves either the old contents or the new, never half of each. */
     public static void writeAtomically(Path target, String contents) throws IOException {
         Path temp = target.resolveSibling(target.getFileName() + ".tmp");
         Files.writeString(temp, contents, StandardCharsets.UTF_8);

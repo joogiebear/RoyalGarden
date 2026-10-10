@@ -13,18 +13,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * A WorldEdit {@code .schem} (Sponge schematic, versions 2 and 3), read into blocks and marker signs.
+ * A WorldEdit {@code .schem} (Sponge v2 and v3), read into blocks and marker signs, with no server types.
  *
- * <p>Plain data, no server types: block states stay as strings until they are pasted, so a schematic can
- * be read — and tested — without a server.
- *
- * <h2>Markers</h2>
- *
- * <p>A sign whose first non-blank line is a name in square brackets — {@code [sam]}, {@code [spawn]},
- * {@code [window]}, {@code [composter]} — is a <b>marker</b>, not part of the build: it says where
- * something goes and which way it faces, and is left out when the schematic is pasted. The way a marker
- * faces is the way its writing faces: stand in front of the sign and read it, and whatever stands at the
- * marker will be looking at you. So a builder edits the spots in-world, in the same session as the build.
+ * <p>A sign whose first non-blank line is a bracketed name ({@code [sam]}, {@code [spawn]}, {@code
+ * [window]}, {@code [composter]}) is a marker: it says where something goes and is pasted as air. A
+ * marker faces the way its writing does, so whatever stands there looks at someone reading the sign.
  */
 public final class Schematic {
 
@@ -42,7 +35,7 @@ public final class Schematic {
 
     private static final Pattern MARKER = Pattern.compile("^\\s*\\[([a-z0-9_-]+)]\\s*$");
 
-    /** Blocks a builder stands a build on — what the ground layer is found by. */
+    // Blocks a builder stands a build on; used to find the ground layer.
     private static final Set<String> GROUND = Set.of("minecraft:grass_block", "minecraft:dirt",
             "minecraft:coarse_dirt", "minecraft:podzol", "minecraft:rooted_dirt", "minecraft:dirt_path",
             "minecraft:stone", "minecraft:sand", "minecraft:gravel", "minecraft:mud", "minecraft:moss_block",
@@ -79,22 +72,21 @@ public final class Schematic {
         return length;
     }
 
-    /** The block state at a schematic position, e.g. {@code minecraft:oak_stairs[facing=north,...]}. */
+    /** e.g. {@code minecraft:oak_stairs[facing=north,...]} */
     public String state(int x, int y, int z) {
         return palette[blocks[(y * length + z) * width + x]];
     }
 
-    /** Block entities, markers left out. */
+    /** Markers left out. */
     public List<BlockEntity> blockEntities() {
         return blockEntities;
     }
 
-    /** Markers by name. */
     public Map<String, Marker> markers() {
         return markers;
     }
 
-    /** Whether a position holds a marker sign, which is pasted as air. */
+    /** Marker signs are pasted as air. */
     public boolean isMarker(int x, int y, int z) {
         for (Marker marker : markers.values()) {
             if (marker.x() == x && marker.y() == y && marker.z() == z) {
@@ -105,9 +97,8 @@ public final class Schematic {
     }
 
     /**
-     * The layer that lines up with the Garden's surface: the highest layer at least half made of ground
-     * blocks. Everything below it is subsoil; everything above it stands on the surface. 0 when nothing
-     * reads as ground — a build with no base sits directly on the surface.
+     * The layer that lines up with the Garden's surface: the highest layer at least half ground blocks. 0
+     * when nothing reads as ground.
      */
     public int groundLayer() {
         int found = -1;
@@ -128,8 +119,6 @@ public final class Schematic {
         }
         return Math.max(0, found);
     }
-
-    // ── reading ────────────────────────────────────────────────────────────────
 
     public static Schematic read(InputStream in) throws IOException {
         Map<String, Object> root = Nbt.read(in);
@@ -208,7 +197,7 @@ public final class Schematic {
                 Collections.unmodifiableMap(markers));
     }
 
-    /** Sponge block data: one unsigned LEB128 varint per block. */
+    // Sponge block data: one unsigned LEB128 varint per block.
     private static int[] varints(byte[] bytes, int count, int paletteSize) throws IOException {
         int[] out = new int[count];
         int i = 0;
@@ -238,9 +227,7 @@ public final class Schematic {
         return out;
     }
 
-    // ── markers ────────────────────────────────────────────────────────────────
-
-    /** The marker a sign names, lower case, or null if it is not a sign or not a marker. */
+    // Lower case, or null if it is not a sign or not a marker.
     static String markerName(String id, Map<String, Object> data) {
         if (!id.endsWith("sign")) {
             return null;
@@ -258,10 +245,7 @@ public final class Schematic {
         return null;
     }
 
-    /**
-     * The plain text of one sign line, however it was stored: a bare string, a JSON string or component,
-     * or a component as a compound.
-     */
+    // One sign line as plain text, whether stored as a bare string, a JSON string or component, or a compound.
     static String plain(Object message) {
         if (message instanceof Map<?, ?> map) {
             StringBuilder out = new StringBuilder();
@@ -295,10 +279,7 @@ public final class Schematic {
         return raw;
     }
 
-    /**
-     * The way a sign's writing faces, as a yaw. A standing sign's {@code rotation} counts sixteenths of a
-     * turn from south; a wall sign faces away from its wall.
-     */
+    // A standing sign's rotation counts sixteenths of a turn from south; a wall sign faces away from its wall.
     static float signYaw(String state) {
         Matcher rotation = Pattern.compile("rotation=(\\d+)").matcher(state);
         if (rotation.find()) {

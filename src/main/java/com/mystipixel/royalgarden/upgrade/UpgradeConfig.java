@@ -12,13 +12,8 @@ import java.util.Locale;
 import java.util.logging.Logger;
 
 /**
- * {@code upgrades.yml}: what each crop upgrade level costs, the libreforge effects it grants, what it
- * pays, and how the menu looks.
- *
- * <p>Which crops can be upgraded comes from {@code milestones.yml} — every milestone crop, unless
- * {@code crops.<id>.enabled} says otherwise — so a crop is defined once, with its blocks and drops, and
- * both features follow it. Read without the shipped file as defaults, since {@code crops:} holds
- * per-crop overrides an admin may delete; every setting has its fallback in code.
+ * {@code upgrades.yml}. Upgradable crops are the milestone crops unless {@code crops.<id>.enabled} says
+ * otherwise. Read without the shipped file as defaults, so every setting has its fallback in code.
  */
 public final class UpgradeConfig extends YamlFile {
 
@@ -33,18 +28,16 @@ public final class UpgradeConfig extends YamlFile {
         return yaml().getBoolean("enabled", true);
     }
 
-    /** A crop's own overrides, or null. */
     private ConfigurationSection crop(String crop) {
         return yaml().getConfigurationSection("crops." + crop.toLowerCase(Locale.ROOT));
     }
 
-    /** Whether this milestone crop can be upgraded. */
     public boolean upgradable(String crop) {
         ConfigurationSection own = crop(crop);
         return own == null || own.getBoolean("enabled", true);
     }
 
-    /** The cost of each level, in order: {@code costs()[0]} buys level 1. Its length is the top level. */
+    /** {@code costs()[0]} buys level 1; the length is the top level. */
     public List<Cost> costs(String crop) {
         ConfigurationSection own = crop(crop);
         List<String> raw = own != null && own.isList("costs") ? own.getStringList("costs")
@@ -60,13 +53,13 @@ public final class UpgradeConfig extends YamlFile {
         return costs(crop).size();
     }
 
-    /** The {@code effects:} template for a crop: its own if it has one, else the shared one. */
+    /** The crop's own template if it has one, else the shared one. */
     public List<?> effects(String crop) {
         ConfigurationSection own = crop(crop);
         return own != null && own.isList("effects") ? own.getList("effects") : yaml().getList("effects", List.of());
     }
 
-    /** The {@code conditions:} template for a crop: its own if it has one, else the shared one. */
+    /** The crop's own template if it has one, else the shared one. */
     public List<?> conditions(String crop) {
         ConfigurationSection own = crop(crop);
         return own != null && own.isList("conditions") ? own.getList("conditions")
@@ -75,7 +68,6 @@ public final class UpgradeConfig extends YamlFile {
 
     public enum Scope { OWN_GARDEN, GARDENS, EVERYWHERE }
 
-    /** Where a player's upgrades are active. */
     public Scope applyIn() {
         String raw = yaml().getString("apply-in", "own-garden").trim().toLowerCase(Locale.ROOT);
         return switch (raw) {
@@ -86,8 +78,8 @@ public final class UpgradeConfig extends YamlFile {
     }
 
     /**
-     * The number menus show for a level, {@code level × value-per-level} — only text: what a level
-     * actually does is its effects, so this is the admin's description of them (5 = "+5% double drops").
+     * Display only: menus show {@code level * value-per-level}. What a level does is its effects; this is
+     * the admin's description of them (5 = "+5% double drops").
      */
     public double valuePerLevel(String crop) {
         ConfigurationSection own = crop(crop);
@@ -95,7 +87,7 @@ public final class UpgradeConfig extends YamlFile {
         return own == null ? fallback : own.getDouble("value-per-level", fallback);
     }
 
-    /** Garden XP for buying {@code level}: {@code base + per-level × level}. */
+    /** {@code base + per-level * level} */
     public long gardenXp(int level) {
         return Math.max(0, yaml().getLong("garden-xp.base", 5) + yaml().getLong("garden-xp.per-level", 5) * level);
     }

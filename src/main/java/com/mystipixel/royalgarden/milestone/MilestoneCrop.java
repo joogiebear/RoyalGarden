@@ -19,7 +19,7 @@ public record MilestoneCrop(String id, String displayName, Material icon, Set<Ma
                             Set<Material> drops, int points, boolean requireRipe, boolean naturalOnly,
                             boolean stacked, long[] tiers) {
 
-    /** The tier a total has reached: 0 before the first threshold, {@code tiers.length} at the top. */
+    /** 0 before the first threshold, {@code tiers.length} at the top. */
     public int tierOf(long total) {
         int tier = 0;
         while (tier < tiers.length && total >= tiers[tier]) {
@@ -37,7 +37,6 @@ public record MilestoneCrop(String id, String displayName, Material icon, Set<Ma
         return tier < tiers.length ? tiers[tier] : -1;
     }
 
-    /** The total the current tier started at. */
     public long tierStart(int tier) {
         return tier <= 0 ? 0 : tiers[tier - 1];
     }

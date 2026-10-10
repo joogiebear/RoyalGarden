@@ -16,11 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-/**
- * The Crop Upgrades page of the desk: one icon per crop, with its level, what the next level costs, and
- * what it is worth. Click to buy the next level. Every line comes from {@code menu:} in
- * {@code upgrades.yml}; each icon is the crop's own from {@code milestones.yml}.
- */
+/** The Crop Upgrades page of the desk. Every line comes from menu: in upgrades.yml. */
 public final class UpgradeMenu {
 
     private final UpgradeService upgrades;

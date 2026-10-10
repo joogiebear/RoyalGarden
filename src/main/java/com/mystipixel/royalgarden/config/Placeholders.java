@@ -8,12 +8,8 @@ import org.bukkit.plugin.Plugin;
 import java.lang.reflect.Method;
 
 /**
- * PlaceholderAPI, when it is installed — reached by reflection.
- *
- * <p>This extension compiles against the host's jar alone, and PlaceholderAPI is not on that path; a
- * direct reference would also make the extension fail to load on a server without it. Looking the one
- * method up at runtime keeps it optional: with PlaceholderAPI absent, text passes through unchanged and
- * any requirement that depends on a placeholder reads as unmet.
+ * PlaceholderAPI through reflection, so the extension still loads without it. With it absent, text passes
+ * through unchanged and any placeholder requirement reads as unmet.
  */
 public final class Placeholders {
 
@@ -23,12 +19,11 @@ public final class Placeholders {
     private Placeholders() {
     }
 
-    /** Whether PlaceholderAPI is installed and could be reached. */
     public static boolean available() {
         return method() != null;
     }
 
-    /** Fill every {@code %placeholder%} PlaceholderAPI knows, or return the text unchanged. */
+    /** Returns the text unchanged if PlaceholderAPI is absent. */
     public static String apply(Player player, String text) {
         Method method = method();
         if (method == null || text == null || text.indexOf('%') < 0) {
@@ -42,8 +37,8 @@ public final class Placeholders {
     }
 
     /**
-     * Read a placeholder as a number: the digits in whatever it returns, so {@code "1,250"} and
-     * {@code "Level 12"} both read sensibly. {@code NaN} if nothing numeric came back.
+     * Reads the digits in whatever the placeholder returns, so {@code "1,250"} and {@code "Level 12"} both
+     * work. {@code NaN} if nothing numeric came back.
      */
     public static double number(Player player, String placeholder) {
         String value = apply(player, placeholder);

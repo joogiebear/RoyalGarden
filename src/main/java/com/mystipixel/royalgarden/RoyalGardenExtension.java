@@ -68,22 +68,10 @@ import java.io.File;
 import java.util.function.Supplier;
 
 /**
- * The Garden, loaded as an eco extension of RoyalSkyblock.
- *
- * <p>An extension rather than a plugin because everything The Garden needs already exists in the
- * host: per-profile worlds through Advanced Slime Paper, persistence, a menu engine, currencies and
- * a border service. Building alongside would mean reimplementing all of it and then keeping the two
- * copies agreeing about who owns what.
- *
- * <p>eco loads any jar in {@code plugins/RoyalSkyblock/extensions/} that carries an
- * {@code extension.yml}. It does so quietly: a jar with no manifest is skipped with a log line and
- * no error, so the console is the only confirmation a build actually took.
- *
- * <p>Everything tunable lives in {@code plugins/RoyalSkyblock/extensions/RoyalGarden/}:
- * {@code config.yml} (the board, costs, rewards, rules, menus), {@code messages.yml},
- * {@code presets.yml}, {@code milestones.yml}, {@code levels.yml}, {@code visitors.yml},
- * {@code upgrades.yml}, {@code composter.yml} and {@code pests.yml}. The host's
- * reload reloads them too.
+ * The Garden, loaded as an eco extension of RoyalSkyblock so it reuses the host's worlds, storage, menus,
+ * currencies and border. eco loads any jar in {@code plugins/RoyalSkyblock/extensions/} with an {@code
+ * extension.yml}, and skips one without it silently. Config lives in {@code
+ * plugins/RoyalSkyblock/extensions/RoyalGarden/}; the host's reload reloads it too.
  */
 public final class RoyalGardenExtension extends Extension {
 
@@ -132,12 +120,8 @@ public final class RoyalGardenExtension extends Extension {
     }
 
     /**
-     * Runs inside the host's own enable, before its services exist.
-     *
-     * <p>Keep this trivial. eco enables extensions from {@code EcoPlugin.onEnable}, so anything
-     * thrown here propagates out of RoyalSkyblock's enable and disables the whole plugin — an
-     * extension can take its host down. Service resolution therefore waits for
-     * {@link #onAfterLoad()}, and everything here is defensive by default.
+     * Runs inside the host's own enable, before its services exist. Keep this trivial: anything thrown here
+     * disables RoyalSkyblock itself. Service resolution waits for {@link #onAfterLoad()}.
      */
     @Override
     protected void onEnable() {
@@ -145,19 +129,16 @@ public final class RoyalGardenExtension extends Extension {
     }
 
     /**
-     * Runs once the host has finished loading, which is where its services actually exist.
-     *
-     * <p>They can still be absent: RoyalSkyblock leaves {@code islandManager} null when the island
-     * world backend is unavailable — running plain Paper instead of Advanced Slime Paper does it —
-     * and its accessors assert non-null, so reaching for one throws. Nothing here is allowed to
-     * escape; a Garden that cannot start should say so and leave the server running.
+     * Runs once the host has loaded. Services can still be absent (no Advanced Slime Paper leaves {@code
+     * islandManager} null, and its accessors throw), so nothing here may escape: a Garden that cannot start
+     * says so and leaves the server running.
      */
     @Override
     protected void onAfterLoad() {
         RoyalSkyblockPlugin host = RoyalSkyblockPlugin.Companion.get();
 
-        // The fields behind these accessors are private; the accessors are not. That is the whole
-        // reason this can be an extension without touching RoyalSkyblock itself.
+        // The fields behind these accessors are private; the accessors are not, which is what lets this be
+        // an extension without touching RoyalSkyblock.
         this.islands = resolve("island manager", host::islands);
         this.worlds = resolve("world service", host::worlds);
         this.storage = resolve("storage", host::storage);
@@ -170,7 +151,7 @@ public final class RoyalGardenExtension extends Extension {
             return;
         }
 
-        getLogger().info("Host services resolved — world backend is "
+        getLogger().info("Host services resolved, world backend is "
                 + this.worlds.getClass().getSimpleName() + ".");
         try {
             start(host);
@@ -181,10 +162,8 @@ public final class RoyalGardenExtension extends Extension {
     }
 
     /**
-     * Re-read {@code config.yml}, {@code messages.yml} and {@code presets.yml}.
-     *
-     * <p>Reached from the host's own reload and from {@code /garden reload}. The board's shape is the
-     * one thing that does not change here — see {@link GardenConfig}.
+     * Re-reads every config file. Reached from the host's reload and {@code /garden reload}. The board's
+     * shape does not change here (see {@link GardenConfig}).
      */
     @Override
     protected void onReload() {
@@ -222,23 +201,13 @@ public final class RoyalGardenExtension extends Extension {
                 + "visitors.yml, upgrades.yml, composter.yml and pests.yml.");
     }
 
-    /**
-     * This extension's own folder: {@code plugins/RoyalSkyblock/extensions/<name>/}.
-     *
-     * <p>Not {@link #getDataFolder()}, which returns the <em>host's</em> folder — every extension
-     * calling it writes into {@code plugins/RoyalSkyblock/} directly, mixed in with the host's own
-     * {@code gui/}, {@code perks/} and {@code upgrades/}.
-     */
+    // plugins/RoyalSkyblock/extensions/<name>/. Not getDataFolder(), which returns the host's folder.
     private File dataDir() {
         return new File(new File(getPlugin().getDataFolder(), "extensions"), getName());
     }
 
-    /**
-     * Move data written by an earlier version out of the host's folder and into ours.
-     *
-     * <p>One-time and conditional: it only moves a name if we do not already own one, so it cannot
-     * overwrite current data, and it does nothing at all on a clean install.
-     */
+    // Moves data an earlier version wrote into the host's folder. Only moves a name we do not already have,
+    // so it never overwrites current data.
     private void migrateStrayData(File target) {
         File host = getPlugin().getDataFolder();
         for (String name : new String[]{"gardens", "presets", "presets.yml"}) {
@@ -251,23 +220,23 @@ public final class RoyalGardenExtension extends Extension {
                 getLogger().info("Moved " + name + " out of the host's folder into " + target.getName() + "/.");
             } else {
                 getLogger().warning("Could not move " + stray + " into " + target
-                        + " — it will be read from neither. Move it by hand.");
+                        + "; it will be read from neither. Move it by hand.");
             }
         }
     }
 
-    /** Stand everything up. Only reached once the host's services are known to exist. */
+    // Only reached once the host's services are known to exist.
     private void start(RoyalSkyblockPlugin host) {
         File data = dataDir();
         if (!data.exists() && !data.mkdirs()) {
-            getLogger().warning("Could not create " + data + " — Garden data will not persist.");
+            getLogger().warning("Could not create " + data + "; Garden data will not persist.");
         }
         migrateStrayData(data);
 
         this.config = new GardenConfig(data, getLogger());
         String layoutProblem = GardenLayout.configure(config.grid(), config.plotSize(), config.groundY());
         if (layoutProblem != null) {
-            getLogger().severe(layoutProblem + " — using the default 5x5 board of 96-block plots.");
+            getLogger().severe(layoutProblem + "; using the default 5x5 board of 96-block plots.");
         }
         this.messages = new Messages(data, getLogger());
         com.mystipixel.royalgarden.garden.Farmhouse.configure(data, config.yaml().getConfigurationSection("farmhouse"),
@@ -287,7 +256,6 @@ public final class RoyalGardenExtension extends Extension {
         Bukkit.getPluginManager().registerEvents(sam, getPlugin());
         Bukkit.getPluginManager().registerEvents(protection, getPlugin());
 
-        // Clearing: locked plots grow debris, and a bought plot must be cleared before it can be built on.
         this.clearing = new ClearingService(getPlugin(), config, messages, gardens);
         protection.setClearing(clearing);
         presetService.setClearing(clearing);
@@ -301,7 +269,6 @@ public final class RoyalGardenExtension extends Extension {
         declare(PresetService.BYPASS_COOLDOWN, PermissionDefault.OP, "Skip the cooldown between plot rebuilds.");
         declare(CommandGarden.ADMIN, PermissionDefault.OP, "Manage presets and other players' Gardens.");
 
-        // Crop Milestones: lifetime harvest per crop, with tiers and rewards, on the desk.
         this.milestoneConfig = new MilestoneConfig(data, getLogger());
         this.milestoneStore = new MilestoneStore(data, getLogger());
         MilestoneService milestones = new MilestoneService(milestoneConfig, milestoneStore, messages);
@@ -312,8 +279,6 @@ public final class RoyalGardenExtension extends Extension {
         Bukkit.getPluginManager().registerEvents(placedBlocks, getPlugin());
         Bukkit.getPluginManager().registerEvents(milestoneListener, getPlugin());
 
-        // Garden Levels: XP from milestone tiers and plot purchases (and /garden xp), levels that pay
-        // rewards and gate plots and presets.
         this.levelConfig = new LevelConfig(data, getLogger());
         GardenLevels levels = new GardenLevels(levelConfig, gardens, messages);
         milestones.onTier((player, crop, tier) ->
@@ -334,7 +299,6 @@ public final class RoyalGardenExtension extends Extension {
         scheduleMilestoneSaves();
         this.milestoneSweeper = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneListener::clearStale, 20L, 20L);
 
-        // Visitors: NPCs at the barn asking for crops, paying Copper, Garden XP and rewards.
         this.visitorConfig = new VisitorConfig(data, getLogger());
         VisitorStore visitorStore = new VisitorStore(data, getLogger());
         this.visitors = new VisitorService(visitorConfig, visitorStore, messages, getLogger());
@@ -353,7 +317,6 @@ public final class RoyalGardenExtension extends Extension {
         }
         scheduleVisitorArrivals();
         visitorNpcs.syncAll();
-        // Crop upgrades: levels bought with Copper at the desk, each granting libreforge effects.
         this.upgradeConfig = new UpgradeConfig(data, getLogger());
         this.upgrades = new UpgradeService(upgradeConfig, new UpgradeStore(data, getLogger()), milestoneConfig,
                 messages, currency);
@@ -365,8 +328,7 @@ public final class RoyalGardenExtension extends Extension {
         this.upgradeHolders = new UpgradeHolders(getPlugin(), upgrades);
         upgradeHolders.register();
 
-        // The Composter: organic matter and fuel in, Compost out over time, with machine upgrades bought
-        // with Copper. It runs while its owner is away and catches up when next touched.
+        // The Composter runs while its owner is away and catches up when next touched.
         this.composterConfig = new ComposterConfig(data, getLogger(), milestoneConfig);
         this.composter = new ComposterService(composterConfig, new ComposterStore(data, getLogger()), messages,
                 currency, getLogger());
@@ -386,8 +348,6 @@ public final class RoyalGardenExtension extends Extension {
         composterBlock.ensureAll();
         scheduleComposter();
 
-        // Pests: EcoMobs mobs brought onto plots by farming, held to their plot, paying Copper and Garden XP
-        // when killed. An infested plot's slowdown is libreforge effects, like crop upgrades.
         this.pestConfig = new PestConfig(data, getLogger());
         this.pests = new PestService(getPlugin(), pestConfig, new PestStore(data, getLogger()), messages, gardens,
                 getLogger());
@@ -447,7 +407,6 @@ public final class RoyalGardenExtension extends Extension {
                 + " plots of " + GardenLayout.plotSize() + ".");
     }
 
-    /** Save milestone progress every {@code save-interval-seconds}. */
     private void scheduleMilestoneSaves() {
         if (milestoneSaver != null) {
             milestoneSaver.cancel();
@@ -456,7 +415,6 @@ public final class RoyalGardenExtension extends Extension {
         milestoneSaver = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneStore::saveAll, period, period);
     }
 
-    /** Catch online players' Composters up every {@code compost.check-every-seconds}. */
     private void scheduleComposter() {
         if (composterTicker != null) {
             composterTicker.cancel();
@@ -465,7 +423,6 @@ public final class RoyalGardenExtension extends Extension {
         composterTicker = Bukkit.getScheduler().runTaskTimer(getPlugin(), composter::tickAll, period, period);
     }
 
-    /** Hold pests to their plots every {@code confine.check-every-seconds}. */
     private void schedulePests() {
         if (pestConfiner != null) {
             pestConfiner.cancel();
@@ -474,16 +431,11 @@ public final class RoyalGardenExtension extends Extension {
         pestConfiner = Bukkit.getScheduler().runTaskTimer(getPlugin(), pests::confineAll, period, period);
     }
 
-    /**
-     * Register {@code %royalgarden_...%} with PlaceholderAPI, if it is enabled.
-     *
-     * <p>The expansion class extends a PlaceholderAPI type, so it is only touched behind the enabled
-     * check, and held as an {@code Object} so this class never needs PlaceholderAPI to load. A failure
-     * costs the placeholders, never the extension.
-     */
+    // The expansion extends a PlaceholderAPI type, so it is only touched behind the enabled check and held
+    // as an Object. A failure costs the placeholders, never the extension.
     private void registerExpansion(java.util.function.BiFunction<org.bukkit.OfflinePlayer, String, String> resolver) {
         if (!Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-            getLogger().info("PlaceholderAPI not found — %royalgarden_...% placeholders are off.");
+            getLogger().info("PlaceholderAPI not found; %royalgarden_...% placeholders are off.");
             return;
         }
         try {
@@ -498,7 +450,6 @@ public final class RoyalGardenExtension extends Extension {
         }
     }
 
-    /** Check for visitor arrivals every {@code arrivals.check-every-seconds}. */
     private void scheduleVisitorArrivals() {
         if (visitorTicker != null) {
             visitorTicker.cancel();
@@ -507,7 +458,7 @@ public final class RoyalGardenExtension extends Extension {
         visitorTicker = Bukkit.getScheduler().runTaskTimer(getPlugin(), visitors::tickAll, period, period);
     }
 
-    /** Where players standing in a Garden go when it is deleted. */
+    // Where players standing in a Garden go when it is deleted.
     private Location evacuationPoint(RoyalSkyblockPlugin host) {
         String name = config.evacuateWorld();
         if (name == null || name.isBlank()) {
@@ -520,15 +471,8 @@ public final class RoyalGardenExtension extends Extension {
         return world.getSpawnLocation();
     }
 
-    /**
-     * Register a permission node.
-     *
-     * <p>An extension has no {@code plugin.yml}, so there is nowhere to declare a node the way the host
-     * declares its own — and an <em>undeclared</em> node is not simply ungated. Bukkit resolves one it
-     * has never seen through {@code PermissionDefault.OP}, so leaving these undeclared makes both
-     * commands operators-only without a word in the log about it. Declaring them here is what makes
-     * {@code default: true} mean anything.
-     */
+    // An extension has no plugin.yml, and Bukkit treats an undeclared node as OP-only, so nodes are
+    // declared here for default: true to mean anything.
     private void declare(String node, PermissionDefault fallback, String description) {
         PluginManager plugins = Bukkit.getPluginManager();
         if (plugins.getPermission(node) != null) {
@@ -537,7 +481,7 @@ public final class RoyalGardenExtension extends Extension {
         plugins.addPermission(new Permission(node, description, fallback));
     }
 
-    /** Reads one host service, treating an absent one as a fact to report rather than a crash. */
+    // An absent host service is reported, not thrown.
     private <T> T resolve(String what, Supplier<T> accessor) {
         try {
             return accessor.get();
@@ -553,13 +497,9 @@ public final class RoyalGardenExtension extends Extension {
     }
 
     /**
-     * Tear down what {@link #start} put up.
-     *
-     * <p>Commands, listeners and the build queue's task are registered against the <em>host</em>
-     * plugin, so nothing here is cleaned up for us on an extension reload — leaving them would stack a
-     * second copy of each on the next load. Garden worlds are not unloaded: the host's world service owns
-     * their lifecycle and saves them on shutdown, and racing it would be the one way to actually lose
-     * someone's farm. Rebuilds cut short here are recorded as pending and resume on the next visit.
+     * Commands, listeners and tasks are registered against the host plugin, so they must be removed here or
+     * a reload stacks a second copy. Garden worlds are not unloaded: the host's world service owns and saves
+     * them. Rebuilds cut short here resume on the next visit.
      */
     @Override
     protected void onDisable() {
@@ -682,22 +622,20 @@ public final class RoyalGardenExtension extends Extension {
         this.currency = null;
     }
 
-    /** The host's island manager, once enabled. */
     public IslandManager islands() {
         return islands;
     }
 
-    /** The host's world service — how a Garden world is created and unloaded. */
+    /** How a Garden world is created and unloaded. */
     public IslandWorldService worlds() {
         return worlds;
     }
 
-    /** The host's storage. */
     public Storage storage() {
         return storage;
     }
 
-    /** Garden worlds, once the extension is running. Null when the host had no island services. */
+    /** Null when the host had no island services. */
     public GardenWorlds gardens() {
         return gardens;
     }

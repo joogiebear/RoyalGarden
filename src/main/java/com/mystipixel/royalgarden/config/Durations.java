@@ -3,10 +3,7 @@ package com.mystipixel.royalgarden.config;
 import java.util.Locale;
 
 /**
- * Durations as admins write them: {@code 2d}, {@code 4h30m}, {@code 45s}, or {@code 0} for none.
- *
- * <p>The same shorthand RoyalSkyblock's upgrade {@code time:} uses, so one config vocabulary covers
- * both plugins.
+ * Durations as admins write them: 2d, 4h30m, 45s, or 0 for none (the same shorthand as RoyalSkyblock's time:).
  */
 public final class Durations {
 
@@ -14,8 +11,8 @@ public final class Durations {
     }
 
     /**
-     * Parse a duration into milliseconds. Returns {@code 0} for blank or unparseable input, which every
-     * caller reads as "no wait" — a typo should cost a cooldown, not a player's access.
+     * Blank or unparseable input gives 0, which callers read as "no wait": a typo should cost a cooldown,
+     * not a player's access.
      */
     public static long parseMillis(String raw) {
         if (raw == null || raw.isBlank()) {
@@ -53,7 +50,7 @@ public final class Durations {
         return total + (digits ? number * 1_000L : 0);
     }
 
-    /** Format milliseconds for a player: {@code 1h 5m}, {@code 30s}, never more than two units. */
+    /** Never more than two units: 1h 5m, 30s. */
     public static String format(long millis) {
         long seconds = Math.max(0, (millis + 999) / 1000);
         long days = seconds / 86_400;

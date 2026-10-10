@@ -18,10 +18,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * The Composter page: organic matter and fuel with their bars (left-click puts one stack in, right-click
- * everything that counts), the status and the next Compost, a collect button, and one button per
- * upgrade. Every icon, line and position comes from {@code menu:} and {@code upgrades:} in
- * {@code composter.yml}. The Composter is caught up each time the page is opened or clicked.
+ * The Composter page. Every icon, line and position comes from menu: and upgrades: in composter.yml.
+ * The Composter is caught up each time the page is opened or clicked.
  */
 public final class ComposterMenu {
 
@@ -118,7 +116,6 @@ public final class ComposterMenu {
         builder.build().open(player);
     }
 
-    /** Catch up, do the click, and redraw. */
     private void act(org.bukkit.entity.HumanEntity clicker, Menu clicked, Consumer<Player> action) {
         Player who = (Player) clicker;
         composter.update(who.getUniqueId());
@@ -126,7 +123,6 @@ public final class ComposterMenu {
         clicked.refresh(who);
     }
 
-    /** One configured icon, drawn per viewer, at its {@code row} and {@code column}. */
     private static void place(MenuBuilder builder, boolean[][] used, int rows, ConfigurationSection section,
                               int defaultRow, int defaultColumn, Material fallback,
                               Function<Player, String[]> placeholders, Function<SlotBuilder, SlotBuilder> clicks) {

@@ -10,21 +10,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Everything remembered about one player's Garden besides its blocks.
- *
- * <ul>
- *   <li><b>Unlocked plots.</b> The centre plot is unlocked by definition — it carries the farmhouse,
- *       and a Garden with no standing room is not a state worth being able to represent.</li>
- *   <li><b>What each plot was last built from</b>, so the desk can show it.</li>
- *   <li><b>When each plot was last rebuilt</b>, for the preset cooldown.</li>
- *   <li><b>Rebuilds still in progress</b>, so one interrupted by the world unloading picks up again
- *       on the next visit instead of leaving half a farm.</li>
- *   <li><b>Debris</b>: how much {@link Overgrowth} each locked plot was generated with, and — once a
- *       plot is bought — how much of it has been cleared. A plot being cleared cannot be built on.</li>
- * </ul>
- *
- * <p>Plots are held as a packed {@code pz * grid + px} so the sets are sets of small ints rather than
- * of objects with equality to get wrong. The packing never leaves this class.
+ * Everything remembered about one player's Garden besides its blocks: unlocked plots (the centre always),
+ * each plot's last preset and rebuild time, unfinished rebuilds, and {@link Overgrowth} debris and
+ * clearing progress. Plots are packed as {@code pz * grid + px}; the packing never leaves this class.
  */
 public final class GardenState {
 
@@ -62,22 +50,19 @@ public final class GardenState {
         return GardenLayout.inGrid(px, pz) && unlocked.contains(key(px, pz));
     }
 
-    /** How many plots are unlocked, farmhouse included. */
+    /** Farmhouse included. */
     public int unlockedCount() {
         return unlocked.size();
     }
 
-    /** How many plots have been bought — the farmhouse is free, so it does not count. */
+    /** The farmhouse is free, so it does not count. */
     public int purchasedCount() {
         return unlocked.size() - 1;
     }
 
     /**
-     * Whether this plot is the next-thing-you-could-buy: locked, on the board, and orthogonally
-     * touching something you already own.
-     *
-     * <p>Orthogonally, not diagonally: a Garden should grow as one connected piece, and a diagonal-only
-     * link would leave a plot you can see and cannot walk to.
+     * Locked, on the board, and orthogonally touching an owned plot. Not diagonally: a diagonal-only link
+     * would leave a plot you can see and cannot walk to.
      */
     public boolean canUnlock(int px, int pz) {
         if (!GardenLayout.inGrid(px, pz) || isUnlocked(px, pz)) {
@@ -88,9 +73,8 @@ public final class GardenState {
     }
 
     /**
-     * Unlock a plot. Returns false if it was not a legal next purchase.
-     *
-     * <p>A plot bought with debris on it starts being cleared: see {@link #beginClearing}.
+     * Returns false if it was not a legal next purchase. A plot bought with debris starts being cleared
+     * (see {@link #beginClearing}).
      */
     public boolean unlock(int px, int pz) {
         if (readOnly || !canUnlock(px, pz)) {
@@ -101,16 +85,14 @@ public final class GardenState {
         return true;
     }
 
-    /** Unlock a plot regardless of adjacency — for admins, and for reading from storage. */
+    /** Ignores adjacency: for admins, and for reading from storage. */
     public boolean forceUnlock(int px, int pz) {
         return GardenLayout.inGrid(px, pz) && unlocked.add(key(px, pz));
     }
 
     /**
-     * Lock a plot again. The farmhouse cannot be locked.
-     *
-     * <p>A plot locked part-way through clearing keeps the debris still on it as its overgrowth, so
-     * unlocking it again asks for what is left to be cleared rather than what was there to begin with.
+     * The farmhouse cannot be locked. A plot locked part-way through clearing keeps its remaining debris as
+     * its overgrowth.
      */
     public boolean lock(int px, int pz) {
         if (!GardenLayout.inGrid(px, pz) || GardenLayout.isCentre(px, pz)) {
@@ -126,7 +108,7 @@ public final class GardenState {
         return true;
     }
 
-    /** Every unlocked plot as {@code {px, pz}} pairs, in unlock order. */
+    /** As {@code {px, pz}} pairs, in unlock order. */
     public List<int[]> plots() {
         List<int[]> out = new ArrayList<>(unlocked.size());
         for (int k : unlocked) {
@@ -135,9 +117,7 @@ public final class GardenState {
         return Collections.unmodifiableList(out);
     }
 
-    // ── presets on plots ───────────────────────────────────────────────────────
-
-    /** The preset a plot was last built from, or null if it still has what it was generated with. */
+    /** Null if it still has what it was generated with. */
     public String presetOn(int px, int pz) {
         return presets.get(key(px, pz));
     }
@@ -150,7 +130,7 @@ public final class GardenState {
         }
     }
 
-    /** When a plot was last rebuilt, in epoch milliseconds; 0 if never. */
+    /** Epoch milliseconds; 0 if never. */
     public long lastApplied(int px, int pz) {
         return lastApplied.getOrDefault(key(px, pz), 0L);
     }
@@ -159,7 +139,7 @@ public final class GardenState {
         lastApplied.put(key(px, pz), when);
     }
 
-    /** Record a rebuild that has started and not yet finished. */
+    /** Records a rebuild that has started and not yet finished. */
     public void setPending(int px, int pz, String id) {
         if (id == null) {
             pending.remove(key(px, pz));
@@ -168,25 +148,19 @@ public final class GardenState {
         }
     }
 
-    /** Rebuilds that were started and never finished, as {@code plot -> preset id}. */
+    /** As {@code plot -> preset id}. */
     public Map<int[], String> pending() {
         Map<int[], String> out = new HashMap<>();
         pending.forEach((k, id) -> out.put(unkey(k), id));
         return out;
     }
 
-    // ── debris ─────────────────────────────────────────────────────────────────
-
     /** Whether a locked plot has had its debris generated. */
     public boolean isOvergrown(int px, int pz) {
         return overgrowth.containsKey(key(px, pz));
     }
 
-    /**
-     * Record that a plot's debris has been generated, {@code blocks} of it.
-     *
-     * <p>If the plot was bought while its debris was still being laid, clearing starts now instead.
-     */
+    /** If the plot was bought while its debris was still being laid, clearing starts now instead. */
     public void setOvergrowth(int px, int pz, int blocks) {
         int k = key(px, pz);
         if (unlocked.contains(k)) {
@@ -199,9 +173,7 @@ public final class GardenState {
     }
 
     /**
-     * Start clearing a plot that has debris on it. Returns true if it now needs clearing.
-     *
-     * <p>A plot generated with no debris — or bought before debris existed — is ready to build on at once.
+     * Returns true if the plot now needs clearing. A plot with no debris is ready to build on at once.
      */
     public boolean beginClearing(int px, int pz) {
         int k = key(px, pz);
@@ -213,24 +185,24 @@ public final class GardenState {
         return true;
     }
 
-    /** Whether a plot is bought and still has a clearing record — below or above the threshold. */
+    /** Below or above the threshold. */
     public boolean isClearing(int px, int pz) {
         return clearing.containsKey(key(px, pz));
     }
 
-    /** Debris the plot had when clearing began; 0 if it is not being cleared. */
+    /** 0 if it is not being cleared. */
     public int clearingTotal(int px, int pz) {
         int[] progress = clearing.get(key(px, pz));
         return progress == null ? 0 : progress[0];
     }
 
-    /** Debris cleared from the plot so far; 0 if it is not being cleared. */
+    /** 0 if it is not being cleared. */
     public int clearingDone(int px, int pz) {
         int[] progress = clearing.get(key(px, pz));
         return progress == null ? 0 : progress[1];
     }
 
-    /** Set how much has been cleared, held between none and all of it. */
+    /** Held between none and all of it. */
     public void setClearingDone(int px, int pz, int done) {
         int[] progress = clearing.get(key(px, pz));
         if (progress != null) {
@@ -238,29 +210,29 @@ public final class GardenState {
         }
     }
 
-    /** How far through clearing a plot is, 0–100, rounded down; 100 when it is not being cleared. */
+    /** 0-100, rounded down; 100 when it is not being cleared. */
     public int clearingPercent(int px, int pz) {
         int[] progress = clearing.get(key(px, pz));
         return progress == null ? 100 : percent(progress[1], progress[0]);
     }
 
-    /** {@code done} of {@code total} as a whole percentage, rounded down so 89.9% never reads as 90. */
+    /** Rounded down so 89.9% never reads as 90. */
     public static int percent(int done, int total) {
         return total <= 0 ? 100 : (int) Math.min(100, (long) done * 100 / total);
     }
 
-    /** Stop tracking a plot's clearing: it is ready to build on. Returns false if it was not being cleared. */
+    /** Returns false if it was not being cleared. */
     public boolean finishClearing(int px, int pz) {
         return clearing.remove(key(px, pz)) != null;
     }
 
-    /** Forget any debris a plot had, locked or bought — for a plot that has just been rebuilt over. */
+    /** For a plot that has just been rebuilt over, locked or bought. */
     public void forgetDebris(int px, int pz) {
         overgrowth.remove(key(px, pz));
         clearing.remove(key(px, pz));
     }
 
-    /** Garden XP earned in total. The level is worked out from it; it is never spent. */
+    /** The level is worked out from it; it is never spent. */
     public long xp() {
         return xp;
     }
@@ -279,8 +251,8 @@ public final class GardenState {
     }
 
     /**
-     * Which {@link Farmhouse#id} the farmhouse plot was built with. Gardens from before schematics were
-     * recorded have none, and read as the built-in barn at their {@link #barnVersion}.
+     * Which {@link Farmhouse#id} the farmhouse plot was built with. Older Gardens have none and read as the
+     * built-in barn at their {@link #barnVersion}.
      */
     public String farmhouse() {
         return farmhouse != null ? farmhouse : "generated-" + barnVersion;
@@ -299,11 +271,8 @@ public final class GardenState {
     }
 
     /**
-     * Whether this state could not be read from disk and must not be written back.
-     *
-     * <p>Saving a state that failed to load would replace whatever is on disk — possibly a player's
-     * whole Garden behind one bad character — with an empty one. So a Garden in this state refuses
-     * changes until an admin resets it or fixes the file.
+     * True if this state could not be read from disk. Saving it would overwrite the file with an empty
+     * Garden, so it refuses changes until an admin resets it or fixes the file.
      */
     public boolean readOnly() {
         return readOnly;
@@ -312,8 +281,6 @@ public final class GardenState {
     void markReadOnly() {
         this.readOnly = true;
     }
-
-    // ── storage views ──────────────────────────────────────────────────────────
 
     Map<Integer, String> presetsByKey() {
         return presets;

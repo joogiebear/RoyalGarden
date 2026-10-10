@@ -5,8 +5,7 @@ import org.bukkit.OfflinePlayer;
 import java.util.Locale;
 
 /**
- * Garden Level for {@code %royalgarden_<key>%}, answered without PlaceholderAPI's types so the logic
- * loads on any server; {@link com.mystipixel.royalgarden.hooks.RoyalGardenExpansion} is the front end.
+ * Garden Level for {@code %royalgarden_<key>%}, without PlaceholderAPI types.
  *
  * <pre>
  *   %royalgarden_level%        the player's Garden Level
@@ -14,9 +13,8 @@ import java.util.Locale;
  *   %royalgarden_max_level%    the highest level levels.yml defines
  * </pre>
  *
- * <p>Plain numbers, so gear can scale with them (a fortune bonus per level) and conditions can compare
- * them. Offline players read {@code 0}: their Garden state is cached for good once read, so a
- * leaderboard or hologram would otherwise load every Garden into memory.
+ * <p>Offline players read {@code 0}: Garden state stays cached once read, so a leaderboard would
+ * otherwise load every Garden into memory.
  */
 public final class LevelPlaceholders {
 
@@ -26,7 +24,7 @@ public final class LevelPlaceholders {
         this.levels = levels;
     }
 
-    /** The value for {@code key}, or null if the key is not one of ours. */
+    /** Null if the key is not one of ours. */
     public String resolve(OfflinePlayer player, String key) {
         String params = key.toLowerCase(Locale.ROOT);
         switch (params) {

@@ -41,25 +41,10 @@ import java.util.UUID;
 import java.util.function.BiConsumer;
 
 /**
- * The visitors standing outside the barn: one no-AI mob per waiting visitor, at the spots listed in
- * {@code visitors.yml}. Right-clicking one opens its offer.
- *
- * <p>Built the way Sam is: a plain entity tagged in its persistent data with the id of the offer it
- * stands for, so it is found again after a restart and never duplicated. The queue is the truth and
- * the entities follow it — {@link #sync} removes any that no longer stand for a waiting visitor and
- * spawns any missing. More visitors than spots wait on the Visitors page without a body.
- *
- * <p>Like Sam, syncing waits for the spots' chunks to have their entities loaded: Paper loads those
- * after the blocks, and looking earlier would find nobody and spawn a second copy.
- *
- * <h2>The line</h2>
- *
- * <p>With {@code line:} in {@code visitors.yml} the spots are a single file leading to the barn's
- * drive-through window, front first. Visitors <em>walk</em> between them rather than jumping: a newcomer
- * walks in from behind the line, and when the one at the window is served the rest step up. They have no
- * AI to walk with — that would bring a villager's whole brain along, beds and workstations included — so
- * they are moved a little every tick instead, facing the way they go. The client animates their legs
- * from the movement, so from the outside it is walking.
+ * The visitors standing outside the barn: one no-AI mob per waiting visitor, tagged with its offer id
+ * like Sam. The queue is the truth; {@link #sync} removes stale entities and spawns missing ones, and
+ * waits for the spots' chunks to have their entities loaded. With {@code line:}, visitors walk between
+ * spots by being moved a little each tick (no AI, which would bring a villager's whole brain along).
  */
 public final class VisitorNpcs implements Listener {
 
@@ -71,7 +56,7 @@ public final class VisitorNpcs implements Listener {
     private final BiConsumer<Player, String> open;
     private final Plugin plugin;
 
-    /** Visitors on their way somewhere: entity id to where they are going. */
+    // Entity id to where they are going.
     private final Map<UUID, Location> walking = new HashMap<>();
     private BukkitTask walker;
 
@@ -83,7 +68,7 @@ public final class VisitorNpcs implements Listener {
         this.plugin = plugin;
     }
 
-    /** Stop walking anyone; the next sync sends them on again. */
+    /** The next sync sends them on again. */
     public void shutdown() {
         if (walker != null) {
             walker.cancel();
@@ -92,7 +77,7 @@ public final class VisitorNpcs implements Listener {
         walking.clear();
     }
 
-    /** Bring the visitors at this owner's Garden in line with their queue, if the Garden is loaded. */
+    /** Only if the Garden is loaded. */
     public void sync(UUID owner) {
         World world = Bukkit.getWorld(GardenWorlds.worldName(owner));
         if (world != null) {
@@ -100,7 +85,7 @@ public final class VisitorNpcs implements Listener {
         }
     }
 
-    /** Bring every loaded Garden's visitors in line — after a reload changed names, spots or looks. */
+    /** After a reload changed names, spots or looks. */
     public void syncAll() {
         for (World world : Bukkit.getWorlds()) {
             if (GardenWorlds.isGarden(world)) {
@@ -109,7 +94,7 @@ public final class VisitorNpcs implements Listener {
         }
     }
 
-    /** Make the entities at this Garden's spots match its queue — once their chunks' entities are loaded. */
+    /** Waits until the spots' chunks have their entities loaded. */
     public void sync(World world) {
         UUID owner = GardenWorlds.ownerOf(world);
         if (owner == null) {
@@ -132,9 +117,8 @@ public final class VisitorNpcs implements Listener {
         Map<String, Integer> wanted = wanted(owner, spots.size());
         List<Offer> queue = service.store().get(owner).queue();
         Set<String> present = new HashSet<>();
-        // Every visitor loaded anywhere in the Garden, not just those in the spots' chunks: a visitor left
-        // standing where the spots used to be — before the line, say — is in some other chunk, and looking
-        // only at the spots' chunks left them there, never walked in and never removed when served.
+        // Every visitor anywhere in the Garden, not just the spots' chunks: one left where the spots used
+        // to be would otherwise never be walked in or removed.
         for (Entity entity : world.getEntities()) {
             String id = tagOf(entity);
             if (id == null) {
@@ -170,9 +154,6 @@ public final class VisitorNpcs implements Listener {
         }
     }
 
-    // ── walking ────────────────────────────────────────────────────────────────
-
-    /** Send a visitor to a spot: walking if they are near and walking is on, otherwise straight there. */
     private void walk(Entity entity, Location to) {
         double speed = service.config().walkSpeed();
         Location at = entity.getLocation();
@@ -193,7 +174,7 @@ public final class VisitorNpcs implements Listener {
         }
     }
 
-    /** Move every walking visitor one step, and stop the task once nobody is walking. */
+    // Stops the task once nobody is walking.
     private void step() {
         double speed = service.config().walkSpeed();
         Iterator<Map.Entry<UUID, Location>> it = walking.entrySet().iterator();
@@ -229,19 +210,18 @@ public final class VisitorNpcs implements Listener {
         face(entity, to.getYaw());
     }
 
-    /** Turn body and head: an AI-less mob's head does not follow a teleport on its own. */
+    // Body and head: an AI-less mob's head does not follow a teleport on its own.
     private static void face(Entity entity, float yaw) {
         entity.setRotation(yaw, 0f);
     }
 
-    /** {@code from}, turned to look at {@code to}. */
     private static Location facing(Location from, Location to) {
         Location out = from.clone();
         out.setYaw((float) Math.toDegrees(Math.atan2(-(to.getX() - from.getX()), to.getZ() - from.getZ())));
         return out;
     }
 
-    /** Offer id to spot index, for the visitors that get a spot: the first in the queue. */
+    // Offer id to spot index, for the first visitors in the queue.
     private Map<String, Integer> wanted(UUID owner, int spots) {
         Map<String, Integer> out = new HashMap<>();
         if (!service.config().enabled() || service.store().readOnly(owner)) {
@@ -262,7 +242,6 @@ public final class VisitorNpcs implements Listener {
         return out;
     }
 
-    /** Where newcomers walk into the line from; null without a line. */
     private Location entrance(World world) {
         VisitorConfig.Spot entry = service.config().entry();
         return entry == null ? null : location(world, entry);
@@ -273,7 +252,7 @@ public final class VisitorNpcs implements Listener {
                 spot.yaw(), 0f);
     }
 
-    /** The configured entity type if it is a living thing that can be spawned; a villager otherwise. */
+    // A villager unless the configured type is a living thing that can be spawned.
     private static EntityType entityType(VisitorType type) {
         if (type == null) {
             return EntityType.VILLAGER;
@@ -286,7 +265,7 @@ public final class VisitorNpcs implements Listener {
         return found;
     }
 
-    /** Everything that makes an entity into this visitor. Idempotent — also repairs an existing one. */
+    // Idempotent: also repairs an existing one.
     private void dress(Entity entity, UUID owner, Offer offer, VisitorType type) {
         String name = Messages.fill(service.config().yaml().getString("npc-name", "%visitor_name%"),
                 service.placeholders(owner, offer));
@@ -327,17 +306,13 @@ public final class VisitorNpcs implements Listener {
         entity.getPersistentDataContainer().set(key, PersistentDataType.STRING, offer.id());
     }
 
-    /** The offer id an entity stands for, or null if it is not a visitor. */
+    /** Null if it is not a visitor. */
     public String tagOf(Entity entity) {
         return entity.getPersistentDataContainer().get(key, PersistentDataType.STRING);
     }
 
-    // ── events ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Visitors whose offer is gone are removed as their chunk loads — wherever they stand, so moving
-     * the spots cannot leave the old ones behind — and the spots are synced once their chunks are in.
-     */
+    // Stale visitors are removed as their chunk loads, wherever they stand, so moved spots cannot leave old
+    // ones behind.
     @EventHandler(priority = EventPriority.MONITOR)
     public void onEntitiesLoad(EntitiesLoadEvent event) {
         World world = event.getWorld();
@@ -370,10 +345,7 @@ public final class VisitorNpcs implements Listener {
         }
     }
 
-    /**
-     * Right-clicking a visitor opens their offer — for the Garden's owner. {@code LOWEST} and cancelled
-     * unconditionally, like Sam, so the villager trading screen never opens.
-     */
+    // Owner only. LOWEST and cancelled unconditionally, like Sam, so the trading screen never opens.
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onInteract(PlayerInteractEntityEvent event) {
         String id = tagOf(event.getRightClicked());
@@ -392,7 +364,7 @@ public final class VisitorNpcs implements Listener {
         open.accept(player, id);
     }
 
-    /** Invulnerable mobs can still be hurt by players in creative; visitors cannot. */
+    // Invulnerable mobs can still be hurt by players in creative; visitors cannot.
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (tagOf(event.getEntity()) != null) {

@@ -7,16 +7,10 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 
-/**
- * {@code /desk} — the farmhouse desk, without walking to it.
- *
- * <p>The same thing right-clicking Sam opens. Hypixel's Garden works this way round too: the desk is
- * the interface, the NPC is one door into it, and the command is the door you use once you know where
- * you are going. The name comes from {@code commands.desk} in the config.
- */
+/** /desk: opens the farmhouse desk, the same menu right-clicking Sam opens. Name from commands.desk. */
 public final class CommandDesk extends PluginCommand {
 
-    /** The node this command needs. See {@link CommandGarden#PERMISSION} for why it is not blank. */
+    /** See CommandGarden.PERMISSION for why this is not blank. */
     public static final String PERMISSION = "royalgarden.desk";
 
     private final GardenMenu menu;

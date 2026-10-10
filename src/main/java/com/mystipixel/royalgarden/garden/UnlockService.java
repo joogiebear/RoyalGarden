@@ -16,36 +16,27 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 /**
- * Buying a plot: what it costs, who may, and what they get for it — all from {@code unlock:} in
- * {@code config.yml}.
- *
- * <h2>Which terms apply</h2>
- *
- * <p>Three layers, most specific first, resolved per setting:
+ * Buying a plot, from {@code unlock:} in {@code config.yml}. Terms resolve per setting, most specific
+ * first:
  *
  * <ol>
- *   <li>{@code by-plot.<name>} — a particular plot, e.g. the corners costing more;</li>
- *   <li>{@code by-count.<n>} — the n-th plot bought, farmhouse not counted, for a price curve or
- *       milestone rewards;</li>
- *   <li>{@code default} — everything else, with an optional {@code cost-scaling} multiplier applied
- *       per plot already bought.</li>
+ *   <li>{@code by-plot.<name>}: a particular plot, e.g. the corners costing more;</li>
+ *   <li>{@code by-count.<n>}: the n-th plot bought, farmhouse not counted;</li>
+ *   <li>{@code default}: everything else, with an optional {@code cost-scaling} multiplier applied per
+ *       plot already bought.</li>
  * </ol>
  *
- * <p>So {@code by-count.24} can add a reward for finishing the board without restating the price, and
- * {@code by-plot.A1} can reprice one corner without losing its milestone reward.
- *
- * <p>Costs are charged through RoyalSkyblock's own {@link CurrencyService}, so every currency the host
- * knows — Vault coins, EcoBits gems, anything with a placeholder and a take command — works here with
- * no setup of its own.
+ * <p>Costs go through the host's {@link CurrencyService}, so every host currency works here.
  */
 public final class UnlockService {
 
-    /** A requirement read through PlaceholderAPI: {@code placeholder} must be at least {@code min}. */
+    /** {@code placeholder} must be at least {@code min}. */
     public record Requirement(String placeholder, double min, String message) {
     }
 
-    /** Everything that applies to one purchase. */
     /**
+     * Everything that applies to one purchase.
+     *
      * @param gardenLevel the Garden level needed, 0 for none
      */
     public record Terms(Cost cost, int gardenLevel, List<Requirement> requirements, List<String> commands,
@@ -79,7 +70,7 @@ public final class UnlockService {
         this.levels = levels;
     }
 
-    /** The Garden level these terms need that the player lacks, or 0 if they have it. */
+    /** 0 if the player has the level. */
     public int levelShortfall(Player player, Terms terms) {
         if (levels == null || terms.gardenLevel() <= 0) {
             return 0;
@@ -87,9 +78,7 @@ public final class UnlockService {
         return levels.level(player.getUniqueId()) < terms.gardenLevel() ? terms.gardenLevel() : 0;
     }
 
-    // ── terms ──────────────────────────────────────────────────────────────────
-
-    /** The terms for buying this plot as the player's {@code purchase}-th, counting from 1. */
+    /** {@code purchase} counts from 1. */
     public Terms terms(int px, int pz, int purchase) {
         ConfigurationSection root = config.yaml().getConfigurationSection("unlock");
         ConfigurationSection byPlot = section(root, "by-plot." + GardenLayout.plotName(px, pz));
@@ -113,8 +102,8 @@ public final class UnlockService {
         ConfigurationSection reqFrom = firstWith("requirements", byPlot, byCount, fallback);
         List<Requirement> requirements = reqFrom == null ? List.of() : requirements(reqFrom);
 
-        // Rewards add up rather than override: a milestone reward on the 10th plot should come on top
-        // of whatever every plot gives, not replace it.
+        // Rewards add up rather than override: a milestone reward on the 10th plot comes on top of what every
+        // plot gives.
         List<String> commands = new ArrayList<>();
         List<String> lines = new ArrayList<>();
         for (ConfigurationSection layer : new ConfigurationSection[]{fallback, byCount, byPlot}) {
@@ -156,14 +145,13 @@ public final class UnlockService {
         return out;
     }
 
-    /** How a cost reads in a menu or message. */
     public String display(Cost cost) {
         return cost.isFree() ? messages.raw("cost-free") : currency.format(cost);
     }
 
     /**
-     * The most plots, farmhouse included, this player may own: {@code unlock.max-plots}, raised by the
-     * highest {@code royalgarden.limit.<n>} permission they have.
+     * Farmhouse included: {@code unlock.max-plots}, raised by the highest {@code royalgarden.limit.<n>}
+     * permission the player has.
      */
     public int limit(Player player) {
         int limit = config.yaml().getInt("unlock.max-plots", GardenLayout.plotCount());
@@ -174,19 +162,19 @@ public final class UnlockService {
                 try {
                     limit = Math.max(limit, Integer.parseInt(node.substring(prefix.length())));
                 } catch (NumberFormatException notANumber) {
-                    // royalgarden.limit.* or a typo — not a limit
+                    // royalgarden.limit.* or a typo: not a limit
                 }
             }
         }
         return Math.min(limit, GardenLayout.plotCount());
     }
 
-    /** {@link #limit} without the farmhouse: how many plots this player may buy, as players are shown it. */
+    /** {@link #limit} without the farmhouse, as players are shown it. */
     public int farmableLimit(Player player) {
         return Math.max(0, limit(player) - 1);
     }
 
-    /** The first requirement this player does not meet, or null if they meet them all. */
+    /** Null if they meet them all. */
     public Requirement unmet(Player player, Terms terms) {
         for (Requirement requirement : terms.requirements()) {
             double value = Placeholders.number(player, requirement.placeholder());
@@ -197,13 +185,9 @@ public final class UnlockService {
         return null;
     }
 
-    // ── buying ─────────────────────────────────────────────────────────────────
-
     /**
-     * Try to buy a plot for a player, telling them how it went. Returns true if it is now theirs.
-     *
-     * <p>Order matters: everything that can refuse without cost is checked before money moves, and the
-     * charge is refunded if the unlock itself then fails — so a player can never pay for nothing.
+     * Tells the player how it went; returns true if the plot is now theirs. Everything that can refuse is
+     * checked before money moves, and the charge is refunded if the unlock then fails.
      */
     public boolean attempt(Player player, int px, int pz) {
         GardenState state = worlds.state(player.getUniqueId());

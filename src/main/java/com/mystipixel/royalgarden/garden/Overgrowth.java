@@ -24,27 +24,11 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 /**
- * The debris a locked plot is generated with — trees, boulders, bushes, fallen logs and undergrowth —
- * which a player clears after buying the plot and before they may build on it.
- *
- * <p>Planning is separate from writing. {@link #plan} is plain maths over a seeded {@link Random}: it
- * decides every block and touches no world, so it can be tested without a server and gives the same
- * plot the same trees every time it is asked. {@link Plan#writeRow} then lays one x-row of that plan,
- * for the {@link BuildQueue} to budget across ticks like any other plot work.
- *
- * <h2>Counting it</h2>
- *
- * <p>How much debris a plot has is counted as it is written, not as it was planned: a block is counted if
- * it was placed or was already there from an earlier, interrupted run. So a plan cut short by the world
- * unloading and redone on the next visit still ends with the right total, and a block that could not be
- * placed because something else stood there is not counted as something to clear.
- *
- * <h2>Trees that stay up</h2>
- *
- * <p>Tree leaves are written with their real distance from a log, worked out here, and are not
- * persistent — so they stand while the tree does and decay once its logs are cut, as they would in the
- * wild. Written with the default distance of 7 they would decay on the first random tick, locked plot or
- * not. Bushes have no log to hang from, so their leaves are persistent and have to be broken.
+ * The debris a locked plot is generated with, cleared after purchase before building. {@link #plan} is
+ * pure and seeded, so a plot always gets the same debris; {@link Plan#writeRow} lays one row for the
+ * {@link BuildQueue}. Debris is counted as written (placed or already there), so an interrupted run still
+ * ends with the right total. Tree leaves get their real log distance and are not persistent, so they
+ * decay once the logs are cut; bush leaves are persistent and must be broken.
  */
 public final class Overgrowth {
 
@@ -65,8 +49,8 @@ public final class Overgrowth {
     /**
      * What {@code clearing:} in {@code config.yml} asks for.
      *
-     * @param required  percent of a plot's debris that must be cleared before it can be built on
-     * @param margin    blocks left bare inside each plot edge, so nothing overhangs the rim or the next plot
+     * @param required    percent of a plot's debris that must be cleared before it can be built on
+     * @param margin      blocks left bare inside each plot edge, so nothing overhangs the rim or the next plot
      * @param coverChance chance, per bare column, of a plant on it
      */
     public record Settings(boolean enabled, int required, int margin,
@@ -83,7 +67,7 @@ public final class Overgrowth {
         public static final Settings OFF = new Settings(false, 90, 3, 0, List.of(), 0, List.of(), 0, List.of(),
                 0, 0, List.of(), List.of(), List.of());
 
-        /** Every material this plan could write — what counts as debris when it is broken. */
+        /** What counts as debris when it is broken. */
         public Set<Material> materials() {
             Set<Material> out = EnumSet.noneOf(Material.class);
             for (String type : treeTypes) {
@@ -96,7 +80,7 @@ public final class Overgrowth {
             return out;
         }
 
-        /** Read {@code clearing:}, warning about and skipping anything that is not a block. */
+        /** Warns about and skips anything that is not a block. */
         public static Settings read(ConfigurationSection section, Logger logger) {
             if (section == null) {
                 return OFF;
@@ -127,14 +111,8 @@ public final class Overgrowth {
                     section.getStringList("rewards.messages"));
         }
 
-        /**
-         * A number, falling back to the shipped config before {@code fallback}.
-         *
-         * <p>Not {@code getInt(path, fallback)}: an explicit fallback wins over the shipped defaults. On a
-         * {@code config.yml} written before {@code clearing:} existed, Bukkit hands back an empty section
-         * for it, and every count read that way came out as its fallback of 0 — nothing was ever planted.
-         * {@code contains} and the one-argument getters both consult the defaults.
-         */
+        // Not getInt(path, fallback): an explicit fallback wins over the shipped defaults, and an older
+        // config.yml gets an empty clearing: section. contains() and the one-argument getters use the defaults.
         private static double number(ConfigurationSection section, String path, double fallback) {
             return section.contains(path) ? section.getDouble(path) : fallback;
         }
@@ -164,22 +142,20 @@ public final class Overgrowth {
         return Material.matchMaterial(type + "_leaves");
     }
 
-    /** The seed for one plot of one Garden: fixed, so asking twice plans the same debris. */
+    /** Fixed, so asking twice plans the same debris. */
     public static long seed(java.util.UUID owner, int px, int pz) {
         long seed = owner.getMostSignificantBits() * 31 + owner.getLeastSignificantBits();
         return seed * 1_000_003L + GardenLayout.plotName(px, pz).hashCode();
     }
 
-    // ── planning ───────────────────────────────────────────────────────────────
-
-    /** Plan the debris for one plot. Pure: the same arguments give the same plan. */
+    /** Pure: the same arguments give the same plan. */
     public static Plan plan(long seed, int size, int groundY, Settings settings) {
         Planner planner = new Planner(new Random(seed), size, groundY + 1, settings);
         planner.run();
         return new Plan(size, planner.placed);
     }
 
-    /** Where the planner has put things so far, keyed by packed position. */
+    // Where the planner has put things so far, keyed by packed position.
     private static final class Planner {
         private final Random random;
         private final int size;
@@ -214,7 +190,7 @@ public final class Overgrowth {
             List<Voxel> at(int x, int z);
         }
 
-        /** Place {@code count} of a shape at random free spots, giving up on a spot that overlaps. */
+        // Gives up on a spot that overlaps.
         private void attempt(int count, Shape shape) {
             int placedCount = 0;
             for (int tries = 0; tries < count * 8 && placedCount < count; tries++) {
@@ -231,11 +207,8 @@ public final class Overgrowth {
             }
         }
 
-        /**
-         * Whether a shape lies inside the margin and clear of everything placed, with a block of air all
-         * round it. Touching would be more than untidy: a leaf next to another tree's log, or a fallen
-         * one, takes its distance from that log, and the planned distances would be wrong.
-         */
+        // Inside the margin with a block of air all round: a leaf touching another tree's log would take its
+        // distance from that log, and the planned distances would be wrong.
         private boolean fits(List<Voxel> voxels) {
             for (Voxel voxel : voxels) {
                 if (voxel.x() < lo || voxel.x() > hi || voxel.z() < lo || voxel.z() > hi) {
@@ -258,7 +231,6 @@ public final class Overgrowth {
             return from.get(random.nextInt(from.size()));
         }
 
-        /** A trunk with a rounded crown, or a cone for spruce — leaves at their real distance from a log. */
         private List<Voxel> tree(int x, int z) {
             String type = pick(settings.treeTypes());
             Material log = log(type);
@@ -290,12 +262,8 @@ public final class Overgrowth {
             return withDistances(shape);
         }
 
-        /**
-         * A square layer of leaf positions around a trunk, corners trimmed at random — the difference
-         * between a tree and a cube on a stick.
-         *
-         * @param plus radius of the solid part; beyond it only the axes, for a rounded top
-         */
+        // A square layer of leaves around a trunk, corners trimmed at random. plus: radius of the solid part;
+        // beyond it only the axes, for a rounded top.
         private void ring(List<long[]> into, int cx, int y, int cz, int radius, int plus) {
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
@@ -311,10 +279,8 @@ public final class Overgrowth {
             }
         }
 
-        /**
-         * Give each leaf its distance from the nearest log, walking through leaves as the game does, and
-         * drop any leaf more than six steps out — it would decay on its own and be cleared by nobody.
-         */
+        // Distance from the nearest log, walking through leaves as the game does. Leaves more than six steps out
+        // are dropped: they would decay on their own.
         private static List<Voxel> withDistances(Map<Long, Voxel> shape) {
             Map<Long, Integer> distance = new HashMap<>();
             Deque<Voxel> frontier = new ArrayDeque<>();
@@ -352,7 +318,6 @@ public final class Overgrowth {
             return out;
         }
 
-        /** A low dome of mixed stone. */
         private List<Voxel> boulder(int x, int z) {
             if (settings.boulderBlocks().isEmpty()) {
                 return List.of();
@@ -373,7 +338,6 @@ public final class Overgrowth {
             return out;
         }
 
-        /** A log lying on its side. */
         private List<Voxel> fallenLog(int x, int z) {
             Material log = log(pick(settings.treeTypes()));
             int length = 3 + random.nextInt(3);
@@ -387,7 +351,6 @@ public final class Overgrowth {
             return out;
         }
 
-        /** A clump of persistent leaves, one or two high. */
         private List<Voxel> bush(int x, int z) {
             if (settings.bushBlocks().isEmpty()) {
                 return List.of();
@@ -406,7 +369,6 @@ public final class Overgrowth {
             return out;
         }
 
-        /** Grass, ferns and flowers on the ground that is still bare. */
         private void undergrowth() {
             if (settings.coverBlocks().isEmpty() || settings.coverChance() <= 0) {
                 return;
@@ -422,17 +384,14 @@ public final class Overgrowth {
         }
     }
 
-    /** Pack a plot-local position; x and z are under 512 and y is a world height. */
+    // x and z are under 512 and y is a world height.
     static long key(int x, int y, int z) {
         return ((long) (y + 2048) << 20) | ((long) (x & 0x3FF) << 10) | (z & 0x3FF);
     }
 
-    // ── writing ────────────────────────────────────────────────────────────────
-
     /**
-     * A plot's planned debris, by x-row, and how much of it the write has found or put in place.
-     *
-     * <p>One plan belongs to one write: {@link #present()} is a running count, not a property of the plan.
+     * A plot's planned debris, by x-row. One plan belongs to one write: {@link #present()} is a running
+     * count, not a property of the plan.
      */
     public static final class Plan {
         private final List<List<Voxel>> rows;
@@ -452,7 +411,7 @@ public final class Overgrowth {
             this.rows = Collections.unmodifiableList(byRow);
         }
 
-        /** Every planned block, in no particular order. */
+        /** In no particular order. */
         public List<Voxel> voxels() {
             List<Voxel> all = new ArrayList<>();
             rows.forEach(all::addAll);
@@ -469,10 +428,8 @@ public final class Overgrowth {
         }
 
         /**
-         * Write one x-row. Returns the number of blocks looked at, for the tick budget.
-         *
-         * <p>Only into air: a plan never overwrites what is already standing, so running it over a plot
-         * that already has debris — or anything else — cannot destroy it.
+         * Returns the blocks looked at, for the tick budget. Writes only into air, so it never destroys what
+         * is already standing.
          */
         public int writeRow(World world, int px, int pz, int row) {
             int minX = GardenLayout.plotMin(px);

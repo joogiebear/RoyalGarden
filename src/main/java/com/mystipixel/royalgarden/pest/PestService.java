@@ -42,18 +42,10 @@ import java.util.logging.Logger;
 import java.util.random.RandomGenerator;
 
 /**
- * Pests: bringing them on while the owner farms, keeping them on their plot, and paying for them.
- *
- * <p>A counted harvest in the owner's own Garden, off cooldown, rolls {@code spawning.chance}; a hit picks
- * a plot with room ({@link PestMath#pickPlot}), a kind of pest by weight from those the Garden's level
- * allows, and a spot on the plot, then runs that pest's console command — an {@code ecomobs spawn} by
- * default. The entity the command spawned is caught as it spawns and tagged in its persistent data with
- * its kind, plot and spawn time, which is how it is found, counted and exempted from the vanilla-mob sweep
- * afterwards. The Garden's {@link PestStore} keeps the record.
- *
- * <p>Killing one pays its killer — only the Garden's owner, with {@code kills.owner-only} — Copper through
- * the visitors' Copper command, Garden XP, and every stacked reward. What an infested plot does to its
- * farmer is not here at all: see {@link PestHolders}.
+ * Pests. A counted harvest in the owner's Garden, off cooldown, rolls {@code spawning.chance}; a hit
+ * picks a plot, a kind by weight and a spot, then runs that pest's console command. The spawned entity
+ * is caught and tagged with kind, plot and spawn time, which is how it is found, counted and exempted
+ * from the mob sweep. Infested-plot effects live in {@link PestHolders}.
  */
 public final class PestService implements Listener {
 
@@ -67,7 +59,6 @@ public final class PestService implements Listener {
         void pay(Player player, long amount);
     }
 
-    /** What an attempt to spawn a pest came to. */
     public enum Outcome { SPAWNED, BAD_PLOT, NO_ROOM, NO_SPOT, NO_PEST, NOT_LOADED, FAILED, UNREADABLE }
 
     private static final NamespacedKey ECOMOBS_MOB = NamespacedKey.fromString("ecomobs:mob");
@@ -86,7 +77,7 @@ public final class PestService implements Listener {
     private java.util.function.Supplier<String> currency = () -> "copper";
     private Consumer<UUID> changed = owner -> { };
     private java.util.function.Function<String, MilestoneCrop> crops = id -> null;
-    /** Entities spawned while a pest's command runs, or null when none is running. */
+    // Entities spawned while a pest's command runs, or null when none is running.
     private List<Entity> capturing;
 
     public PestService(Plugin plugin, PestConfig config, PestStore store, Messages messages, GardenWorlds gardens,
@@ -109,7 +100,6 @@ public final class PestService implements Listener {
         return store;
     }
 
-    /** How a Garden's level is read, and how Garden XP and Copper are paid. */
     public void setPayment(ToIntFunction<UUID> level, XpSink xp, CopperSink copper,
                            java.util.function.Supplier<String> currency) {
         this.level = level;
@@ -118,7 +108,7 @@ public final class PestService implements Listener {
         this.currency = currency == null ? () -> "copper" : currency;
     }
 
-    /** Where a crop's blocks and drops come from, for {@code %crop%} in the infested effects. */
+    /** For {@code %crop%} in the infested effects. */
     public void setCrops(java.util.function.Function<String, MilestoneCrop> crops) {
         this.crops = crops;
     }
@@ -127,14 +117,12 @@ public final class PestService implements Listener {
         return id == null || id.isBlank() ? null : crops.apply(id);
     }
 
-    /** Told whenever a Garden's pests change — how infested plots' effects stay in step. */
+    /** Told whenever a Garden's pests change; this is how infested plots' effects stay in step. */
     public void onChange(Consumer<UUID> changed) {
         this.changed = changed == null ? owner -> { } : changed;
     }
 
-    // ── spawning ───────────────────────────────────────────────────────────────
-
-    /** A counted harvest — from the milestone listener. Maybe brings a pest. */
+    /** From the milestone listener. Maybe brings a pest. */
     public void harvested(Player player, Block block, MilestoneCrop crop) {
         UUID owner = player.getUniqueId();
         World world = block.getWorld();
@@ -161,7 +149,7 @@ public final class PestService implements Listener {
         spawn(world, null, plot, crop.id(), random);
     }
 
-    /** Plots a pest may land on in this Garden: unlocked, and not the farmhouse unless it is allowed. */
+    /** Unlocked, and not the farmhouse unless it is allowed. */
     public List<Integer> eligiblePlots(World world) {
         GardenState state = gardens.stateOf(world);
         List<Integer> out = new ArrayList<>();
@@ -177,7 +165,7 @@ public final class PestService implements Listener {
     }
 
     /**
-     * Bring a pest onto a plot of a loaded Garden now, off the cooldown and chance but within the caps.
+     * Spawns a pest now in a loaded Garden, ignoring cooldown and chance but not the caps.
      *
      * @param type a kind of pest, or null for a random pick by weight
      * @param plot a plot, or -1 for a random one with room
@@ -218,7 +206,7 @@ public final class PestService implements Listener {
         if (entity == null) {
             logger.warning("pests.yml: '" + type.command() + "' (pest " + type.id() + ") spawned nothing RoyalGarden "
                     + "could find" + (type.mob().isBlank() ? "" : " with EcoMobs id '" + type.mob() + "'")
-                    + " — check the command and the EcoMobs mob.");
+                    + "; check the command and the EcoMobs mob.");
             return Outcome.FAILED;
         }
         long now = System.currentTimeMillis();
@@ -236,7 +224,7 @@ public final class PestService implements Listener {
         return Outcome.SPAWNED;
     }
 
-    /** A random spot with room to stand, on a loaded part of the plot, or null. */
+    // A random spot with room to stand, on a loaded part of the plot, or null.
     private Location spot(World world, int plot, RandomGenerator random) {
         int px = PestStore.px(plot);
         int pz = PestStore.pz(plot);
@@ -258,7 +246,6 @@ public final class PestService implements Listener {
         return null;
     }
 
-    /** Run a pest's command at a spot and find the entity it spawned. */
     private Entity run(PestType type, Location at, UUID owner, int plot) {
         OfflinePlayer player = Bukkit.getOfflinePlayer(owner);
         String command = Messages.fill(type.command(),
@@ -314,12 +301,11 @@ public final class PestService implements Listener {
         }
     }
 
-    /** The kind of pest an entity is, or null if it is not a pest. */
+    /** Null if it is not a pest. */
     public String typeOf(Entity entity) {
         return entity.getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
     }
 
-    /** Catches what a pest's command spawns. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntitySpawn(EntitySpawnEvent event) {
         if (capturing != null) {
@@ -327,14 +313,8 @@ public final class PestService implements Listener {
         }
     }
 
-    // ── keeping count ──────────────────────────────────────────────────────────
-
-    /**
-     * Pests as their chunk loads. A known pest is kept unless its plot has since been locked or the caps
-     * lowered below what the plot holds. One without a record — its record was dropped while it stood in an unloaded chunk —
-     * is taken back in if there is room, unless it predates a clear, its plot is locked, or its plot is
-     * gone.
-     */
+    // A known pest is kept unless its plot was locked or the caps lowered. One without a record is taken
+    // back in if there is room, unless it predates a clear or its plot is locked or gone.
     @EventHandler(priority = EventPriority.MONITOR)
     public void onEntitiesLoad(EntitiesLoadEvent event) {
         World world = event.getWorld();
@@ -395,9 +375,8 @@ public final class PestService implements Listener {
     }
 
     /**
-     * Every loaded Garden's pests: one outside its plot is put back where it first appeared, and a record
-     * whose chunk is loaded without its entity — removed by something other than a death — is dropped.
-     * Runs on a timer.
+     * Runs on a timer: a pest outside its plot is put back where it appeared, and a record whose chunk is
+     * loaded without its entity is dropped.
      */
     public void confineAll() {
         for (World world : Bukkit.getWorlds()) {
@@ -445,8 +424,8 @@ public final class PestService implements Listener {
     }
 
     /**
-     * Remove every pest from a Garden (admin, and {@code /garden reset}). Pests standing in chunks that
-     * are not loaded are removed as they load, since they predate the clear. Returns how many records went.
+     * Admin, and {@code /garden reset}. Pests in unloaded chunks are removed as they load, since they
+     * predate the clear. Returns how many records went.
      */
     public int clear(UUID owner) {
         if (store.readOnly(owner)) {
@@ -475,8 +454,6 @@ public final class PestService implements Listener {
         return removed;
     }
 
-    // ── killing ────────────────────────────────────────────────────────────────
-
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDeath(EntityDeathEvent event) {
         LivingEntity entity = event.getEntity();
@@ -502,7 +479,7 @@ public final class PestService implements Listener {
         return plot == null ? -1 : PestStore.pack(plot[0], plot[1]);
     }
 
-    /** Count a kill and pay for it: Copper, Garden XP, then every stacked reward. */
+    // Copper, Garden XP, then every stacked reward.
     private void pay(Player killer, String typeId, int plot) {
         UUID id = killer.getUniqueId();
         PestType type = config.pest(typeId);
@@ -555,12 +532,7 @@ public final class PestService implements Listener {
         store.unload(player);
     }
 
-    // ── placeholders ───────────────────────────────────────────────────────────
-
-    /**
-     * What pest messages, menus and rewards can use: {@code %player% %uuid% %pest% %pest_name% %plot%
-     * %pests% %kills% %pest_kills% %alive% %currency%}.
-     */
+    /** {@code %player% %uuid% %pest% %pest_name% %plot% %pests% %kills% %pest_kills% %alive% %currency%} */
     public String[] placeholders(UUID owner, PestType type, int plot) {
         PestStore.Data data = store.peek(owner);
         String id = type == null ? "" : type.id();
@@ -577,7 +549,7 @@ public final class PestService implements Listener {
                 "%uuid%", owner.toString()};
     }
 
-    /** The Pests page's stats: {@code %alive% %infested% %killed% %max_per_garden%}. */
+    /** {@code %alive% %infested% %killed% %max_per_garden%} */
     public String[] statPlaceholders(UUID owner) {
         PestStore.Data data = store.peek(owner);
         return new String[]{
@@ -599,9 +571,8 @@ public final class PestService implements Listener {
     }
 
     /**
-     * {@code %royalgarden_pests_<key>%}, or null if the key is not one of these: {@code alive} (in the
-     * player's Garden), {@code infested} (plots), {@code killed}, {@code <pest>_killed} and
-     * {@code plot_<plot>} (pests on that plot of their Garden). Plain numbers for use in conditions.
+     * {@code %royalgarden_pests_<key>%} for {@code alive}, {@code infested}, {@code killed}, {@code
+     * <pest>_killed} and {@code plot_<plot>}; null otherwise. Plain numbers for use in conditions.
      */
     public String resolve(OfflinePlayer player, String key) {
         String params = key.toLowerCase(Locale.ROOT);
@@ -630,8 +601,6 @@ public final class PestService implements Listener {
         }
         return null;
     }
-
-    // ── plumbing ───────────────────────────────────────────────────────────────
 
     private static void dispatch(String command) {
         if (command == null || command.isBlank()) {

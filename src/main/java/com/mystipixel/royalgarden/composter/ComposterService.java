@@ -32,16 +32,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Logger;
 
 /**
- * The Composter: feeding it, catching it up, collecting Compost, and its upgrades.
- *
- * <p>It turns organic matter and fuel into Compost over time (see {@link ComposterMath}), whether or not
- * its owner is online or their Garden is loaded: nothing ticks for an absent player, and whoever next
- * touches their Composter — the player, a menu, an admin command — catches it up from {@code last-tick}
- * first. Online players are also caught up on a timer, so they hear when it stops.
- *
- * <p>Upgrades are machine properties bought with any host currency (Copper by default): speed, a chance
- * of bonus Compost, bigger matter and fuel tanks, and cheaper Compost. They change how the machine runs,
- * not how good the player is at anything, so they are plain config rather than libreforge effects.
+ * The Composter. Nothing ticks for an absent player: whoever next touches a Composter (player, menu,
+ * admin command) catches it up from {@code last-tick} first; online players are also caught up on a
+ * timer so they hear when it stops. Upgrades are machine properties, so plain config, not libreforge.
  */
 public final class ComposterService implements Listener {
 
@@ -80,13 +73,11 @@ public final class ComposterService implements Listener {
         this.xp = xp == null ? (owner, amount) -> { } : xp;
     }
 
-    // ── the machine as upgraded ────────────────────────────────────────────────
-
     public int level(ComposterStore.Data data, Upgrade upgrade) {
         return Math.min(data.level(upgrade.key()), config.maxLevel(upgrade));
     }
 
-    /** What an upgrade adds at a level: percent, or an amount for the caps. */
+    /** Percent, or an amount for the caps. */
     public double value(Upgrade upgrade, int level) {
         return config.perLevel(upgrade) * level;
     }
@@ -109,9 +100,7 @@ public final class ComposterService implements Listener {
         return config.baseFuelCap() + value(Upgrade.FUEL_CAP, level(data, Upgrade.FUEL_CAP));
     }
 
-    // ── time ───────────────────────────────────────────────────────────────────
-
-    /** Catch every online player's Composter up. Runs on a timer. */
+    /** Runs on a timer. */
     public void tickAll() {
         if (!config.enabled()) {
             return;
@@ -122,8 +111,8 @@ public final class ComposterService implements Listener {
     }
 
     /**
-     * Run a Composter up to now. Saves only when Compost was made or its clock was started: otherwise the
-     * saved state and the saved {@code last-tick} still add up to the same thing (see {@link ComposterMath}).
+     * Saves only when Compost was made or the clock was started; otherwise the saved state and
+     * {@code last-tick} still add up the same (see {@link ComposterMath}).
      */
     public void update(UUID owner) {
         if (!config.enabled() || store.readOnly(owner)) {
@@ -158,11 +147,9 @@ public final class ComposterService implements Listener {
         }
     }
 
-    // ── putting things in ──────────────────────────────────────────────────────
-
     /**
-     * Feed the Composter from the player's inventory: the first stack that counts, or with {@code all}
-     * everything that counts, up to its capacity. Returns whether anything went in.
+     * The first stack that counts, or with {@code all} everything that counts, up to capacity. Returns
+     * whether anything went in.
      */
     public boolean insert(Player player, Kind kind, boolean all) {
         UUID owner = player.getUniqueId();
@@ -248,9 +235,7 @@ public final class ComposterService implements Listener {
         return true;
     }
 
-    // ── taking Compost out ─────────────────────────────────────────────────────
-
-    /** Give the player the Compost waiting for them, as much as their inventory holds. */
+    /** As much as their inventory holds. */
     public boolean collect(Player player) {
         UUID owner = player.getUniqueId();
         if (!usable(player)) {
@@ -306,7 +291,6 @@ public final class ComposterService implements Listener {
         return true;
     }
 
-    /** How many of {@code item} the inventory's storage can take. */
     static long space(PlayerInventory inventory, ItemStack item) {
         int max = Math.max(1, item.getMaxStackSize());
         long room = 0;
@@ -320,7 +304,7 @@ public final class ComposterService implements Listener {
         return room;
     }
 
-    /** Hand over {@code amount} copies in whole stacks; anything that does not fit drops at their feet. */
+    // Whole stacks; anything that does not fit drops at their feet.
     private static void give(Player player, ItemStack item, long amount) {
         int max = Math.max(1, item.getMaxStackSize());
         long left = amount;
@@ -336,9 +320,7 @@ public final class ComposterService implements Listener {
         }
     }
 
-    // ── upgrades ───────────────────────────────────────────────────────────────
-
-    /** What the next level of an upgrade costs, or null at the top. */
+    /** Null at the top. */
     public Cost nextCost(ComposterStore.Data data, Upgrade upgrade) {
         List<Cost> costs = config.costs(upgrade);
         int level = level(data, upgrade);
@@ -350,7 +332,7 @@ public final class ComposterService implements Listener {
                 : cost.isFree() ? messages.raw("cost-free") : currency.format(cost);
     }
 
-    /** Buy the next level of an upgrade. Charge, then save, then refund if the save failed. */
+    /** Charge, then save, then refund if the save failed. */
     public boolean buy(Player player, Upgrade upgrade) {
         UUID owner = player.getUniqueId();
         if (!usable(player)) {
@@ -391,9 +373,7 @@ public final class ComposterService implements Listener {
         return true;
     }
 
-    // ── admin ──────────────────────────────────────────────────────────────────
-
-    /** Add organic matter or fuel outright (admin), up to capacity. Returns what was added, or -1. */
+    /** Admin, up to capacity. Returns what was added, or -1. */
     public double give(UUID owner, Kind kind, double amount) {
         if (store.readOnly(owner)) {
             return -1;
@@ -411,7 +391,7 @@ public final class ComposterService implements Listener {
         return after - before;
     }
 
-    /** Empty a Composter and forget its upgrades (admin). */
+    /** Admin: empties the Composter and forgets its upgrades. */
     public void reset(UUID owner) {
         store.reset(owner);
     }
@@ -441,13 +421,10 @@ public final class ComposterService implements Listener {
         }
     }
 
-    // ── placeholders ───────────────────────────────────────────────────────────
-
     /**
-     * What Composter messages, menus and rewards can use: {@code %player% %uuid% %matter% %matter_cap%
-     * %matter_percent% %matter_bar% %fuel% %fuel_cap% %fuel_percent% %fuel_bar% %stored% %max_stored%
-     * %status% %next% %time% %matter_cost% %fuel_cost% %bonus_chance% %made% %collected% %compost%}.
-     * Read from the player's data as it stands; call {@link #update} first to show it caught up.
+     * {@code %player% %uuid% %matter% %matter_cap% %matter_percent% %matter_bar% %fuel% %fuel_cap%
+     * %fuel_percent% %fuel_bar% %stored% %max_stored% %status% %next% %time% %matter_cost% %fuel_cost%
+     * %bonus_chance% %made% %collected% %compost%}. Not caught up; call {@link #update} first for that.
      */
     public String[] placeholders(UUID owner) {
         ComposterStore.Data data = store.get(owner);
@@ -483,8 +460,8 @@ public final class ComposterService implements Listener {
     }
 
     /**
-     * An upgrade's placeholders, with the Composter's own: {@code %upgrade% %upgrade_name% %level%
-     * %level_roman% %max_level% %value% %next_value% %next_cost%}.
+     * The Composter's placeholders plus {@code %upgrade% %upgrade_name% %level% %level_roman% %max_level%
+     * %value% %next_value% %next_cost%}.
      */
     public String[] upgradePlaceholders(UUID owner, Upgrade upgrade) {
         ComposterStore.Data data = store.get(owner);
@@ -502,12 +479,10 @@ public final class ComposterService implements Listener {
     }
 
     /**
-     * {@code %royalgarden_composter_<key>%}, or null if the key is not one of these: {@code matter},
-     * {@code fuel}, {@code stored}, {@code next} (blank while stopped), {@code matter_cap},
-     * {@code fuel_cap}, {@code made} and {@code <upgrade>_level}. Plain numbers for use in conditions.
-     *
-     * <p>Projected to now without saving anything or rolling bonus Compost, so an offline player's
-     * Composter reads as running and nobody's file is written from a scoreboard thread.
+     * {@code %royalgarden_composter_<key>%} for {@code matter}, {@code fuel}, {@code stored}, {@code next}
+     * (blank while stopped), {@code matter_cap}, {@code fuel_cap}, {@code made} and {@code <upgrade>_level};
+     * null otherwise. Projected to now without saving or rolling bonuses, so no file is written from a
+     * scoreboard thread.
      */
     public String resolve(OfflinePlayer player, String key) {
         String params = key.toLowerCase(Locale.ROOT);
@@ -556,8 +531,6 @@ public final class ComposterService implements Listener {
         store.unload(owner);
     }
 
-    // ── formatting ─────────────────────────────────────────────────────────────
-
     private String bar(double value, double cap) {
         return Tiers.bar(cap <= 0 ? 0 : value / cap, config.barLength(), config.barFilled(), config.barEmpty());
     }
@@ -566,13 +539,13 @@ public final class ComposterService implements Listener {
         return cap <= 0 ? "0" : String.valueOf((int) Math.floor(Math.clamp(value / cap, 0.0, 1.0) * 100));
     }
 
-    /** {@code 1,234} or {@code 1,234.5}: grouped, one decimal only when there is one. */
+    // 1,234 or 1,234.5: grouped, one decimal only when there is one.
     static String number(double value) {
         double rounded = Math.round(value * 10) / 10.0;
         return rounded == Math.rint(rounded) ? String.format("%,d", (long) rounded) : String.format("%,.1f", rounded);
     }
 
-    /** {@code 1234} or {@code 1234.5}, for placeholders compared in conditions. */
+    // 1234 or 1234.5, for placeholders compared in conditions.
     static String plain(double value) {
         double rounded = Math.round(value * 10) / 10.0;
         return rounded == Math.rint(rounded) ? String.valueOf((long) rounded) : String.valueOf(rounded);

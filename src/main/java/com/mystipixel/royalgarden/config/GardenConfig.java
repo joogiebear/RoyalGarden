@@ -15,16 +15,13 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 /**
- * {@code config.yml}: every number and switch The Garden runs on.
- *
- * <p>Typed accessors read the live file each time, so {@code /garden reload} takes effect on the next
- * call without anything holding a stale copy. The exception is {@code layout:}, which is read once at
- * startup by {@link com.mystipixel.royalgarden.garden.GardenLayout} — changing the shape of the board
- * under Gardens that were built to the old one would misplace every plot in them.
+ * {@code config.yml}. Accessors read the live file, so {@code /garden reload} applies on the next call.
+ * The exception is {@code layout:}, read once at startup: reshaping the board under existing Gardens
+ * would misplace every plot.
  */
 public final class GardenConfig extends YamlFile {
 
-    /** {@code clearing:}, parsed once per load: it is asked for on every block broken in a Garden. */
+    // Parsed once per load: it is asked for on every block broken in a Garden.
     private Overgrowth.Settings clearing;
 
     public GardenConfig(File dataFolder, Logger logger) {
@@ -37,9 +34,7 @@ public final class GardenConfig extends YamlFile {
         clearing = null;
     }
 
-    // ── clearing ───────────────────────────────────────────────────────────────
-
-    /** The debris locked plots grow and how much of it must be cleared, from {@code clearing:}. */
+    /** The debris locked plots grow and how much of it must be cleared. */
     public Overgrowth.Settings clearing() {
         Overgrowth.Settings parsed = clearing;
         if (parsed == null) {
@@ -49,7 +44,7 @@ public final class GardenConfig extends YamlFile {
         return parsed;
     }
 
-    // ── layout (startup only) ──────────────────────────────────────────────────
+    // Layout: read at startup only.
 
     public int grid() {
         return yaml().getInt("layout.grid", 5);
@@ -63,8 +58,6 @@ public final class GardenConfig extends YamlFile {
         return yaml().getInt("layout.ground-y", 100);
     }
 
-    // ── generation ─────────────────────────────────────────────────────────────
-
     /** Blocks written per tick across <em>all</em> Gardens together. */
     public int blocksPerTick() {
         return Math.max(256, yaml().getInt("generation.blocks-per-tick", 24_000));
@@ -75,7 +68,7 @@ public final class GardenConfig extends YamlFile {
         return Math.max(0L, yaml().getLong("generation.paste-ticks-per-row", 12L));
     }
 
-    /** Tallest capture allowed, counted from the floor course up. */
+    /** Counted from the floor course up. */
     public int maxTemplateHeight() {
         return Math.clamp(yaml().getInt("generation.max-template-height", 48), 4, 256);
     }
@@ -100,14 +93,12 @@ public final class GardenConfig extends YamlFile {
         return yaml().getBoolean("generation.clear-legacy-walls", true);
     }
 
-    // ── presets ────────────────────────────────────────────────────────────────
-
     /** Whether crops and other ageable blocks are pasted at age 0 rather than as captured. */
     public boolean resetCropAge() {
         return yaml().getBoolean("presets.reset-crop-age", true);
     }
 
-    /** Blocks that are pasted as air, so a preset can never hand out a harvest. */
+    /** Pasted as air, so a preset can never hand out a harvest. */
     public Set<Material> neverPaste() {
         return materials("presets.never-paste");
     }
@@ -116,7 +107,7 @@ public final class GardenConfig extends YamlFile {
         return yaml().getBoolean("presets.players.enabled", true);
     }
 
-    /** Default wait between two applies to the same plot, unless the preset sets its own. */
+    /** Unless the preset sets its own. */
     public long presetCooldownMillis() {
         return Durations.parseMillis(yaml().getString("presets.players.cooldown", "1h"));
     }
@@ -125,8 +116,6 @@ public final class GardenConfig extends YamlFile {
     public long confirmMillis() {
         return Durations.parseMillis(yaml().getString("presets.players.confirm-window", "10s"));
     }
-
-    // ── world rules ────────────────────────────────────────────────────────────
 
     public Difficulty difficulty() {
         String raw = yaml().getString("world.difficulty", "peaceful");
@@ -158,7 +147,7 @@ public final class GardenConfig extends YamlFile {
         return yaml().getBoolean("world.sweep-vanilla-mobs", true);
     }
 
-    /** Why a creature may spawn in a Garden. Everything else is cancelled. */
+    /** Everything else is cancelled. */
     public Set<SpawnReason> allowedSpawnReasons() {
         Set<SpawnReason> out = EnumSet.noneOf(SpawnReason.class);
         for (String raw : yaml().getStringList("world.allowed-spawn-reasons")) {
@@ -171,9 +160,7 @@ public final class GardenConfig extends YamlFile {
         return out;
     }
 
-    // ── protection ─────────────────────────────────────────────────────────────
-
-    /** A protection switch under {@code protection:}; every one defaults to on. */
+    /** A switch under {@code protection:}; every one defaults to on. */
     public boolean protect(String key) {
         return yaml().getBoolean("protection." + key, true);
     }
@@ -191,14 +178,12 @@ public final class GardenConfig extends YamlFile {
         return materials("protection.interact-allow");
     }
 
-    // ── Sam and commands ───────────────────────────────────────────────────────
-
     public boolean samEnabled() {
         return yaml().getBoolean("sam.enabled", true);
     }
 
     public String samName() {
-        return yaml().getString("sam.name", "&aSam &7— Garden Desk");
+        return yaml().getString("sam.name", "&aSam &7- Garden Desk");
     }
 
     public String samProfession() {
@@ -210,14 +195,12 @@ public final class GardenConfig extends YamlFile {
         return name == null || name.isBlank() ? fallback : name.trim().toLowerCase(Locale.ROOT);
     }
 
-    /** Which world a reset Garden's occupants are sent to; blank means the host's {@code spawn.world}. */
+    /** Where a reset Garden's occupants are sent; blank means the host's {@code spawn.world}. */
     public String evacuateWorld() {
         return yaml().getString("admin.evacuate-world", "");
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────────
-
-    /** A material by name, or the fallback (with a warning) if the name is wrong. */
+    /** The fallback (with a warning) if the name is wrong. */
     public Material material(String path, Material fallback) {
         String raw = yaml().getString(path);
         if (raw == null || raw.isBlank()) {
@@ -246,8 +229,7 @@ public final class GardenConfig extends YamlFile {
     }
 
     /**
-     * Read a cost the same two ways RoyalSkyblock's upgrades accept one, so the currencies defined in
-     * the host's {@code currencies:} section work here unchanged:
+     * Reads a cost the two ways RoyalSkyblock's upgrades accept one, so the host's currencies work here:
      *
      * <pre>
      *   cost: 5000 coins        cost:
@@ -268,7 +250,7 @@ public final class GardenConfig extends YamlFile {
         return parseCost(parent.getString(key), parent.getCurrentPath() + "." + key, log);
     }
 
-    /** Parse the compact {@code "5000 coins"} form. {@code where} names the setting in warnings. */
+    /** The compact {@code "5000 coins"} form. {@code where} names the setting in warnings. */
     public static Cost parseCost(String compact, String where, Logger log) {
         if (compact == null || compact.isBlank()) {
             return new Cost("", 0);
@@ -279,7 +261,7 @@ public final class GardenConfig extends YamlFile {
             amount = Double.parseDouble(parts[0]);
         } catch (NumberFormatException notANumber) {
             if (log != null) {
-                log.warning(where + ": '" + compact + "' is not a cost — expected e.g. '5000 coins'. "
+                log.warning(where + ": '" + compact + "' is not a cost; expected e.g. '5000 coins'. "
                         + "Treating it as free.");
             }
             return new Cost("", 0);

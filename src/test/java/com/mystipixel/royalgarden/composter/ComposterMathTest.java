@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ComposterMathTest {
 
     private static final long MINUTE = 60_000;
-    /** One Compost a minute for 10 matter and 5 fuel, holding up to 100. */
+    // One Compost a minute for 10 matter and 5 fuel, holding up to 100.
     private static final Machine MACHINE = new Machine(MINUTE, 10, 5, 100, 0);
 
     @Test

@@ -1,22 +1,15 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RoyalGarden  ·  messages.yml
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Every line a player can read. & colour codes and &#rrggbb hex work.
-#  Set a message to "" to switch it off.
-#  Placeholders are listed next to the messages that have them.
-#  Missing keys fall back to the shipped text, so updates never leave a blank.
-# ═══════════════════════════════════════════════════════════════════════════════
+# Every line a player can read. & colour codes and &#rrggbb hex work.
+# Set a message to "" to switch it off. Placeholders are listed next to the
+# messages that have them. Missing keys fall back to the shipped text.
 
 prefix: "&2&lGarden &8» &r"
 
-# ── Going to your Garden ─────────────────────────────────────────────────────
 garden-opening: "&7Opening your Garden…"
 garden-welcome: "&aWelcome to your Garden. &7Talk to Sam, or use /desk."
 garden-open-failed: "&cYour Garden could not be opened. The error is in the server log."
-garden-unreadable: "&cYour Garden's data could not be read. Please contact staff — nothing has been lost."
+garden-unreadable: "&cYour Garden's data could not be read. Please contact staff; nothing has been lost."
 
-# ── Unlocking ────────────────────────────────────────────────────────────────
-# %plot% %cost% %count% (farmable plots now owned — the farmhouse is not counted)
+# %plot% %cost% %count% (farmable plots now owned, the farmhouse not counted)
 unlocked: "&aUnlocked plot &f%plot%&a for &e%cost%&a. &7(%count% plots)"
 # %plot% %required%
 unlocked-needs-clearing: "&7It's overgrown: clear &f%required%%&7 of it before you can build there."
@@ -31,7 +24,6 @@ cost-free: "&aFree"
 payment-failed: "&cThe payment could not be taken. Nothing was changed."
 payment-refunded: "&cThat did not go through, so you have been refunded."
 
-# ── Presets ──────────────────────────────────────────────────────────────────
 presets-disabled: "&cChoosing presets is switched off."
 presets-none: "&7There are no presets to choose from yet."
 presets-go-to-garden: "&cGo to your Garden first: &f/garden"
@@ -47,28 +39,26 @@ presets-confirm: "&eThis replaces &lEVERYTHING&e on plot &f%plot%&e with &f%pres
 presets-cannot-afford: "&f%preset%&c costs &e%cost%&c."
 presets-failed: "&cThat preset could not be read, so nothing was changed. Please tell staff."
 # %preset% %plot%
-presets-applying: "&aBuilding &f%preset%&a on plot &f%plot%&a… &7Stand back — it takes about a minute."
+presets-applying: "&aBuilding &f%preset%&a on plot &f%plot%&a… &7Stand back, it takes about a minute."
 # %plot% %percent% %required%
 presets-clear-first: "&cClear plot &f%plot%&c first &7(%percent%%/%required%%)&c."
 plot-busy: "&cPlot &f%plot%&c is already being built. Wait for it to finish."
 
 # Menu fragments
 preset-none: "&7as generated"
-preset-current: "&a✔ On this plot now"
+preset-current: "&aOn this plot now"
 preset-status-ready: "&eClick to choose."
 preset-status-cooldown: "&cAvailable in %time%"
 preset-status-no-permission: "&cLocked"
 menu-presets-hint: "&eRight-click to choose a preset."
 
-# ── Crop Milestones ──────────────────────────────────────────────────────────
 # %crop_name% %tier% %tier_roman% %max_tier% %total% %next% %remaining% %percent% %bar%
 milestone-progress: "&6%crop_name% &e%total% &7/ &e%next%"
-milestone-tier-up: "&6&lMILESTONE! &f%crop_name% &e%tier_roman% &7— %total% harvested."
+milestone-tier-up: "&6&lMILESTONE! &f%crop_name% &e%tier_roman% &7- %total% harvested."
 # Also %player%. Only sent with broadcast-tier-ups: true in milestones.yml.
 milestone-broadcast: "&6%player% &freached &6%crop_name% &e%tier_roman%&f!"
 milestone-maxed: "max"
 
-# ── Garden Levels ────────────────────────────────────────────────────────────
 # Placeholders: %level% %level_roman% %max_level% %xp% %next% %remaining% %percent% %bar%
 # Action bar on gaining XP; also %amount% and %reason% (one of the level-source-* below).
 level-xp-gained: "&a+%amount% Garden XP &7(%reason%) &8| &fLevel %level% &7%percent%%"
@@ -83,40 +73,38 @@ level-maxed: "max"
 # /garden level. Also %player%.
 level-info: "&f%player%'s Garden: &alevel %level%&7/%max_level% &8| &f%xp% XP &8| &7next at %next%\n%bar% &7%percent%%"
 # %plot% %required% %level%
-unlock-garden-level: "&cPlot &f%plot%&c needs Garden level &a%required%&c — yours is %level%."
+unlock-garden-level: "&cPlot &f%plot%&c needs Garden level &a%required%&c; yours is %level%."
 # %preset% %required%
 presets-garden-level: "&f%preset%&c needs Garden level &a%required%&c."
 preset-status-level: "&cNeeds Garden level %required%"
 menu-level-required: "&cNeeds Garden level %required%"
 
-# ── Visitors ─────────────────────────────────────────────────────────────────
 # Placeholders: %visitor% %visitor_name% %rarity% %rarity_name% %copper% %xp%
 #               %currency% %served% %visitor_served% %unique% %waiting% %player%
 visitor-arrived: "%visitor_name% &7(%rarity_name%&7) &ahas arrived at your Garden. &7Visit the barn or /garden visitors."
 visitor-accepted: "&aYou served %visitor_name%&a: &c+%copper% Copper &8| &2+%xp% Garden XP"
 visitor-refused: "&7You sent %visitor_name% &7away."
 visitor-gone: "&cThat visitor has already left."
-# %items% — the visitor-missing-line entries, joined by visitor-missing-separator
+# %items%: the visitor-missing-line entries, joined by visitor-missing-separator
 visitor-missing: "&cYou still need: %items%"
 # %item% %amount%
 visitor-missing-line: "&f%amount%x %item%"
 visitor-missing-separator: "&7, "
 # %item%
 visitor-bad-item: "&cThis visitor wants '%item%', which does not exist here. Please tell staff."
-visitor-unreadable: "&cYour visitors could not be read. Please contact staff — nothing has been lost."
+visitor-unreadable: "&cYour visitors could not be read. Please contact staff; nothing has been lost."
 visitor-not-yours: "&7This visitor is waiting for the Garden's owner."
 visitors-disabled: "&cVisitors are switched off."
 visitor-queue-full: "&cthe queue is full"
 visitor-status-ready: "&eClick to accept!"
 visitor-status-missing: "&cYou do not have everything yet."
 # %have% %amount%
-visitor-item-have: "&a✔ You have %have%"
-visitor-item-missing: "&c✘ You have %have%"
-visitor-check-yes: "&a✔"
-visitor-check-no: "&c✘"
+visitor-item-have: "&aYou have %have%"
+visitor-item-missing: "&cYou have %have%"
+visitor-check-yes: "&a(done)"
+visitor-check-no: "&c(missing)"
 level-source-visitor: "visitor"
 
-# ── Crop Upgrades ────────────────────────────────────────────────────────────
 # Placeholders: %crop% %crop_name% %level% %level_roman% %max_level% %value%
 #               %next_value% %next_cost% %player%
 # Also %cost% (what was paid).
@@ -124,11 +112,10 @@ upgrade-bought: "&aUpgraded &f%crop_name%&a to level &e%level%&a for %cost%&a."
 upgrade-cannot-afford: "&cThe next %crop_name% upgrade costs %next_cost%&c."
 upgrade-maxed-message: "&7%crop_name% is fully upgraded."
 upgrade-maxed: "&6Maxed"
-upgrade-unreadable: "&cYour crop upgrades could not be read. Please contact staff — nothing has been lost."
+upgrade-unreadable: "&cYour crop upgrades could not be read. Please contact staff; nothing has been lost."
 upgrades-disabled: "&cCrop upgrades are switched off."
 level-source-upgrade: "crop upgrade"
 
-# ── The Composter ────────────────────────────────────────────────────────────
 # Placeholders: %matter% %matter_cap% %matter_percent% %fuel% %fuel_cap%
 #               %fuel_percent% %stored% %max_stored% %status% %next% %time%
 #               %matter_cost% %fuel_cost% %bonus_chance% %made% %collected%
@@ -142,22 +129,22 @@ composter-matter-name: "organic matter"
 composter-fuel-name: "fuel"
 # %amount%
 composter-collected: "&aCollected &f%amount% %compost%&a."
-composter-collected-some: "&aCollected &f%amount% %compost%&a — your inventory is full, the rest is still in the Composter."
+composter-collected-some: "&aCollected &f%amount% %compost%&a. Your inventory is full; the rest is still in the Composter."
 composter-nothing-to-collect: "&7There is no %compost% to collect yet."
 composter-inventory-full: "&cYour inventory is full."
 # %item%
 composter-bad-output: "&cThe Composter makes '%item%', which does not exist here. Please tell staff."
 composter-save-failed: "&cThe Composter could not be saved, so nothing was changed. Please tell staff."
-composter-unreadable: "&cYour Composter could not be read. Please contact staff — nothing has been lost."
+composter-unreadable: "&cYour Composter could not be read. Please contact staff; nothing has been lost."
 composter-disabled: "&cThe Composter is switched off."
 composter-not-yours: "&cThis Composter belongs to the Garden's owner."
 composter-stopped-no-matter: "&eYour Composter has run out of organic matter."
 composter-stopped-no-fuel: "&eYour Composter has run out of fuel."
-composter-stopped-full: "&eYour Composter is full — collect your %compost%."
+composter-stopped-full: "&eYour Composter is full. Collect your %compost%."
 composter-status-running: "&aComposting…"
 composter-status-no-matter: "&cNeeds organic matter"
 composter-status-no-fuel: "&cNeeds fuel"
-composter-status-full: "&6Full — collect it!"
+composter-status-full: "&6Full: collect it!"
 composter-next-stopped: "&7stopped"
 composter-no-limit: "∞"
 # Upgrades: %upgrade_name% %level% %level_roman% %max_level% %value% %next_value%
@@ -168,13 +155,12 @@ composter-upgrade-maxed-message: "&7%upgrade_name% is fully upgraded."
 composter-upgrade-maxed: "&6Maxed"
 level-source-composter: "Composter"
 
-# ── Pests ────────────────────────────────────────────────────────────────────
 # Placeholders: %pest% %pest_name% %plot% %pests% %kills% %pest_kills% %alive%
 #               %currency% %player%
 pest-spawned: "&c%pest_name% &7appeared on plot &f%plot%&7! &8(%pests% there)"
 # also %copper% %xp%
 pest-killed: "&aKilled a %pest_name%&a: &c+%copper% Copper&a, &a+%xp% Garden XP."
-pest-status-infested: "&cInfested — farming here is slowed."
+pest-status-infested: "&cInfested: farming here is slowed."
 pest-status-below: "&7Not infested yet."
 # %plot%
 pest-located: "&aYou are on plot %plot%. Find the pests!"
@@ -185,7 +171,7 @@ pests-disabled: "&cPests are switched off."
 pests-unreadable: "&cThat player's pests could not be read. Nothing was changed."
 level-source-pest: "pest"
 
-# ── Protection (shown in the action bar) ─────────────────────────────────────
+# Protection (shown in the action bar).
 # %plot%
 deny-locked: "&cPlot %plot% is locked. Open the desk to unlock it."
 deny-farmhouse: "&cThe farmhouse plot is protected."
@@ -193,19 +179,18 @@ deny-floor: "&cThat is the floor of your Garden."
 deny-outside: "&cThat is outside your Garden."
 deny-visitor: "&cThis is not your Garden."
 # A plot bought but not yet cleared. %plot% %percent% %required% %bar% %cleared% %total%
-deny-uncleared: "&cClear plot %plot% first &7(%percent%%/%required%%) &c— break the overgrowth."
+deny-uncleared: "&cClear plot %plot% first &7(%percent%%/%required%%)&c: break the overgrowth."
 
-# ── Clearing ─────────────────────────────────────────────────────────────────
 # Action bar while clearing. %plot% %percent% %required% %bar% %cleared% %total%
 clearing-progress: "&aClearing %plot% %bar% &f%percent%%&7/%required%%"
 # %royalgarden_clearing_status%, while standing on a plot being cleared. Same placeholders.
 clearing-status: "&6Clearing %plot%: &f%percent%%&7/%required%%"
 # %plot% %player%
-clearing-done: "&aPlot &f%plot%&a is clear — you can build on it now."
+clearing-done: "&aPlot &f%plot%&a is clear. You can build on it now."
 
-# ── Admin (/garden <subcommand>) ─────────────────────────────────────────────
+# Admin (/garden <subcommand>).
 no-permission: "&cYou cannot do that."
-admin-help: "&7/garden &8— &7go to your Garden. &7/garden milestones&8 — &7your Crop Milestones. &7/garden visitors&8 — &7your visitors. &7/garden upgrades&8 — &7crop upgrades. &7/garden composter&8 — &7your Composter. &7/garden pests&8 — &7your pests. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock|clear <player> <plot>, farmhouse [set|unset <spot>], visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset, pests <player> spawn [pest] [plot]|clear|stats|reset-stats"
+admin-help: "&7/garden&8: &7go to your Garden. &7/garden milestones&8: &7your Crop Milestones. &7/garden visitors&8: &7your visitors. &7/garden upgrades&8: &7crop upgrades. &7/garden composter&8: &7your Composter. &7/garden pests&8: &7your pests. Admin: &fcapture <name>, apply <name>, flat, bedrock, default [name], delete <name>, presets, reload, reset <player> [world], unlock|lock|clear <player> <plot>, farmhouse [set|unset <spot>], visit <player>, info <player>, milestones <player>, milestone <player> <crop> <amount>|reset, level <player>, xp <player> give|take|set <amount>, visitor <player> add [visitor]|clear|stats|reset-stats, upgrade <player> <crop> <level>|reset, composter <player> give-matter|give-fuel <amount>|collect|reset, pests <player> spawn [pest] [plot]|clear|stats|reset-stats"
 admin-stand-in-garden: "&cStand in a Garden first."
 admin-stand-on-plot: "&cStand on the plot you want to use."
 admin-capture-usage: "&cName the preset: /garden capture <name>  (a-z, 0-9, _ and - only)"
@@ -214,7 +199,7 @@ admin-capture-farmhouse: "&cThat is the farmhouse plot. Build presets on any oth
 admin-captured: "&aCaptured plot %plot% as '%preset%' (%layers% layers). &7Add it to presets.yml to offer it to players."
 # %error%
 admin-capture-failed: "&cCould not save the preset: %error%"
-admin-apply-usage: "&cName a preset: /garden apply <name>  — or /garden flat, /garden bedrock"
+admin-apply-usage: "&cName a preset: /garden apply <name>, or /garden flat, /garden bedrock"
 admin-apply-farmhouse: "&cThe farmhouse plot cannot be replaced."
 # %preset% %plot%
 admin-applying: "&aBuilding '%preset%' on plot %plot%… &7This takes about a minute."
@@ -242,18 +227,18 @@ admin-unlocked: "&aUnlocked %plot% for %player%."
 admin-locked: "&aLocked %plot% for %player%."
 # /garden farmhouse
 admin-farmhouse-info: "&aFarmhouse: &f%farmhouse%&a. Spots: &7%spots%"
-admin-farmhouse-usage: "&c/garden farmhouse set|unset sam|spawn|window|composter  &7— stand where it goes, facing the way it should face (for the composter, look at the block)."
+admin-farmhouse-usage: "&c/garden farmhouse set|unset sam|spawn|window|composter  &7(stand where it goes, facing the way it should face; for the composter, look at the block)."
 admin-farmhouse-look: "&cLook at the block the Composter should be."
 admin-farmhouse-set: "&aSet the farmhouse's &f%spot%&a spot. Every Garden uses it now."
 admin-farmhouse-unset: "&aForgot the farmhouse's &f%spot%&a spot; it falls back to a sign or the default."
-admin-farmhouse-failed: "&cCould not save farmhouse-spots.yml — see the console."
+admin-farmhouse-failed: "&cCould not save farmhouse-spots.yml; see the console."
 admin-cleared: "&aMarked %plot% as cleared for %player%."
 admin-not-clearing: "&7%plot% is not being cleared for %player%."
 admin-unchanged: "&7%plot% was already like that for %player%."
 admin-bad-plot: "&c'%plot%' is not a plot on this board."
 # %player% %unlocked% %total% %plots% %loaded% %readonly% %level% %xp%
 admin-info: "&a%player%&7: %unlocked%/%total% plots (%plots%). Level %level% (%xp% XP). Loaded: %loaded%. Read-only: %readonly%."
-admin-milestone-usage: "&c/garden milestone <player> <crop> <amount>  — or —  /garden milestone <player> reset"
+admin-milestone-usage: "&c/garden milestone <player> <crop> <amount>, or /garden milestone <player> reset"
 # %player% %crop_name% %total% %tier%
 admin-milestone-set: "&aSet %player%'s %crop_name% to %total% (tier %tier%). No rewards were given."
 admin-milestone-reset: "&aReset all of %player%'s milestones."
@@ -263,12 +248,12 @@ admin-xp-done: "&a%player%'s Garden: level %level% (%xp% XP)."
 admin-visitor-usage: "&c/garden visitor <player> add [visitor] | clear | stats | reset-stats"
 # %player% %visitor% %visitor_name%
 admin-visitor-added: "&aSent %visitor_name% &ato %player%."
-admin-visitor-none: "&cNo visitor could be sent — check the id, or that visitors.yml has any."
+admin-visitor-none: "&cNo visitor could be sent; check the id, or that visitors.yml has any."
 admin-visitor-cleared: "&aSent all of %player%'s visitors away."
 admin-visitor-reset: "&aReset %player%'s visitor stats."
 # %player% %served% %refused% %unique% %total_visitors% %copper_earned% %waiting% %max_queue% %next%
 admin-visitor-stats: "&a%player%&7: served %served% (%unique%/%total_visitors% different), refused %refused%, %copper_earned% Copper earned. Waiting: %waiting%/%max_queue%, next in %next%."
-admin-upgrade-usage: "&c/garden upgrade <player> <crop> <level>  — or —  /garden upgrade <player> reset"
+admin-upgrade-usage: "&c/garden upgrade <player> <crop> <level>, or /garden upgrade <player> reset"
 # upgrade placeholders + %player%
 admin-upgrade-set: "&aSet %player%'s %crop_name% upgrade to level %level%. Nothing was charged."
 admin-upgrade-reset: "&aReset all of %player%'s crop upgrades."
@@ -284,12 +269,12 @@ admin-pests-usage: "&c/garden pests <player> spawn [pest|random] [plot] | clear 
 admin-pests-no-such-pest: "&cThere is no pest '%pest%' in pests.yml."
 # %player% %plot% (blank for a random plot)
 admin-pests-spawn-spawned: "&aBrought a pest onto %player%'s Garden."
-admin-pests-spawn-bad-plot: "&cPests cannot go on plot %plot% of %player%'s Garden — it is locked, or the farmhouse."
+admin-pests-spawn-bad-plot: "&cPests cannot go on plot %plot% of %player%'s Garden: it is locked, or the farmhouse."
 admin-pests-spawn-no-room: "&c%player%'s Garden has no room for another pest there (see max-per-plot and max-per-garden)."
 admin-pests-spawn-no-spot: "&cNo loaded spot with room to stand was found. Stand near that plot and try again."
 admin-pests-spawn-no-pest: "&cNo pest in pests.yml can appear at %player%'s Garden level."
 admin-pests-spawn-not-loaded: "&c%player%'s Garden is not loaded."
-admin-pests-spawn-failed: "&cThe pest's command spawned nothing — see the console."
+admin-pests-spawn-failed: "&cThe pest's command spawned nothing; see the console."
 admin-pests-spawn-unreadable: "&c%player%'s pests could not be read. Nothing was changed."
 # %player% %amount%
 admin-pests-cleared: "&aRemoved %amount% pest(s) from %player%'s Garden."

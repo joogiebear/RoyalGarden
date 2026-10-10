@@ -27,15 +27,8 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * The Visitors page of the desk, and each visitor's offer.
- *
- * <p>The Visitor Log lists every visitor there is: a head for each one the player has served, with how
- * many times, and a locked icon for the rest.
- *
- * <p>The page lists everyone waiting — including those without a spot outside the barn — with the
- * player's stats, the time to the next arrival and the SkyMart button. Clicking a visitor, or
- * right-clicking one outside, opens their offer: what they want, what the player has of it, and what
- * they pay. Every icon and line comes from {@code menu:} in {@code visitors.yml}.
+ * The Visitors page, the Visitor Log and each visitor's offer. Every icon and line comes from {@code
+ * menu:} in {@code visitors.yml}.
  */
 public final class VisitorMenu {
 
@@ -63,9 +56,7 @@ public final class VisitorMenu {
         return menu == null ? fallback : menu.getString(path, fallback);
     }
 
-    // ── the list ───────────────────────────────────────────────────────────────
-
-    /** The Visitors page for the viewer's own Garden. */
+    /** For the viewer's own Garden. */
     public void open(Player player) {
         if (!service.config().enabled()) {
             messages.send(player, "visitors-disabled");
@@ -113,7 +104,7 @@ public final class VisitorMenu {
         return ItemSpec.build(section("entry"), type == null ? Material.VILLAGER_SPAWN_EGG : type.icon(), placeholders);
     }
 
-    /** Open SkyMart, the Copper shop — an EcoShop shop, reached through its command. */
+    // SkyMart is an EcoShop shop, reached through its command.
     private void skymart(Player player) {
         String command = Messages.fill(service.config().skymartCommand(), "%player%", player.getName());
         if (command.isBlank()) {
@@ -128,12 +119,7 @@ public final class VisitorMenu {
         }
     }
 
-    // ── the log ────────────────────────────────────────────────────────────────
-
-    /**
-     * The Visitor Log: every visitor in {@code visitors.yml}, in order. Those the viewer has served show
-     * as their head with how many times they have visited; the rest are locked.
-     */
+    /** Served visitors show as their head with a visit count; the rest are locked. */
     public void openLog(Player player, int page) {
         if (!service.config().enabled()) {
             messages.send(player, "visitors-disabled");
@@ -191,7 +177,7 @@ public final class VisitorMenu {
         return head;
     }
 
-    /** A visitor's face: a base64 skin texture, or a player whose skin to borrow. */
+    // A base64 skin texture, or a player whose skin to borrow.
     private static PlayerProfile profile(VisitorType type) {
         String head = type.head();
         if (head.length() > 16) {
@@ -205,9 +191,6 @@ public final class VisitorMenu {
         return Bukkit.createProfile(head);
     }
 
-    // ── one offer ──────────────────────────────────────────────────────────────
-
-    /** A visitor's offer. */
     public void openOffer(Player player, String offerId) {
         UUID owner = player.getUniqueId();
         Offer offer = service.store().get(owner).offer(offerId);
@@ -227,8 +210,7 @@ public final class VisitorMenu {
         builder.setSlot(1, 5, Slot.builder(visitorFace(type, withDialogue)).build());
         used[1][5] = true;
 
-        // One plain icon per item: what is wanted, not how much. The amounts are on the accept button, where
-        // they sit next to whether you have them — a row of stacks said the same thing less legibly.
+        // One plain icon per item; the amounts are on the accept button, next to whether you have them.
         List<Offer.Wanted> items = offer.items();
         int count = Math.min(7, items.size());
         int start = 5 - (count - 1) / 2;
@@ -270,12 +252,7 @@ public final class VisitorMenu {
         builder.build().open(player);
     }
 
-    /**
-     * The visitor at the top of their offer: their {@code head} if they have one, their icon otherwise.
-     *
-     * <p>A face rather than the icon, because the icon is usually what they farm — Spud's is a potato — and
-     * drawn above the request for potatoes it read as a second, puzzling copy of the request.
-     */
+    // Their head if they have one: the icon is usually what they farm and would read as a second request.
     private ItemStack visitorFace(VisitorType type, String[] placeholders) {
         if (type == null || type.head().isBlank()) {
             return ItemSpec.build(section("offer.visitor"),
@@ -289,7 +266,6 @@ public final class VisitorMenu {
         return head;
     }
 
-    /** A requested item as a single plain item, with how many are wanted and how many the viewer has. */
     private ItemStack wantedIcon(Player viewer, Offer.Wanted wanted) {
         TestableItem item = VisitorService.lookup(wanted.item());
         ItemStack stack = item == null ? new ItemStack(Material.BARRIER) : item.getItem().clone();
@@ -334,7 +310,7 @@ public final class VisitorMenu {
         return true;
     }
 
-    /** {@code %items%}: one line per requested item, from {@code menu.item-line}. */
+    // %items%: one line per requested item, from menu.item-line.
     private String itemLines(Player player, Offer offer) {
         List<String> lines = new ArrayList<>();
         for (Offer.Wanted wanted : offer.items()) {
@@ -348,7 +324,7 @@ public final class VisitorMenu {
         return String.join("\n", lines);
     }
 
-    /** {@code %rewards%}: Copper, Garden XP, then any lines the visitor's {@code reward-lore} adds. */
+    // %rewards%: Copper, Garden XP, then any lines the visitor's reward-lore adds.
     private String rewardLines(Offer offer) {
         List<String> lines = new ArrayList<>();
         if (offer.copper() > 0 && service.config().copperEnabled()) {
@@ -365,9 +341,6 @@ public final class VisitorMenu {
         return String.join("\n", lines);
     }
 
-    // ── layout ─────────────────────────────────────────────────────────────────
-
-    /** Put a configured bottom-row button in its column, if the column is free. */
     private void place(MenuBuilder builder, boolean[][] used, int row, String key, int defaultColumn,
                        Material fallback, Consumer<Player> click) {
         ConfigurationSection spec = section(key);

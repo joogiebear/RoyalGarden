@@ -6,8 +6,7 @@ import org.bukkit.OfflinePlayer;
 import java.util.Locale;
 
 /**
- * Visitor stats for {@code %royalgarden_<key>%}, answered without PlaceholderAPI's types so the logic
- * loads on any server; {@link com.mystipixel.royalgarden.hooks.RoyalGardenExpansion} is the front end.
+ * Visitor stats for {@code %royalgarden_<key>%}, without PlaceholderAPI types.
  *
  * <pre>
  *   %royalgarden_visitors_served%        visitors served in total
@@ -21,8 +20,7 @@ import java.util.Locale;
  *   %royalgarden_visitor_&lt;id&gt;_served%   times one visitor has been served
  * </pre>
  *
- * <p>Plain numbers, no separators, so they can be compared in conditions. Offline players are read
- * from disk without being cached, so leaderboards and holograms do not fill memory with them.
+ * <p>Plain numbers, so conditions can compare them. Offline players are read from disk without caching.
  */
 public final class VisitorPlaceholders {
 
@@ -32,7 +30,7 @@ public final class VisitorPlaceholders {
         this.service = service;
     }
 
-    /** The value for {@code key}, or null if the key is not one of ours. */
+    /** Null if the key is not one of ours. */
     public String resolve(OfflinePlayer player, String key) {
         String params = key.toLowerCase(Locale.ROOT);
         VisitorStore.Data data = service.store().peek(player.getUniqueId());

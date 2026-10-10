@@ -1,14 +1,9 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RoyalGarden  ·  levels.yml  —  Garden Levels
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Every Garden earns XP. XP adds up to levels; levels pay rewards and can gate
-#  plots (unlock.*.garden-level in config.yml) and presets (garden-level in
-#  presets.yml). XP is never spent. Reload with /garden reload.
+# Garden Levels. Every Garden earns XP; XP adds up to levels, which pay rewards and
+# can gate plots (unlock.*.garden-level in config.yml) and presets (garden-level in
+# presets.yml). XP is never spent. Reload with /garden reload.
 #
-#  Other plugins can pay Garden XP with a console command:
-#      garden xp <player> give <amount> [silent]
-#  (quests, EcoSkills level-ups, visitors, crates — anything that runs commands)
-# ═══════════════════════════════════════════════════════════════════════════════
+# Other plugins can pay Garden XP with a console command:
+#     garden xp <player> give <amount> [silent]
 
 enabled: true
 
@@ -16,30 +11,28 @@ enabled: true
 max-level: 15
 
 # XP to reach each level after 1. Two ways to write it:
-#   Curve — first: XP from level 1 to 2; growth: each level needs this many
-#           times more than the last; round-to.
-#   List  — amounts: [50, 120, 220, ...]  running totals for levels 2, 3, 4…
-#           (max-level is then the list's length + 1)
-# The default curve totals about 14,000 XP — roughly what finishing every
-# plot and a good share of crop milestones earns.
+#   Curve: first (XP from level 1 to 2), growth (each level needs this many
+#          times more than the last), round-to.
+#   List:  amounts: [50, 120, 220, ...]  running totals for levels 2, 3, 4...
+#          (max-level is then the list's length + 1)
+# The default curve totals about 14,000 XP.
 xp:
   first: 50
   growth: 1.4
   round-to: 10
 
-# ── Where XP comes from ────────────────────────────────────────────────────────
+# Where XP comes from.
 sources:
-  # Each crop milestone tier reached: base + per-tier × tier number.
+  # Each crop milestone tier reached: base + per-tier * tier number.
   milestone-tier:
     base: 10
     per-tier: 2
-  # Each plot bought: base + per-plot × which purchase it is (1st, 2nd…).
+  # Each plot bought: base + per-plot * which purchase it is (1st, 2nd, ...).
   plot-unlock:
     base: 25
     per-plot: 5
 
-# ── Rewards ────────────────────────────────────────────────────────────────────
-# Stacked: reaching a level gives every-level plus by-level.<n>. A gain that
+# Rewards are stacked: reaching a level gives every-level plus by-level.<n>. A gain that
 # jumps several levels pays each one.
 # Placeholders: %player% %uuid% %reached% %reached_roman% %level% %level_roman%
 #               %max_level% %xp% %next% %remaining% %percent%
@@ -51,11 +44,10 @@ rewards:
   by-level: {}
   #  5:
   #    commands: ["eco give %player% garden_hoe 1"]
-  #    messages: ["&aGarden Level 5 — you earned a Garden Hoe!"]
+  #    messages: ["&aGarden Level 5: you earned a Garden Hoe!"]
   #  15:
   #    commands: ["broadcast %player% has maxed their Garden!"]
 
-# ── Display ────────────────────────────────────────────────────────────────────
 broadcast-level-ups: true
 # Show "+12 Garden XP (milestone)" in the action bar when XP is earned.
 announce-xp-gains: true

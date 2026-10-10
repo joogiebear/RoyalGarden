@@ -10,10 +10,8 @@ import java.util.List;
 import java.util.logging.Logger;
 
 /**
- * {@code levels.yml}: how much Garden XP each level takes, where XP comes from, and what levels pay.
- *
- * <p>Levels start at 1. {@code thresholds()[0]} is the XP total that reaches level 2, and the last
- * entry reaches the top level — so there is always one threshold fewer than there are levels.
+ * {@code levels.yml}. Levels start at 1; {@code thresholds()[0]} is the XP total that reaches level 2, so
+ * there is always one threshold fewer than there are levels.
  */
 public final class LevelConfig extends YamlFile {
 
@@ -61,12 +59,12 @@ public final class LevelConfig extends YamlFile {
         return thresholds.length + 1;
     }
 
-    /** The level a total reaches, from 1 to {@link #maxLevel()}. */
+    /** From 1 to {@link #maxLevel()}. */
     public int levelOf(long xp) {
         return levelOf(thresholds, xp);
     }
 
-    /** The level {@code xp} reaches against these thresholds: 1, plus one per threshold met. */
+    /** 1, plus one per threshold met. */
     public static int levelOf(long[] thresholds, long xp) {
         int level = 1;
         while (level - 1 < thresholds.length && xp >= thresholds[level - 1]) {
@@ -80,26 +78,21 @@ public final class LevelConfig extends YamlFile {
         return level - 1 < thresholds.length ? thresholds[level - 1] : -1;
     }
 
-    /** XP the given level started at. */
     public long levelStart(int level) {
         return level <= 1 ? 0 : thresholds[level - 2];
     }
 
-    // ── sources ────────────────────────────────────────────────────────────────
-
-    /** XP for reaching a milestone tier: {@code base + per-tier × tier}. */
+    /** {@code base + per-tier * tier} */
     public long milestoneXp(int tier) {
         return Math.max(0, yaml().getLong("sources.milestone-tier.base", 10)
                 + yaml().getLong("sources.milestone-tier.per-tier", 2) * tier);
     }
 
-    /** XP for buying the {@code purchase}-th plot: {@code base + per-plot × purchase}. */
+    /** XP for buying the {@code purchase}-th plot: {@code base + per-plot * purchase}. */
     public long unlockXp(int purchase) {
         return Math.max(0, yaml().getLong("sources.plot-unlock.base", 25)
                 + yaml().getLong("sources.plot-unlock.per-plot", 5) * purchase);
     }
-
-    // ── display ────────────────────────────────────────────────────────────────
 
     public boolean broadcastLevelUps() {
         return yaml().getBoolean("broadcast-level-ups", true);

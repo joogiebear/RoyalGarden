@@ -19,19 +19,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Each player's visitors, one small YAML per player under {@code visitors/}: who is waiting, the arrival
- * clock, and how many they have served.
- *
- * <p>Unlike milestones, every change is written straight away. Changes are rare — an arrival every few
- * minutes, a click to accept — and accepting takes items out of an inventory, so a crash that forgot an
- * accept would hand the same visitor back to be paid twice.
- *
- * <p>A file that does not parse is copied aside and that player's visitors are held read-only in
- * memory, the same way milestones are.
+ * Each player's visitors, one YAML per player under {@code visitors/}. Every change is written straight
+ * away: accepting takes items, and a lost write would let the same visitor be paid twice. An unparseable
+ * file is copied aside and the player held read-only.
  */
 public final class VisitorStore {
 
-    /** One player's visitor data. Mutable; save it through {@link #save} after changing it. */
+    /** Mutable; save it through {@link #save} after changing it. */
     public static final class Data {
         private final LinkedHashMap<String, Offer> queue = new LinkedHashMap<>();
         private final Map<String, Long> servedBy = new ConcurrentHashMap<>();
@@ -41,7 +35,7 @@ public final class VisitorStore {
         private long refused;
         private long copper;
 
-        /** Waiting visitors in arrival order. */
+        /** In arrival order. */
         public List<Offer> queue() {
             return List.copyOf(queue.values());
         }
@@ -92,17 +86,15 @@ public final class VisitorStore {
             this.lastSeen = when;
         }
 
-        /** Visitors served in total. */
         public long served() {
             return served;
         }
 
-        /** How many times one visitor has been served. */
         public long served(String visitor) {
             return servedBy.getOrDefault(visitor, 0L);
         }
 
-        /** How many different visitors have been served at least once. */
+        /** Visitors served at least once. */
         public int unique() {
             return servedBy.size();
         }
@@ -111,12 +103,10 @@ public final class VisitorStore {
             return refused;
         }
 
-        /** Copper earned from visitors in total. */
         public long copper() {
             return copper;
         }
 
-        /** Count one served visitor and what it paid. */
         public void recordServed(String visitor, long copperPaid) {
             served++;
             servedBy.merge(visitor, 1L, Long::sum);
@@ -127,7 +117,7 @@ public final class VisitorStore {
             refused++;
         }
 
-        /** Forget the counts (admin). The queue and clock are left alone. */
+        /** Admin: clears the counts; the queue and clock are left alone. */
         public void resetStats() {
             served = 0;
             refused = 0;
@@ -138,7 +128,7 @@ public final class VisitorStore {
 
     private final File dir;
     private final Logger logger;
-    // Concurrent: placeholders are often asked for off the server thread (scoreboards, tab lists).
+    // Concurrent: placeholders are often asked for off the main thread (scoreboards, tab lists).
     private final Map<UUID, Data> cache = new ConcurrentHashMap<>();
     private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
@@ -146,7 +136,7 @@ public final class VisitorStore {
         this.dir = new File(dataFolder, "visitors");
         this.logger = logger;
         if (!dir.exists() && !dir.mkdirs()) {
-            logger.warning("Could not create " + dir + " — visitors will not persist.");
+            logger.warning("Could not create " + dir + "; visitors will not persist.");
         }
     }
 
@@ -154,30 +144,28 @@ public final class VisitorStore {
         return new File(dir, player + ".yml");
     }
 
-    /** A player's data, read from disk the first time. */
+    /** Read from disk the first time. */
     public Data get(UUID player) {
         return cache.computeIfAbsent(player, id -> read(id, true));
     }
 
     /**
-     * A player's data for reading only: the cached copy if there is one, else read from disk without
-     * caching it — for placeholders asked about offline players. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
+     * caching. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
         return cached != null ? cached : read(player, false);
     }
 
-    /** Whether this player's file could not be read, so nothing of theirs may change. */
+    /** True if this player's file could not be read, so nothing of theirs may change. */
     public boolean readOnly(UUID player) {
         get(player);
         return unreadable.contains(player);
     }
 
-    /**
-     * @param keep whether the result will be cached. Only then is a broken file copied aside and marked
-     *             read-only; a peek just sees nothing, so asking about one repeatedly copies nothing.
-     */
+    // keep: whether the result will be cached. Only then is a broken file copied aside and marked
+    // read-only, so repeated peeks copy nothing.
     private Data read(UUID player, boolean keep) {
         Data data = new Data();
         File file = fileFor(player);
@@ -239,7 +227,6 @@ public final class VisitorStore {
         return data;
     }
 
-    /** Write one player now. */
     public void save(UUID player) {
         Data data = cache.get(player);
         if (data == null || unreadable.contains(player)) {
@@ -273,14 +260,12 @@ public final class VisitorStore {
         }
     }
 
-    /** Write every player held in memory. */
     public void saveAll() {
         for (UUID player : Set.copyOf(cache.keySet())) {
             save(player);
         }
     }
 
-    /** Save and forget a player who has left. */
     public void unload(UUID player) {
         save(player);
         cache.remove(player);

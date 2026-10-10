@@ -7,32 +7,23 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 
 /**
- * Generates a brand-new Garden: the centre plot and the farmhouse standing on it.
- *
- * <p>Only the centre plot is built <em>here</em>, synchronously, so the player has somewhere to stand
- * the moment the world exists. The rest are laid in behind them by {@link GardenWorlds#sync} through
- * the {@link BuildQueue} — locked plots included, because ground you will one day own should look like
- * ground, not a hole in the board.
- *
- * <p>Everything here writes blocks, so it must run on the server thread. It is also deterministic:
- * every Garden is identical, which keeps "is this world already built?" a question about the world
- * name rather than about its contents.
+ * Generates a new Garden's centre plot and farmhouse. Only the centre is built here, synchronously, so
+ * the player has somewhere to stand; the rest is laid by {@link GardenWorlds#sync} through the {@link
+ * BuildQueue}. Writes blocks, so main thread only.
  */
 public final class GardenBuilder {
 
-    /** Half-width of the barn's floor plan; the building is {@code BARN_X * 2 + 1} across. */
+    // Half-width of the barn's floor plan; the building is BARN_X * 2 + 1 across.
     private static final int BARN_X = 7;
 
-    /** Half-depth of the barn's floor plan. */
     private static final int BARN_Z = 5;
 
-    /** Wall height between the floor and the eaves. */
+    // Wall height between the floor and the eaves.
     private static final int WALL = 5;
 
     /**
-     * The barn as {@link #build} makes it now. A Garden built to an older one is brought up to date by
-     * {@link #renovate} on its next load; each version's changes are additions, never a rebuild, so a
-     * renovation cannot disturb anything else standing on the farmhouse plot.
+     * The barn as {@link #build} makes it now; older Gardens are brought up to date by {@link #renovate}.
+     * Each version only adds blocks, never rebuilds.
      *
      * <ol>
      *   <li>the original barn;</li>
@@ -41,17 +32,15 @@ public final class GardenBuilder {
      */
     public static final int BARN_VERSION = 2;
 
-    /** What plot boundaries used to be drawn in, kept only so old Gardens can be cleaned up. */
+    // Kept only so old Gardens can be cleaned up.
     private static final Material LEGACY_BOUNDARY = Material.STONE_BRICK_WALL;
 
     private GardenBuilder() {
     }
 
     /**
-     * Where a player arrives: on the path just outside the barn doors, looking north at them.
-     *
-     * <p>Outside rather than inside, so the first thing you see is the building you are about to walk
-     * into — and so the spawn point can never be inside a block if the barn is ever reshaped.
+     * On the path just outside the barn doors, looking at them, so the spawn can never be inside a block if
+     * the barn is reshaped.
      */
     public static Location spawn(World world) {
         Farmhouse.Anchor marked = Farmhouse.current().anchor("spawn");
@@ -64,12 +53,7 @@ public final class GardenBuilder {
         return spawn;
     }
 
-    /**
-     * Where Sam stands: behind the desk at the back of the barn, facing over it toward the doors.
-     *
-     * <p>Yaw 0 is +z, the way the doors face. It was 180 once, which stood Sam with his back to the desk
-     * and his face to the wall; he is re-posted on every load, so that corrects itself.
-     */
+    /** Behind the desk at the back of the barn, facing the doors (yaw 0 is +z). */
     public static Location samPost(World world) {
         Farmhouse.Anchor marked = Farmhouse.current().anchor("sam");
         if (marked != null) {
@@ -81,7 +65,7 @@ public final class GardenBuilder {
         return post;
     }
 
-    /** Build the centre plot and its farmhouse — built-in or a schematic — into a freshly created world. */
+    /** Into a freshly created world; the farmhouse is built-in or a schematic. */
     public static void build(World world, Palette palette, java.util.logging.Logger logger) {
         for (int row = 0; row < GardenLayout.plotSize(); row++) {
             generatePlotRow(world, GardenLayout.centre(), GardenLayout.centre(), row, Base.FLAT, palette);
@@ -89,27 +73,22 @@ public final class GardenBuilder {
         Farmhouse.current().build(world, logger);
     }
 
-    /** The built-in barn, with its path and drive-through, onto bare ground. */
+    // Onto bare ground, with its path and drive-through.
     static void buildBarn(World world) {
         barn(world);
         approach(world);
         driveThrough(world);
     }
 
-    /** Bring a barn built to {@code from} up to {@link #BARN_VERSION}. */
+    /** From barn version {@code from} up to {@link #BARN_VERSION}. */
     public static void renovate(World world, int from) {
         if (from < 2) {
             driveThrough(world);
         }
     }
 
-    /**
-     * The drive-through: a window in the front wall east of the doors, with a counter and an awning, and a
-     * path running south from it for visitors to queue along.
-     *
-     * <p>The window is where the line in {@code visitors.yml} starts — its front spot, {@code 6, 6.5},
-     * stands a visitor square in the opening. Moving one means moving the other.
-     */
+    // A window east of the doors with a counter and awning, and a lane south for the queue. The line's front
+    // spot in visitors.yml (6, 6.5) stands in this opening: moving one means moving the other.
     private static void driveThrough(World world) {
         int y = GardenLayout.groundY();
         int wall = BARN_Z;
@@ -146,40 +125,34 @@ public final class GardenBuilder {
     }
 
     /**
-     * The two plots that are generated rather than captured.
-     *
-     * <p>They are not presets and deliberately do not live in the preset library: they need no file,
-     * cannot be deleted, and are the two states a plot can always be returned to.
+     * The two plots that are generated rather than captured. Not in the preset library: they need no file,
+     * cannot be deleted, and are the states a plot can always return to.
      */
     public enum Base {
-        /** Grass over dirt over bedrock, with a path around the rim — somewhere to start. */
+        /** Grass over dirt over bedrock, with a path around the rim. */
         FLAT,
-        /** The bedrock course and nothing else — a bare slab to build on from scratch. */
+        /** The bedrock course and nothing else. */
         BEDROCK
     }
 
-    /** Blocks written by one call to {@link #generatePlotRow} — four courses across the plot. */
+    /** Blocks written by one call to {@link #generatePlotRow}: four courses across the plot. */
     public static int rowCost() {
         return GardenLayout.plotSize() * 4;
     }
 
-    /** The first Y above a generated base, i.e. where clearing starts. */
+    /** Where clearing starts. */
     public static int baseTop() {
         return GardenLayout.groundY() + 1;
     }
 
-    /** The highest Y a plot owns — the top of the tallest template allowed — so clearing knows where to stop. */
+    /** The top of the tallest template allowed, so clearing knows where to stop. */
     public static int ceiling(int maxTemplateHeight) {
         return GardenLayout.floorY() + maxTemplateHeight;
     }
 
     /**
-     * Clear one x-row of a plot from {@code fromY} up to the plot ceiling.
-     *
-     * <p>Applying anything to a plot has to erase what was there, and neither a preset nor a base
-     * writes above its own height — so without this, stamping a short preset over a tall build leaves
-     * the top of the old build floating above the new one. Only done when applying: during world
-     * generation everything above is already air, and clearing it would be a million wasted writes.
+     * Clears one x-row of a plot from {@code fromY} up to the ceiling, so a short preset stamped over a tall
+     * build leaves nothing floating. Only when applying: during generation everything above is already air.
      */
     public static int clearRowAbove(World world, int px, int pz, int row, int fromY, int top) {
         int x = GardenLayout.plotMin(px) + row;
@@ -198,13 +171,8 @@ public final class GardenBuilder {
     }
 
     /**
-     * Generate one x-row of a plain plot: surface over subsoil over floor, with a rim along the edge.
-     *
-     * <p>A row at a time so the caller can spend a fixed block budget per tick. The whole default
-     * board is 230,400 columns, and laying it in one go is seconds of frozen server.
-     *
-     * <p>The bottom course is the floor: a plot floats over the void, and the floor is the only thing
-     * between a player with a shovel and a fall out of their own Garden.
+     * Generates one x-row: surface over subsoil over floor, with a rim. A row at a time because the whole
+     * default board is 230,400 columns, which in one go is seconds of frozen server.
      */
     public static int generatePlotRow(World world, int px, int pz, int row, Base base, Palette palette) {
         int y = GardenLayout.groundY();
@@ -230,15 +198,8 @@ public final class GardenBuilder {
     }
 
     /**
-     * Whether a plot has been generated, judged by the bedrock course under its centre.
-     *
-     * <p>Sampling one column rather than tracking a "built" flag alongside the unlock set: the world is
-     * the authority on what exists in it, and two records of the same fact would eventually disagree.
-     *
-     * <p>The <em>floor</em>, not the surface: every generated form of a plot lays the bedrock course —
-     * flat, templated, and the bare {@code bedrock} slab alike — while the surface is legitimately air
-     * on a slab plot. Sampling the surface made {@link GardenWorlds#sync} read a slab as ungenerated
-     * and stamp the default preset back over it on the next load.
+     * Judged by the bedrock floor under the plot's centre: every generated form lays it, while the surface
+     * is legitimately air on a bedrock slab. The world is the authority, not a separate flag.
      */
     public static boolean isGenerated(World world, int px, int pz) {
         int half = GardenLayout.plotSize() / 2;
@@ -247,15 +208,8 @@ public final class GardenBuilder {
     }
 
     /**
-     * Strip any boundary wall left behind by an earlier version.
-     *
-     * <p>Plot edges were once drawn in stone brick wall, before the border became a real world border.
-     * A Garden built then still has them standing, and nothing else would ever remove them — so this
-     * runs once per load and clears the course above every plot rim. Cheap, and it means an old Garden
-     * repairs itself rather than needing to be wiped.
-     *
-     * <p>It touches every plot edge, which loads most of the board's chunks, so it runs once per Garden
-     * — {@link GardenState#legacyWallsCleared()} records that it has — and not on every visit.
+     * Strips stone brick plot edges left by an early version. Touches every plot edge (loading most chunks),
+     * so it runs once per Garden; {@link GardenState#legacyWallsCleared()} records that it has.
      */
     public static void clearLegacyWalls(World world) {
         int y = GardenLayout.groundY() + 1;
@@ -276,7 +230,6 @@ public final class GardenBuilder {
         }
     }
 
-    /** A short path from the spawn point to the barn doors, so the way in reads as intended. */
     private static void approach(World world) {
         int y = GardenLayout.groundY();
         for (int z = BARN_Z; z <= BARN_Z + 6; z++) {
@@ -286,13 +239,7 @@ public final class GardenBuilder {
         }
     }
 
-    /**
-     * The farmhouse: a 15&times;11 spruce-framed barn with a gabled roof and open double doors.
-     *
-     * <p>Built rather than pasted. A schematic would need WorldEdit installed and a {@code .schem} file
-     * shipped and kept in step with the layout constants above; code needs neither, and the barn moves
-     * automatically if the plot maths ever changes.
-     */
+    // The 15x11 barn, built in code rather than pasted so it needs no WorldEdit and follows the layout.
     private static void barn(World world) {
         int y = GardenLayout.groundY();
 
@@ -329,8 +276,8 @@ public final class GardenBuilder {
             world.getBlockAt(x, y + 3, BARN_Z).setType(Material.GLASS_PANE, false);
         }
 
-        // the doorway: a 3-wide, 4-high opening in the +z wall, left open rather than doored so the
-        // farmhouse reads as a barn and nobody has to fight a door to reach the desk
+        // the doorway: a 3-wide, 4-high opening in the +z wall, left open so nobody has to fight a door to
+        // reach the desk
         for (int x = -1; x <= 1; x++) {
             for (int h = 1; h <= 4; h++) {
                 world.getBlockAt(x, y + h, BARN_Z).setType(Material.AIR, false);
@@ -343,12 +290,7 @@ public final class GardenBuilder {
         interior(world, y);
     }
 
-    /**
-     * A gabled roof: each course steps in from both long sides and up by one, ridge along the x axis.
-     *
-     * <p>The ridge runs the long way on purpose — a barn is a long building, and a roof pitched across
-     * the short axis is what makes it read as one rather than as a house that got wider.
-     */
+    // A gabled roof, ridge along the long (x) axis.
     private static void roof(World world, int y) {
         for (int step = 0; step <= BARN_Z + 1; step++) {
             int level = y + WALL + 1 + step;
@@ -373,7 +315,6 @@ public final class GardenBuilder {
         }
     }
 
-    /** The desk Sam works at, and enough dressing that the barn looks used. */
     private static void interior(World world, int y) {
         // the desk itself, at the back wall, facing the doors
         setData(world, 0, y + 1, -BARN_Z + 2, "minecraft:lectern[facing=south,has_book=false]");
@@ -390,7 +331,7 @@ public final class GardenBuilder {
             world.getBlockAt(-BARN_X + 2, y + 2, z).setType(Material.HAY_BLOCK, false);
         }
 
-        // composters and a water barrel down the east end — the working half
+        // composters and a water barrel down the east end, the working half
         for (int z = -3; z <= 3; z += 2) {
             world.getBlockAt(BARN_X - 1, y + 1, z).setType(Material.COMPOSTER, false);
         }
@@ -402,7 +343,7 @@ public final class GardenBuilder {
         }
     }
 
-    /** Set a block from a blockdata string, skipping if that state is invalid on this version. */
+    // Skips a state that is invalid on this version.
     private static void setData(World world, int x, int y, int z, String data) {
         try {
             world.getBlockAt(x, y, z).setBlockData(Bukkit.createBlockData(data), false);
