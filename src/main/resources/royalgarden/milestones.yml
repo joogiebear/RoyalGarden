@@ -139,7 +139,7 @@ menu:
       - "&7Next tier at &e%next% &7(%remaining% to go)"
       - "%bar% &7%percent%%"
   entry-maxed:
-    name: "&6%crop_name% &e%tier_roman% &a(max)"
+    name: "&6%crop_name% &e%tier_roman% &a✔"
     lore:
       - "&7Total: &e%total%"
       - "&aEvery tier reached!"

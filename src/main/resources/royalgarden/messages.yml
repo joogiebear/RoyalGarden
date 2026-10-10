@@ -46,7 +46,7 @@ plot-busy: "&cPlot &f%plot%&c is already being built. Wait for it to finish."
 
 # Menu fragments
 preset-none: "&7as generated"
-preset-current: "&aOn this plot now"
+preset-current: "&a✔ On this plot now"
 preset-status-ready: "&eClick to choose."
 preset-status-cooldown: "&cAvailable in %time%"
 preset-status-no-permission: "&cLocked"
@@ -99,10 +99,10 @@ visitor-queue-full: "&cthe queue is full"
 visitor-status-ready: "&eClick to accept!"
 visitor-status-missing: "&cYou do not have everything yet."
 # %have% %amount%
-visitor-item-have: "&aYou have %have%"
-visitor-item-missing: "&cYou have %have%"
-visitor-check-yes: "&a(done)"
-visitor-check-no: "&c(missing)"
+visitor-item-have: "&a✔ You have %have%"
+visitor-item-missing: "&c✘ You have %have%"
+visitor-check-yes: "&a✔"
+visitor-check-no: "&c✘"
 level-source-visitor: "visitor"
 
 # Placeholders: %crop% %crop_name% %level% %level_roman% %max_level% %value%
