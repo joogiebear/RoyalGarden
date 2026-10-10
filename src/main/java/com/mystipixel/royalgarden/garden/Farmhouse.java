@@ -42,32 +42,11 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
- * What stands on the farmhouse plot: the built-in barn, or a WorldEdit schematic from
- * {@code farmhouse.schematic} in {@code config.yml}.
- *
- * <p>A schematic is pasted centred on the plot, its ground layer ({@link Schematic#groundLayer}) on the
- * Garden's surface. Its marker signs say where things go — {@code [sam]}, {@code [spawn]},
- * {@code [window]} (the front of the visitors' line) and {@code [composter]} — and are pasted as air. A
- * spot with no marker falls back to where the built-in barn puts it, which on a different building may
- * well be inside a wall, so a schematic without them is warned about.
- *
- * <h2>What is pasted</h2>
- *
- * <p>Block states, and the data that only decorates: sign text, banner patterns, the owner of a head,
- * a decorated pot's sherds. Never container contents — the same rule presets keep, so a farmhouse can
- * never be a way to duplicate items. A chest in the schematic is an empty chest.
- *
- * <h2>Spots set in-game</h2>
- *
- * <p>{@code /garden farmhouse set <spot>} records a spot where an admin is standing, in
- * {@code farmhouse-spots.yml}. Those win over the schematic's signs, so a farmhouse can be arranged
- * without WorldEdit — and they apply to the built-in barn too. Every Garden's farmhouse plot is laid out
- * the same, so one set of world coordinates serves them all.
- *
- * <h2>Changing it</h2>
- *
- * <p>{@link #id} fingerprints the farmhouse in use. Each Garden records the one it was built with, and
- * one built with another is rebuilt on its next load — see {@link GardenWorlds#prepare}.
+ * What stands on the farmhouse plot: the built-in barn, or a WorldEdit schematic from {@code
+ * farmhouse.schematic}, pasted centred with its ground layer on the surface. Marker signs ({@code [sam]},
+ * {@code [spawn]}, {@code [window]}, {@code [composter]}) place things; spots set in-game with {@code
+ * /garden farmhouse set} win over them. Container contents are never pasted, so a farmhouse cannot
+ * duplicate items. A Garden built with a different {@link #id} is rebuilt on its next load.
  */
 public final class Farmhouse {
 
@@ -82,17 +61,15 @@ public final class Farmhouse {
         }
     }
 
-    /** The id of the built-in barn at its current version. */
     public static String generatedId() {
         return "generated-" + GardenBuilder.BARN_VERSION;
     }
 
     private static volatile Farmhouse current = new Farmhouse(null, "", 0, generatedId());
 
-    /** The spots anything can be told to stand at. */
     public static final List<String> SPOTS = List.of("sam", "spawn", "window", "composter");
 
-    /** Spots set in-game, by name; they win over the schematic's signs. */
+    // By name; these win over the schematic's signs.
     private static volatile Map<String, Anchor> setSpots = Map.of();
     private static File spotsFile;
 
@@ -109,15 +86,13 @@ public final class Farmhouse {
         this.id = id;
     }
 
-    /** The farmhouse in use. */
     public static Farmhouse current() {
         return current;
     }
 
     /**
-     * Read {@code farmhouse:} from {@code config.yml} and load its schematic, if it names one. Any problem
-     * with the file is logged and the built-in barn used instead — a bad schematic costs a warning, never
-     * a Garden.
+     * Reads {@code farmhouse:} and loads its schematic. Any problem is logged and the built-in barn used,
+     * so a bad schematic costs a warning, never a Garden.
      */
     public static void configure(File dataFolder, ConfigurationSection section, Logger logger) {
         loadSpots(new File(dataFolder, "farmhouse-spots.yml"), logger);
@@ -165,10 +140,7 @@ public final class Farmhouse {
         }
     }
 
-    /**
-     * Write out the schematic of that name shipped in the jar, if there is one, so the default farmhouse
-     * needs no setup. Only ever fills a gap: a file already on disk, edited or not, is never overwritten.
-     */
+    // Only fills a gap: a file already on disk, edited or not, is never overwritten.
     private static void extractBundled(String name, File target, Logger logger) {
         if (name.contains("/") || name.contains("\\")) {
             return;
@@ -200,28 +172,27 @@ public final class Farmhouse {
         }
     }
 
-    /** Whether a schematic is in use rather than the built-in barn. */
     public boolean isSchematic() {
         return schematic != null;
     }
 
-    /** Which farmhouse this is, for telling whether a Garden was built with it. */
+    /** For telling whether a Garden was built with this farmhouse. */
     public String id() {
         return id;
     }
 
-    /** The schematic file's name, blank for the built-in barn. */
+    /** Blank for the built-in barn. */
     public String file() {
         return file;
     }
 
-    /** The highest Y the farmhouse reaches, so rebuilding knows how high to clear. */
+    /** So rebuilding knows how high to clear. */
     public int top() {
         return schematic == null ? GardenLayout.groundY() + 16
                 : GardenLayout.groundY() + schematic.height() - groundLayer;
     }
 
-    /** A spot: set in-game, else the schematic's marker, else null (the built-in barn's own). */
+    /** Set in-game, else the schematic's marker, else null (the built-in barn's own). */
     public Anchor anchor(String name) {
         Anchor set = setSpots.get(name);
         if (set != null) {
@@ -236,8 +207,6 @@ public final class Farmhouse {
         }
         return new Anchor(minX() + marker.x() + 0.5, worldY(marker.y()), minZ() + marker.z() + 0.5, marker.yaw());
     }
-
-    // ── spots set in-game ──────────────────────────────────────────────────────
 
     private static void loadSpots(File file, Logger logger) {
         spotsFile = file;
@@ -263,12 +232,11 @@ public final class Farmhouse {
         setSpots = Map.copyOf(loaded);
     }
 
-    /** The spots set in-game. */
     public static Map<String, Anchor> setSpots() {
         return setSpots;
     }
 
-    /** Record a spot (or forget it, with null) in {@code farmhouse-spots.yml}. */
+    /** Null forgets it. Stored in {@code farmhouse-spots.yml}. */
     public static void setSpot(String name, Anchor anchor) throws IOException {
         Map<String, Anchor> next = new HashMap<>(setSpots);
         if (anchor == null) {
@@ -302,12 +270,7 @@ public final class Farmhouse {
         return GardenLayout.groundY() + schematicY - groundLayer;
     }
 
-    // ── building ───────────────────────────────────────────────────────────────
-
-    /**
-     * Put the farmhouse on the centre plot. The plot is expected to be bare ground: a new Garden, or one
-     * whose centre plot has just been cleared for a rebuild.
-     */
+    /** Expects bare ground: a new Garden, or a centre plot just cleared for a rebuild. */
     public void build(World world, Logger logger) {
         if (schematic == null) {
             GardenBuilder.buildBarn(world);
@@ -340,16 +303,15 @@ public final class Farmhouse {
                 + decorated + " decorated blocks) in " + (System.nanoTime() - started) / 1_000_000 + "ms.");
     }
 
-    /** Distinct states in the order {@link #parsedPalette} parsed them, and where each one is. */
     private final Map<String, Integer> indices = new HashMap<>();
     private final List<BlockData> byIndex = new ArrayList<>();
 
-    /** Where a position's state is in {@link #parsed}. Only after {@link #parsedPalette} has run. */
+    // Only after parsedPalette has run.
     private int paletteIndex(int x, int y, int z) {
         return indices.get(schematic.state(x, y, z));
     }
 
-    /** Every distinct state parsed once; one this version does not know becomes air, logged once. */
+    // A state this version does not know becomes air, logged once.
     private synchronized BlockData[] parsedPalette(Logger logger) {
         if (parsed != null) {
             return parsed;
@@ -380,7 +342,7 @@ public final class Farmhouse {
         return parsed;
     }
 
-    /** Apply the decorative part of a block entity. Returns true if anything was applied. */
+    // Returns true if anything was applied.
     private static boolean decorate(Block block, Schematic.BlockEntity entity) {
         BlockState state = block.getState();
         boolean changed = switch (state) {
@@ -429,7 +391,6 @@ public final class Farmhouse {
         return any;
     }
 
-    /** A sign line as a component, from any of the ways it may have been stored. */
     private static Component component(Object message) {
         try {
             if (message instanceof Map<?, ?> map) {

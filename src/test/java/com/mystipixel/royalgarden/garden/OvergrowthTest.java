@@ -69,10 +69,8 @@ class OvergrowthTest {
         }
     }
 
-    /**
-     * A tree leaf's distance must be the number of leaf-steps to a log, as the game works it out — too
-     * high and the tree sheds its crown on a locked plot, too low and it never decays once felled.
-     */
+    // A leaf's distance must be its leaf-steps to a log: too high and a locked plot's tree sheds its crown,
+    // too low and it never decays once felled.
     @Test
     void treeLeavesCarryTheirRealDistanceFromALog() {
         List<Overgrowth.Voxel> voxels = Overgrowth.plan(11, SIZE, GROUND, SETTINGS).voxels();
@@ -111,10 +109,7 @@ class OvergrowthTest {
         assertTrue(Overgrowth.plan(3, SIZE, GROUND, Overgrowth.Settings.OFF).voxels().isEmpty());
     }
 
-    /**
-     * A config.yml from before clearing existed has no clearing section; the shipped one backs it as
-     * defaults. Reading it once gave every count as 0 and planted nothing on any plot.
-     */
+    // A config.yml without clearing: must read the shipped defaults, not plant nothing.
     @Test       // block lists are left out: checking one is a block needs a running server's registry
     void anOldConfigReadsTheShippedAmounts() throws Exception {
         YamlConfiguration shipped = new YamlConfiguration();

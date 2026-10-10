@@ -23,11 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-/**
- * The Pests page: the board laid out as on the desk, each unlocked plot showing its pests — click one
- * with pests to go there — plus the Garden's pest stats and the Pest Log, which lists every kind of pest
- * and how many the viewer has killed. Every icon and line comes from {@code menu:} in {@code pests.yml}.
- */
+/** The Pests page and the Pest Log. Every icon and line comes from menu: in pests.yml. */
 public final class PestMenu {
 
     private final PestService service;
@@ -51,8 +47,6 @@ public final class PestMenu {
         ConfigurationSection menu = service.config().menu();
         return menu == null ? fallback : menu.getString(path, fallback);
     }
-
-    // ── the board ──────────────────────────────────────────────────────────────
 
     public void open(Player player) {
         if (!service.config().enabled()) {
@@ -116,7 +110,6 @@ public final class PestMenu {
                 "%pests%", String.valueOf(count), "%list%", String.join("\n", lines), "%status%", status);
     }
 
-    /** Take the viewer to a plot with pests on it, or say where they are. */
     private void locate(Player player, int plot) {
         UUID owner = player.getUniqueId();
         PestStore.Data data = service.store().get(owner);
@@ -153,9 +146,6 @@ public final class PestMenu {
         });
     }
 
-    // ── the log ────────────────────────────────────────────────────────────────
-
-    /** The Pest Log: every kind of pest in {@code pests.yml}, killed ones shown, the rest unknown. */
     public void openLog(Player player) {
         if (!service.config().enabled()) {
             messages.send(player, "pests-disabled");
@@ -200,8 +190,6 @@ public final class PestMenu {
         return type.copper().min() == type.copper().max() ? String.format("%,d", type.copper().min())
                 : String.format("%,d-%,d", type.copper().min(), type.copper().max());
     }
-
-    // ── plumbing ───────────────────────────────────────────────────────────────
 
     private void place(MenuBuilder builder, boolean[][] used, int row, String key, int defaultColumn,
                        Material fallback, Consumer<Player> click) {

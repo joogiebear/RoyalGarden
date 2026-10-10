@@ -1,22 +1,12 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RoyalGarden  ·  composter.yml  —  the Composter
-# ═══════════════════════════════════════════════════════════════════════════════
-#  The Composter turns ORGANIC MATTER (crops) and FUEL into Compost over time.
-#  Feed it at the composter in the barn, the Composter button on the desk, or
-#  /garden composter. It makes one Compost every `compost.time` while it holds
-#  enough of both and has room, and it keeps working while its owner is
-#  offline or their Garden is unloaded — it catches up when next opened.
-#
-#  Its upgrades are machine properties (how fast it works, how much it holds),
-#  bought with Copper. They are not player buffs, so they are plain numbers
-#  here rather than libreforge effects.
-#
-#  Reload with /garden reload.
-# ═══════════════════════════════════════════════════════════════════════════════
+# The Composter turns organic matter (crops) and fuel into Compost over time.
+# Feed it at the composter in the barn, from the desk, or with /garden composter.
+# It makes one Compost every `compost.time` while it holds enough of both and has
+# room, and keeps working while its owner is offline (it catches up when next
+# opened). Upgrades are plain numbers bought with Copper, not libreforge effects.
+# Reload with /garden reload.
 
 enabled: true
 
-# ── Organic matter ─────────────────────────────────────────────────────────────
 # What each item is worth when put in.
 organic-matter:
   # Every crop's drops from milestones.yml count, at crop-value each unless
@@ -41,7 +31,6 @@ organic-matter:
     - sweet_berries 0.5
   #  - ecoitems:enchanted_wheat 160
 
-# ── Fuel ───────────────────────────────────────────────────────────────────────
 # "<item> <value>", as above.
 fuel:
   items:
@@ -51,9 +40,8 @@ fuel:
     - dried_kelp_block 80
     - blaze_rod 120
 
-# ── Making Compost ─────────────────────────────────────────────────────────────
 compost:
-  # Time per Compost: 10m, 1h30m, 45s…
+  # Time per Compost: 10m, 1h30m, 45s...
   time: 10m
   # Organic matter and fuel used per Compost.
   organic-matter: 160
@@ -69,7 +57,6 @@ compost:
   # Tell a player when their Composter stops (out of matter, out of fuel, full).
   notify-stopped: true
 
-# ── Compost ────────────────────────────────────────────────────────────────────
 output:
   # What collecting gives: any eco item lookup, e.g. ecoitems:compost (see
   # examples/EcoItems/). Leave blank ("") to give nothing and only run
@@ -82,11 +69,10 @@ output:
   commands: []
   #  - "ecobits givesilent %player% compost %amount_raw%"
 
-# ── Rewards ────────────────────────────────────────────────────────────────────
 garden-xp:
   # Garden XP per Compost collected.
   per-compost: 2
-  # Garden XP for buying an upgrade level: base + per-level × the level bought.
+  # Garden XP for buying an upgrade level: base + per-level * the level bought.
   upgrade:
     base: 5
     per-level: 5
@@ -100,9 +86,8 @@ rewards:
     commands: []
     messages: []
 
-# ── Upgrades ───────────────────────────────────────────────────────────────────
 # One entry per level in `costs` (any currency from RoyalSkyblock's
-# `currencies:` — Copper must be added there, see examples/RoyalSkyblock/).
+# `currencies:`; Copper must be added there, see examples/RoyalSkyblock/).
 # `per-level` is what one level adds:
 #   speed           +% speed      (100 = twice as fast)
 #   multi-drop      +% chance of a bonus Compost that uses nothing
@@ -241,11 +226,9 @@ upgrades:
         - ""
         - "&6Maxed!"
 
-# ── The block in the barn ──────────────────────────────────────────────────────
-# Right-click it to open the Composter. x and z are world coordinates, y is
-# the height above the plot surface. The default is one of the composters the
-# barn already has, on its east side. It is marked in the chunk, so the barn's
-# other composters stay scenery; with place: true it is put back if missing.
+# The Composter block in the barn. x and z are world coordinates, y is
+# the height above the plot surface. The default is one of the barn's own
+# composters; with place: true it is put back if missing.
 block:
   enabled: true
   material: composter
@@ -259,8 +242,7 @@ sounds:
   collect: "entity.item.pickup"
   upgrade: "block.anvil.use"
 
-# ── The menu ───────────────────────────────────────────────────────────────────
-# Placeholders everywhere below: %matter% %matter_cap% %matter_percent%
+# Menu placeholders: %matter% %matter_cap% %matter_percent%
 #   %matter_bar% %fuel% %fuel_cap% %fuel_percent% %fuel_bar% %stored%
 #   %max_stored% %status% %next% %time% %matter_cost% %fuel_cost%
 #   %bonus_chance% %made% %collected% %compost% %player%

@@ -19,13 +19,9 @@ import java.util.Locale;
 import java.util.logging.Logger;
 
 /**
- * {@code composter.yml}: what the Composter accepts and what it is worth, how fast it works, what it
- * makes, its upgrades, rewards, the block in the barn and the menu.
- *
- * <p>Organic matter defaults to every crop's drops from {@code milestones.yml}, so a crop is defined
- * once and the Composter follows it; {@code organic-matter.items} adds or overrides any item, EcoItems
- * ids included. Read without the shipped file as defaults, since the item lists and per-crop values are
- * the admin's to delete; every setting has its fallback in code.
+ * {@code composter.yml}. Organic matter defaults to every milestone crop's drops; {@code
+ * organic-matter.items} adds or overrides any item, EcoItems ids included. Read without the shipped file
+ * as defaults, so every setting has its fallback in code.
  */
 public final class ComposterConfig extends YamlFile {
 
@@ -33,7 +29,7 @@ public final class ComposterConfig extends YamlFile {
     public record Source(String id, TestableItem item, double value) {
     }
 
-    /** The upgrades, fixed in code because each changes a different part of the machine. */
+    /** Fixed in code because each changes a different part of the machine. */
     public enum Upgrade {
         SPEED("speed", 20),
         MULTI_DROP("multi-drop", 3),
@@ -86,11 +82,9 @@ public final class ComposterConfig extends YamlFile {
         return yaml().getBoolean("enabled", true);
     }
 
-    // ── what goes in ───────────────────────────────────────────────────────────
-
     /**
-     * Everything that counts as organic matter: {@code organic-matter.items} first, so a custom item
-     * is matched before the vanilla crop it is made from, then every crop's drops.
+     * {@code organic-matter.items} first, so a custom item is matched before the vanilla crop it is made
+     * from, then every crop's drops.
      */
     public List<Source> matterSources() {
         if (matter == null) {
@@ -115,7 +109,7 @@ public final class ComposterConfig extends YamlFile {
         return matter;
     }
 
-    /** Everything that counts as fuel, from {@code fuel.items}. */
+    /** From {@code fuel.items}. */
     public List<Source> fuelSources() {
         if (fuel == null) {
             fuel = List.copyOf(parse(yaml().getStringList("fuel.items"), "fuel.items"));
@@ -132,7 +126,7 @@ public final class ComposterConfig extends YamlFile {
         return false;
     }
 
-    /** {@code "<item> <value>"} lines, the item being any eco item lookup. */
+    // "<item> <value>" lines, the item being any eco item lookup.
     private List<Source> parse(List<String> lines, String where) {
         List<Source> out = new ArrayList<>();
         for (String line : lines) {
@@ -175,8 +169,6 @@ public final class ComposterConfig extends YamlFile {
         return null;
     }
 
-    // ── the machine ────────────────────────────────────────────────────────────
-
     /** Milliseconds per Compost before upgrades. */
     public long baseInterval() {
         long millis = Durations.parseMillis(yaml().getString("compost.time", "10m"));
@@ -199,7 +191,7 @@ public final class ComposterConfig extends YamlFile {
         return Math.max(0, yaml().getDouble("compost.max-fuel", 10_000));
     }
 
-    /** The most finished Compost a Composter holds; 0 for no limit. */
+    /** 0 for no limit. */
     public long maxStored() {
         return Math.max(0, yaml().getLong("compost.max-stored", 1_000));
     }
@@ -209,19 +201,16 @@ public final class ComposterConfig extends YamlFile {
         return Math.max(20L, yaml().getLong("compost.check-every-seconds", 30) * 20L);
     }
 
-    /** Whether a player is told when their Composter stops. */
     public boolean notifyStopped() {
         return yaml().getBoolean("compost.notify-stopped", true);
     }
-
-    // ── what comes out ─────────────────────────────────────────────────────────
 
     /** An eco item lookup for Compost, or blank to only run {@link #outputCommands()}. */
     public String outputItem() {
         return yaml().getString("output.item", "bone_meal");
     }
 
-    /** Console commands run on collecting, with {@code %amount%}. */
+    /** Run on collecting, with {@code %amount%}. */
     public List<String> outputCommands() {
         return yaml().getStringList("output.commands");
     }
@@ -230,12 +219,11 @@ public final class ComposterConfig extends YamlFile {
         return yaml().getString("output.name", "Compost");
     }
 
-    /** Garden XP per Compost collected. */
     public double gardenXpPerCompost() {
         return Math.max(0, yaml().getDouble("garden-xp.per-compost", 2));
     }
 
-    /** Garden XP for buying upgrade {@code level}: {@code base + per-level × level}. */
+    /** {@code base + per-level * level} */
     public long upgradeGardenXp(int level) {
         return Math.max(0, yaml().getLong("garden-xp.upgrade.base", 5)
                 + yaml().getLong("garden-xp.upgrade.per-level", 5) * level);
@@ -244,8 +232,6 @@ public final class ComposterConfig extends YamlFile {
     public ConfigurationSection rewards() {
         return yaml().getConfigurationSection("rewards");
     }
-
-    // ── upgrades ───────────────────────────────────────────────────────────────
 
     private ConfigurationSection upgrade(Upgrade upgrade) {
         return yaml().getConfigurationSection("upgrades." + upgrade.key());
@@ -256,13 +242,13 @@ public final class ComposterConfig extends YamlFile {
         return own == null || own.getBoolean("enabled", true);
     }
 
-    /** What one level adds: percent for speed, multi-drop and cost-reduction; an amount for the caps. */
+    /** Percent for speed, multi-drop and cost-reduction; an amount for the caps. */
     public double perLevel(Upgrade upgrade) {
         ConfigurationSection own = upgrade(upgrade);
         return own == null ? upgrade.defaultPerLevel : own.getDouble("per-level", upgrade.defaultPerLevel);
     }
 
-    /** The cost of each level in order; its length is the top level. */
+    /** In order; its length is the top level. */
     public List<Cost> costs(Upgrade upgrade) {
         ConfigurationSection own = upgrade(upgrade);
         List<String> raw = own != null && own.isList("costs") ? own.getStringList("costs") : DEFAULT_COSTS;
@@ -283,7 +269,7 @@ public final class ComposterConfig extends YamlFile {
         return own == null ? upgrade.key() : own.getString("name", upgrade.key());
     }
 
-    /** The menu icon for an upgrade: {@code icon-maxed} at the top level if there is one. */
+    /** {@code icon-maxed} at the top level if there is one. */
     public ConfigurationSection upgradeIcon(Upgrade upgrade, boolean maxed) {
         ConfigurationSection own = upgrade(upgrade);
         if (own == null) {
@@ -305,8 +291,6 @@ public final class ComposterConfig extends YamlFile {
         return yaml().getString("sounds.collect", "entity.item.pickup");
     }
 
-    // ── the block ──────────────────────────────────────────────────────────────
-
     public boolean blockEnabled() {
         return yaml().getBoolean("block.enabled", true);
     }
@@ -325,8 +309,6 @@ public final class ComposterConfig extends YamlFile {
     public int[] blockSpot() {
         return new int[]{yaml().getInt("block.x", 6), yaml().getInt("block.y", 1), yaml().getInt("block.z", -1)};
     }
-
-    // ── the menu ───────────────────────────────────────────────────────────────
 
     public ConfigurationSection menu() {
         return yaml().getConfigurationSection("menu");

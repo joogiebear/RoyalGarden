@@ -11,17 +11,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Crop Milestones: counting harvests, noticing tiers, and paying for them.
- *
- * <p>Rewards stack, like plot-unlock rewards: reaching a tier gives everything under
- * {@code rewards.every-tier}, plus {@code rewards.by-tier.<n>}, plus the crop's own
- * {@code every-tier} and {@code by-tier.<n>}. So a server can pay a little for every tier of every crop,
- * a milestone bonus at tier 10 of all of them, and something special for the top wheat tier, without
- * repeating any of it. A harvest that jumps several tiers pays each tier it passes.
+ * Crop Milestones. Rewards stack: reaching a tier pays rewards.every-tier, rewards.by-tier.<n>, and the
+ * crop's own every-tier and by-tier.<n>. A harvest that jumps several tiers pays each tier it passes.
  */
 public final class MilestoneService {
 
-    /** Told about every tier reached — this is how milestones pay Garden XP. */
+    /** Told about every tier reached; this is how milestones pay Garden XP. */
     public interface TierListener {
         void reached(Player player, MilestoneCrop crop, int tier);
     }
@@ -49,7 +44,6 @@ public final class MilestoneService {
         return store;
     }
 
-    /** Count a harvest for a player. */
     public void record(Player player, MilestoneCrop crop, long amount) {
         if (amount <= 0 || !config.enabled()) {
             return;
@@ -104,7 +98,6 @@ public final class MilestoneService {
         tierListener.reached(player, crop, tier);
     }
 
-    /** The placeholders every milestone message and reward can use. */
     public String[] placeholders(MilestoneCrop crop, int tier, long total) {
         long next = crop.nextThreshold(tier);
         long start = crop.tierStart(tier);

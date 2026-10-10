@@ -7,12 +7,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.function.BiFunction;
 
 /**
- * PlaceholderAPI front end for {@code %royalgarden_<key>%}.
- *
- * <p>Deliberately thin, like the host's own expansion: it extends a PlaceholderAPI type and so cannot
- * even load without it, which is why the answers come from a resolver that knows nothing about
- * PlaceholderAPI. Only constructed once PlaceholderAPI is known to be enabled. The class resolves because
- * RoyalSkyblock soft-depends on PlaceholderAPI, and an extension's classes load through the host's.
+ * PlaceholderAPI front end for {@code %royalgarden_<key>%}. Kept thin because it cannot load without
+ * PlaceholderAPI; only construct it once PlaceholderAPI is enabled.
  */
 public final class RoyalGardenExpansion extends PlaceholderExpansion {
 

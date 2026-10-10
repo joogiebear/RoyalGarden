@@ -1,17 +1,13 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RoyalGarden  ·  milestones.yml  —  Crop Milestones
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Every player has a lifetime total per crop. Totals climb through tiers; each
-#  tier reached pays its rewards once. Shown at the desk (Milestones button) and
-#  with /garden milestones. Reload with /garden reload.
-# ═══════════════════════════════════════════════════════════════════════════════
+# Crop Milestones. Every player has a lifetime total per crop. Totals climb through
+# tiers; each tier reached pays its rewards once. Shown at the desk and with
+# /garden milestones. Reload with /garden reload.
 
 enabled: true
 
-# blocks — each harvested block adds the crop's `points` (default 1).
-# drops  — the crop items that actually drop are added, so Fortune counts.
-#          Plugins that pocket drops before they fall (telekinesis, auto-pickup)
-#          hide them from this mode — keep `blocks` if you run those.
+# blocks: each harvested block adds the crop's `points` (default 1).
+# drops:  the crop items that actually drop are added, so Fortune counts.
+#         Plugins that pocket drops (telekinesis, auto-pickup) hide them from
+#         this mode; keep `blocks` if you run those.
 counting: blocks
 
 # Count only in Garden worlds. Set false to count in the `worlds` below instead
@@ -32,19 +28,17 @@ progress-bar:
   filled: "&a|"
   empty: "&7|"
 
-# ── Tiers ──────────────────────────────────────────────────────────────────────
-# Used by any crop without its own `tiers:`. Two ways to write them:
-#   Curve  — first: how much tier 1 needs; growth: each next tier needs this
-#            many times more than the last; count: how many tiers; round-to.
-#   List   — amounts: [30, 80, 160, ...]  running totals, one per tier.
+# Tiers for any crop without its own `tiers:`. Two ways to write them:
+#   Curve: first (how much tier 1 needs), growth (each next tier needs this many
+#          times more than the last), count (how many tiers), round-to.
+#   List:  amounts: [30, 80, 160, ...]  running totals, one per tier.
 default-tiers:
   first: 30
   growth: 1.35
   count: 30
   round-to: 10
 
-# ── Rewards ────────────────────────────────────────────────────────────────────
-# Stacked, like plot unlock rewards: reaching a tier gives every-tier, plus
+# Rewards are stacked, like plot unlock rewards: reaching a tier gives every-tier, plus
 # by-tier.<n>, plus the crop's own every-tier and by-tier.<n> (under crops.<id>.rewards).
 # Placeholders: %player% %uuid% %crop% %crop_name% %tier% %tier_roman% %max_tier%
 #               %total% %next% %remaining% %percent%
@@ -57,14 +51,14 @@ rewards:
   by-tier: {}
   #  10:
   #    commands: ["eco give %player% garden_trophy 1"]
-  #    messages: ["&6You reached %crop_name% X — a trophy is yours!"]
+  #    messages: ["&6You reached %crop_name% X: a trophy is yours!"]
 
-# ── Crops ──────────────────────────────────────────────────────────────────────
+# Crops:
 #    display-name, icon
 #    blocks        : blocks that are this crop when broken
 #    drops         : items counted in `drops` counting
 #    points        : amount per block in `blocks` counting (default 1)
-#    require-ripe  : only fully grown blocks count (default true) — off for cane
+#    require-ripe  : only fully grown blocks count (default true); off for cane
 #                    and cactus, whose "age" is a growth timer
 #    natural-only  : player-placed blocks never count (default true)
 #    stacked       : blocks of this crop above the broken one fall with it and count
@@ -101,7 +95,7 @@ crops:
     icon: melon_slice
     blocks: [melon]
     drops: [melon_slice]
-    # A melon block drops 3–7 slices; count each block as 5 so it keeps pace.
+    # A melon block drops 3-7 slices; count each block as 5 so it keeps pace.
     points: 5
   pumpkin:
     display-name: "Pumpkin"
@@ -133,8 +127,7 @@ crops:
     blocks: [red_mushroom, brown_mushroom]
     drops: [red_mushroom, brown_mushroom]
 
-# ── Menu ───────────────────────────────────────────────────────────────────────
-# Placeholders as for rewards, plus %player% in the title.
+# Menu placeholders: as for rewards, plus %player% in the title.
 menu:
   title: "&8Crop Milestones"
   entry:

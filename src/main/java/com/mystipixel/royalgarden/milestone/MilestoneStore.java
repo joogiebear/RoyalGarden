@@ -17,15 +17,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Each player's lifetime harvest per crop, one small YAML per player under {@code milestones/}.
- *
- * <p>Harvests are far too frequent to write a file each — a farmer breaks tens of blocks a second — so
- * totals change in memory and are marked dirty, and dirty players are written on a timer, when they
- * leave, and on shutdown. The most a crash can cost is one save interval of progress, and never a file:
- * writes go through a temporary file that is moved into place.
- *
- * <p>A file that does not parse is copied aside and that player's progress is held read-only in memory,
- * so a bad character cannot cost someone their milestones on the next save.
+ * Each player's lifetime harvest per crop, one YAML per player under {@code milestones/}. Totals change in
+ * memory and dirty players are written on a timer, on quit and on shutdown, through a temp file moved into
+ * place. A file that does not parse is copied aside and that player is held read-only.
  */
 public final class MilestoneStore {
 
@@ -39,7 +33,7 @@ public final class MilestoneStore {
         this.dir = new File(dataFolder, "milestones");
         this.logger = logger;
         if (!dir.exists() && !dir.mkdirs()) {
-            logger.warning("Could not create " + dir + " — milestones will not persist.");
+            logger.warning("Could not create " + dir + "; milestones will not persist.");
         }
     }
 
@@ -47,7 +41,7 @@ public final class MilestoneStore {
         return new File(dir, player + ".yml");
     }
 
-    /** A player's totals by crop id, read from disk the first time. */
+    /** Read from disk the first time. */
     public Map<String, Long> totals(UUID player) {
         return totals.computeIfAbsent(player, this::read);
     }
@@ -56,20 +50,19 @@ public final class MilestoneStore {
         return totals(player).getOrDefault(crop, 0L);
     }
 
-    /** Add to a total and return the new one. */
+    /** Returns the new total. */
     public long add(UUID player, String crop, long amount) {
         long now = totals(player).merge(crop, amount, Long::sum);
         dirty.add(player);
         return now;
     }
 
-    /** Set a total outright (admin). */
     public void set(UUID player, String crop, long amount) {
         totals(player).put(crop, Math.max(0, amount));
         dirty.add(player);
     }
 
-    /** Forget every total for a player (admin). The file is moved aside, not deleted. */
+    /** The file is moved aside, not deleted. */
     public void reset(UUID player) {
         totals.put(player, new HashMap<>());
         unreadable.remove(player);
@@ -110,7 +103,7 @@ public final class MilestoneStore {
         return out;
     }
 
-    /** Write one player now, if they have unsaved progress. */
+    /** Only if they have unsaved progress. */
     public void save(UUID player) {
         if (!dirty.remove(player)) {
             return;
@@ -134,14 +127,12 @@ public final class MilestoneStore {
         }
     }
 
-    /** Write everyone with unsaved progress. */
     public void saveAll() {
         for (UUID player : Set.copyOf(dirty)) {
             save(player);
         }
     }
 
-    /** Save and forget a player who has left, so memory tracks who is online. */
     public void unload(UUID player) {
         save(player);
         totals.remove(player);

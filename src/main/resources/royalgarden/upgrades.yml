@@ -1,29 +1,18 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RoyalGarden  ·  upgrades.yml  —  Crop Upgrades
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Every crop in milestones.yml can be upgraded at the desk (Crop Upgrades
-#  button, or /garden upgrades). Each level costs the next entry of `costs`.
-#
-#  What a level DOES is up to you: it gives the player libreforge effects —
-#  the same effects EcoSkills, EcoItems, EcoPets and RoyalSkyblock's island
-#  upgrades use. Yield, stats, skill XP: anything the eco plugins you run
-#  offer. Nothing here does the maths itself, so it all stacks with what
-#  EcoSkills' own skills give.
-#
-#  Reload with /garden reload.
-# ═══════════════════════════════════════════════════════════════════════════════
+# Crop Upgrades. Every crop in milestones.yml can be upgraded at the desk (or
+# /garden upgrades). Each level costs the next entry of `costs`, and gives the
+# player libreforge effects, so what a level does is up to you and stacks with
+# EcoSkills. Reload with /garden reload.
 
 enabled: true
 
 # Where a player's upgrades are active:
-#   own-garden — only in their own Garden (default, like Hypixel)
-#   gardens    — in any Garden
-#   everywhere — anywhere at all
+#   own-garden: only in their own Garden (default)
+#   gardens:    in any Garden
+#   everywhere: anywhere at all
 apply-in: own-garden
 
-# ── Cost ───────────────────────────────────────────────────────────────────────
-# One entry per level, in any currency from RoyalSkyblock's `currencies:`.
-# Copper must be added there to be spent — see examples/RoyalSkyblock/.
+# Cost: one entry per level, in any currency from RoyalSkyblock's `currencies:`.
+# Copper must be added there to be spent (see examples/RoyalSkyblock/).
 # The number of entries is the number of levels.
 costs:
   - 5 copper
@@ -36,17 +25,16 @@ costs:
   - 1000 copper
   - 2000 copper
 
-# ── What a level does ──────────────────────────────────────────────────────────
-# libreforge effects (and optional conditions), held while the upgrade is
-# active. Only the CURRENT level's effects apply, so write totals:
-#   %level%   the crop's upgrade level (1, 2, 3…)
+# What a level does: libreforge effects (and optional conditions), held while
+# the upgrade is active. Only the CURRENT level's effects apply, so write totals:
+#   %level%   the crop's upgrade level (1, 2, 3...)
 #   %crop%    the crop's id (wheat)
-#   %value%   level × value-per-level
-#   %blocks%  the crop's blocks, from milestones.yml — write it alone as a value
-#   %drops%   the crop's drop items, from milestones.yml — likewise
+#   %value%   level * value-per-level
+#   %blocks%  the crop's blocks, from milestones.yml; write it alone as a value
+#   %drops%   the crop's drop items, from milestones.yml; likewise
 #
-# Default: each level is +5% chance of double drops for that crop, like
-# Hypixel's per-crop Farming Fortune — player-placed blocks never count.
+# Default: each level is +5% chance of double drops for that crop. Player-placed
+# blocks never count.
 effects:
   - id: multiply_drops
     args:
@@ -62,9 +50,8 @@ conditions: []
 
 # Using EcoSkills instead:
 #
-#   One shared stat — make a stat in EcoSkills (examples/EcoSkills/stats/
-#   farming_fortune.yml does double drops) and have every upgrade feed it, so
-#   skills, pets, gear and upgrades all add to the same number:
+#   One shared stat: make a stat in EcoSkills (examples/EcoSkills/stats/
+#   farming_fortune.yml does double drops) and have every upgrade feed it:
 #     effects:
 #       - id: add_stat
 #         args:
@@ -77,12 +64,11 @@ conditions: []
 #           multiplier: "1 + %level% * 0.02"
 #           skills: [farming]
 
-# Menus show %value% = level × value-per-level. It is only text — describe what
+# Menus show %value% = level * value-per-level. It is only text: describe what
 # your effects do (5 = "+5% double drops" with the default effects above).
 value-per-level: 5
 
-# ── Per crop ───────────────────────────────────────────────────────────────────
-# Any crop can have its own costs, effects, conditions and value-per-level, or
+# Per crop: any crop can have its own costs, effects, conditions and value-per-level, or
 # be left out with enabled: false.
 crops: {}
 #  pumpkin:
@@ -96,8 +82,8 @@ crops: {}
 #          stat: wheat_fortune
 #          amount: "%level% * 5"
 
-# ── Rewards for buying a level ─────────────────────────────────────────────────
-# Garden XP: base + per-level × the level bought.
+# Rewards for buying a level.
+# Garden XP: base + per-level * the level bought.
 garden-xp:
   base: 5
   per-level: 5
@@ -114,8 +100,7 @@ rewards:
 
 upgrade-sound: "block.anvil.use"
 
-# ── The menu ───────────────────────────────────────────────────────────────────
-# One icon per crop (its icon from milestones.yml). Click to buy the next level.
+# The menu: one icon per crop (its icon from milestones.yml). Click to buy the next level.
 # Placeholders as for rewards above.
 menu:
   title: "&8Crop Upgrades"

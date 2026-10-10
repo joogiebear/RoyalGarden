@@ -16,20 +16,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Each player's Composter, one small YAML per player under {@code composter/}: what it holds, its clock,
- * and its upgrade levels.
- *
- * <p>Per player, not per Garden, like crop upgrades: the upgrades are paid for, so a {@code /garden
- * reset} for a new contest must not take them away. Written on every change — inserting and collecting
- * move items in and out of inventories, and a crash that forgot one would duplicate or lose them.
- * Concurrent, because placeholders are read off the server thread.
- *
- * <p>A file that does not parse is copied aside and that player's Composter is held read-only, the same
- * way visitors are.
+ * Each player's Composter, one YAML per player under {@code composter/}. Per player, not per Garden, so
+ * {@code /garden reset} never takes paid upgrades. Written on every change: inserting and collecting move
+ * items, and a lost write would duplicate or lose them. Concurrent because placeholders read it off the
+ * main thread. An unparseable file is copied aside and the player held read-only.
  */
 public final class ComposterStore {
 
-    /** One player's Composter. Mutable; save it through {@link #save} after changing it. */
+    /** Mutable; save it through {@link #save} after changing it. */
     public static final class Data {
         private volatile double matter;
         private volatile double fuel;
@@ -67,7 +61,6 @@ public final class ComposterStore {
             this.fuel = Math.max(0, fuel);
         }
 
-        /** Finished Compost waiting to be collected. */
         public long stored() {
             return stored;
         }
@@ -76,7 +69,7 @@ public final class ComposterStore {
             this.stored = Math.max(0, stored);
         }
 
-        /** When the Composter was last caught up, or 0 if it never has been. */
+        /** When the Composter was last caught up, or 0 if never. */
         public long lastTick() {
             return lastTick;
         }
@@ -85,7 +78,7 @@ public final class ComposterStore {
             this.lastTick = when;
         }
 
-        /** Compost made in total, bonus included. */
+        /** Bonus included. */
         public long made() {
             return made;
         }
@@ -94,7 +87,6 @@ public final class ComposterStore {
             this.made += Math.max(0, amount);
         }
 
-        /** Compost collected in total. */
         public long collected() {
             return collected;
         }
@@ -125,7 +117,7 @@ public final class ComposterStore {
         this.dir = new File(dataFolder, "composter");
         this.logger = logger;
         if (!dir.exists() && !dir.mkdirs()) {
-            logger.warning("Could not create " + dir + " — Composters will not persist.");
+            logger.warning("Could not create " + dir + "; Composters will not persist.");
         }
     }
 
@@ -133,21 +125,21 @@ public final class ComposterStore {
         return new File(dir, player + ".yml");
     }
 
-    /** A player's Composter, read from disk the first time. */
+    /** Read from disk the first time. */
     public Data get(UUID player) {
         return cache.computeIfAbsent(player, id -> read(id, true));
     }
 
     /**
-     * A player's Composter for reading only: the cached copy if there is one, else read from disk
-     * without caching it — for placeholders asked about offline players. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
+     * caching. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
         return cached != null ? cached : read(player, false);
     }
 
-    /** Whether this player's file could not be read, so nothing of theirs may change. */
+    /** True if this player's file could not be read, so nothing of theirs may change. */
     public boolean readOnly(UUID player) {
         get(player);
         return unreadable.contains(player);
@@ -193,7 +185,7 @@ public final class ComposterStore {
         return data;
     }
 
-    /** Write one player now. Returns false if it could not be written, so the caller can undo. */
+    /** Returns false if it could not be written, so the caller can undo. */
     public boolean save(UUID player) {
         Data data = cache.get(player);
         if (data == null || unreadable.contains(player)) {
@@ -219,19 +211,17 @@ public final class ComposterStore {
         }
     }
 
-    /** Write every player held in memory. */
     public void saveAll() {
         for (UUID player : Set.copyOf(cache.keySet())) {
             save(player);
         }
     }
 
-    /** Players whose Composter is held in memory. */
     public Set<UUID> loaded() {
         return Set.copyOf(cache.keySet());
     }
 
-    /** Empty a player's Composter and forget its upgrades (admin). The file is moved aside, not deleted. */
+    /** Admin: empties the Composter and its upgrades. The file is moved aside, not deleted. */
     public void reset(UUID player) {
         cache.put(player, new Data());
         unreadable.remove(player);
@@ -241,7 +231,6 @@ public final class ComposterStore {
         }
     }
 
-    /** Save and forget a player who has left. */
     public void unload(UUID player) {
         save(player);
         cache.remove(player);

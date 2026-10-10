@@ -18,20 +18,17 @@ import java.util.TreeMap;
 import java.util.logging.Logger;
 
 /**
- * {@code visitors.yml}: who visits, when, what they ask for, what they pay, and how Copper is given.
- *
- * <p>Read without the shipped file as defaults — {@code visitors:} and {@code rarities:} are lists of
- * things, and one the admin deleted would otherwise keep coming back — so every setting here has its
- * fallback in code.
+ * {@code visitors.yml}. Read without the shipped file as defaults ({@code visitors:} and {@code
+ * rarities:} are lists, and a deleted entry would keep coming back), so every setting has its fallback
+ * in code.
  */
 public final class VisitorConfig extends YamlFile {
 
-    /** A rarity from {@code rarities:}: its name, how likely its visitors are, and what it adds. */
     public record Rarity(String id, String displayName, double weight, VisitorMath.Range copper,
                          VisitorMath.Range xp, ConfigurationSection rewards) {
     }
 
-    /** Where a visitor stands, relative to the middle of the farmhouse plot. */
+    /** Relative to the middle of the farmhouse plot. */
     public record Spot(double x, double y, double z, float yaw, boolean hasY) {
     }
 
@@ -127,7 +124,7 @@ public final class VisitorConfig extends YamlFile {
         }
     }
 
-    /** {@code requests:} — a list of {@code {weight, items}}; or a bare {@code items:} for one request. */
+    // requests: a list of {weight, items}; or a bare items: for one request.
     private List<VisitorType.Request> requests(ConfigurationSection visitor, String where) {
         List<VisitorType.Request> out = new ArrayList<>();
         List<Map<?, ?>> listed = visitor.getMapList("requests");
@@ -152,10 +149,8 @@ public final class VisitorConfig extends YamlFile {
         return out;
     }
 
-    /**
-     * Items as {@code "wheat 64"}, {@code "ecoitems:enchanted_wheat 2-4"}, or
-     * {@code {item: …, amount: …, name: …}}. The last word of the short form is the amount.
-     */
+    // Items as "wheat 64", "ecoitems:enchanted_wheat 2-4", or {item: ..., amount: ..., name: ...}. The last
+    // word of the short form is the amount.
     private List<VisitorType.Item> items(List<?> raw, String where) {
         List<VisitorType.Item> out = new ArrayList<>();
         if (raw == null) {
@@ -194,8 +189,8 @@ public final class VisitorConfig extends YamlFile {
         walkSpeed = 0;
         lineOn = false;
         ConfigurationSection line = yaml().getConfigurationSection("line");
-        // No line: section at all means a visitors.yml written before the drive-through existed. This file
-        // has no shipped defaults behind it, so the defaults are here: the line is on unless it is turned off.
+        // No line: section means an older visitors.yml; with no shipped defaults behind it, the line is on
+        // unless turned off.
         if (line == null || line.getBoolean("enabled", true)) {
             loadLine(line);
             return;
@@ -218,10 +213,8 @@ public final class VisitorConfig extends YamlFile {
         }
     }
 
-    /**
-     * Spots in single file behind the drive-through window, front first, and the place newcomers walk in
-     * from: as far again behind the last spot as the spacing between two.
-     */
+    // Spots in single file behind the drive-through window, front first. Newcomers walk in from one
+    // spacing behind the last spot.
     private void loadLine(ConfigurationSection line) {
         String rawFront = line == null ? "6, 6.5, 180" : line.getString("front", "6, 6.5, 180");
         Spot front = parseSpot(rawFront);
@@ -262,11 +255,8 @@ public final class VisitorConfig extends YamlFile {
         lineLength = length;
     }
 
-    /**
-     * The line from a farmhouse schematic's {@code [window]} sign, when there is one: the first visitor
-     * stands on the sign facing the way its writing does, and the line runs back behind them. It takes the
-     * place of {@code line.front} and {@code line.direction}; spacing, length and speed still come from here.
-     */
+    // A farmhouse schematic's [window] sign: the first visitor stands on it facing the way its writing does,
+    // and the line runs back behind them. Replaces line.front and line.direction only.
     private List<Spot> markedLine() {
         if (!lineOn) {
             return null;
@@ -319,7 +309,7 @@ public final class VisitorConfig extends YamlFile {
         return out;
     }
 
-    /** A {@code copper: 10-20} style range under {@code section}, or zero. */
+    // A copper: 10-20 style range under section, or zero.
     VisitorMath.Range range(ConfigurationSection section, String key, String where) {
         if (section == null || !section.contains(key)) {
             return VisitorMath.Range.ZERO;
@@ -341,28 +331,24 @@ public final class VisitorConfig extends YamlFile {
         return single.isEmpty() ? List.of() : List.of(single);
     }
 
-    // ── settings ───────────────────────────────────────────────────────────────
-
     public boolean enabled() {
         return yaml().getBoolean("enabled", true);
     }
 
-    /** Time between two arrivals while the player is online. */
+    /** While the player is online. */
     public long intervalMillis() {
         return Math.max(1_000L, Durations.parseMillis(yaml().getString("arrivals.interval", "15m")));
     }
 
-    /** How soon a player's very first visitor arrives. */
     public long firstArrivalMillis() {
         return Math.max(0L, Durations.parseMillis(yaml().getString("arrivals.first-arrival", "1m")));
     }
 
-    /** How often arrivals are checked, in ticks. */
+    /** In ticks. */
     public long checkTicks() {
         return Math.max(1L, yaml().getLong("arrivals.check-every-seconds", 5)) * 20L;
     }
 
-    /** Most visitors waiting at once for a Garden of this level. */
     public int maxQueue(int level) {
         return Math.clamp(VisitorMath.byLevel(queueByLevel, level, yaml().getInt("arrivals.max-queue", 5)), 1, 45);
     }
@@ -376,7 +362,6 @@ public final class VisitorConfig extends YamlFile {
         return yaml().getBoolean("arrivals.require-garden", true);
     }
 
-    /** Whether the same visitor can be waiting twice. */
     public boolean allowDuplicates() {
         return yaml().getBoolean("arrivals.allow-duplicates", false);
     }
@@ -406,8 +391,6 @@ public final class VisitorConfig extends YamlFile {
         return yaml().getString("refuse-sound", "entity.villager.no");
     }
 
-    // ── copper ─────────────────────────────────────────────────────────────────
-
     public boolean copperEnabled() {
         return yaml().getBoolean("copper.enabled", true);
     }
@@ -416,12 +399,10 @@ public final class VisitorConfig extends YamlFile {
         return yaml().getString("copper.currency", "copper");
     }
 
-    /** The console command that pays Copper: {@code %player%}, {@code %amount%}, {@code %currency%}. */
+    /** {@code %player%}, {@code %amount%}, {@code %currency%}. */
     public String copperCommand() {
         return yaml().getString("copper.give-command", "ecobits givesilent %player% %currency% %amount%");
     }
-
-    // ── skymart ────────────────────────────────────────────────────────────────
 
     public boolean skymartEnabled() {
         return yaml().getBoolean("skymart.enabled", true);
@@ -435,8 +416,6 @@ public final class VisitorConfig extends YamlFile {
         return yaml().getBoolean("skymart.as-console", false);
     }
 
-    // ── things ─────────────────────────────────────────────────────────────────
-
     public Collection<VisitorType> visitors() {
         return Collections.unmodifiableCollection(visitors.values());
     }
@@ -449,20 +428,20 @@ public final class VisitorConfig extends YamlFile {
         return id == null ? null : rarities.get(id.toLowerCase(Locale.ROOT));
     }
 
-    /** Where visitors stand, the front of the line first when there is one. */
+    /** Front of the line first when there is one. */
     public List<Spot> spots() {
         List<Spot> marked = markedLine();
         return marked != null ? Collections.unmodifiableList(marked.subList(0, lineLength))
                 : Collections.unmodifiableList(spots);
     }
 
-    /** Where a new visitor walks into the line from; null without a line. */
+    /** Null without a line. */
     public Spot entry() {
         List<Spot> marked = markedLine();
         return marked != null ? marked.get(lineLength) : entry;
     }
 
-    /** Blocks per tick visitors walk along the line; 0 to appear in place. */
+    /** Blocks per tick; 0 to appear in place. */
     public double walkSpeed() {
         return walkSpeed;
     }

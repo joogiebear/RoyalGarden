@@ -3,24 +3,19 @@ package com.mystipixel.royalgarden.composter;
 import java.util.random.RandomGenerator;
 
 /**
- * Composter arithmetic: how much Compost an elapsed time makes, what stops it, and what upgrades do to
- * the machine. Pure, so it can be tested without a server.
+ * Composter arithmetic. Pure, so it can be tested without a server.
  *
- * <p>The Composter makes one Compost every {@link Machine#interval()} while it holds at least one
- * Compost's worth of organic matter and of fuel and has room to store it. Each Compost uses its matter
- * and fuel when it is finished. The clock only runs while all three hold, so a Composter that ran out
- * keeps no partial progress, and one that is refilled starts a fresh Compost.
- *
- * <p>Catching up is additive: advancing by {@code a} and then by {@code b} lands where advancing by
- * {@code a + b} does (bonus rolls aside). That is what lets the last tick be saved only when something
- * was made, and lets an offline player's Composter be caught up in one step when they come back.
+ * <p>One Compost every {@link Machine#interval()} while it holds a Compost's worth of matter and fuel and
+ * has room; the clock only runs while all three hold, so a stopped Composter keeps no partial progress.
+ * Catching up is additive (advancing a then b equals advancing a + b, bonus rolls aside), which is what
+ * lets an offline Composter catch up in one step.
  */
 public final class ComposterMath {
 
-    /** Slack for comparing stored matter and fuel against a cost, so 0.1 × 3 still pays for 0.3. */
+    // Slack for comparing stored matter and fuel against a cost, so 0.1 * 3 still pays for 0.3.
     private static final double EPSILON = 1e-9;
 
-    /** Above this many Compost at once, bonus Compost is the expected share rather than one roll each. */
+    // Above this many Compost at once, bonus Compost is the expected share rather than one roll each.
     private static final long ROLL_LIMIT = 10_000;
 
     private ComposterMath() {
@@ -30,8 +25,6 @@ public final class ComposterMath {
      * A Composter as its upgrades leave it.
      *
      * @param interval    milliseconds per Compost
-     * @param matterCost  organic matter used per Compost
-     * @param fuelCost    fuel used per Compost
      * @param maxStored   the most finished Compost it holds; 0 or less for no limit
      * @param bonusChance chance, 0 to 1, that a finished Compost comes with a second one
      */
@@ -52,7 +45,7 @@ public final class ComposterMath {
 
     public enum Status { RUNNING, NO_MATTER, NO_FUEL, FULL }
 
-    /** Whether the Composter is working, and if not, why. Being full is reported before running dry. */
+    /** Being full is reported before running dry. */
     public static Status status(State state, Machine machine) {
         if (machine.maxStored() > 0 && state.stored() >= machine.maxStored()) {
             return Status.FULL;
@@ -66,7 +59,7 @@ public final class ComposterMath {
         return Status.RUNNING;
     }
 
-    /** How many Compost {@code have} pays for at {@code cost} each; unlimited when it costs nothing. */
+    /** Unlimited when it costs nothing. */
     public static long affordable(double have, double cost) {
         if (cost <= 0) {
             return Long.MAX_VALUE;
@@ -117,7 +110,7 @@ public final class ComposterMath {
         return out;
     }
 
-    /** Milliseconds until the next Compost, or -1 while the Composter is stopped. */
+    /** -1 while the Composter is stopped. */
     public static long untilNext(State state, Machine machine) {
         if (machine.interval() <= 0 || status(state, machine) != Status.RUNNING) {
             return -1;
@@ -125,13 +118,13 @@ public final class ComposterMath {
         return Math.max(0, machine.interval() - Math.max(0, state.progress()) % machine.interval());
     }
 
-    /** The time per Compost at {@code speedPercent} faster: +100% halves it. Never below 1ms. */
+    /** +100% halves it. Never below 1ms. */
     public static long interval(long base, double speedPercent) {
         double factor = 1.0 + Math.max(0.0, speedPercent) / 100.0;
         return Math.max(1, Math.round(Math.max(1, base) / factor));
     }
 
-    /** A cost after {@code reductionPercent} off, which is held between 0 and 100. */
+    /** {@code reductionPercent} is held between 0 and 100. */
     public static double reduced(double cost, double reductionPercent) {
         return Math.max(0, cost) * (1.0 - Math.clamp(reductionPercent, 0.0, 100.0) / 100.0);
     }

@@ -43,30 +43,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * What may and may not change inside a Garden.
- *
- * <p>The board has three kinds of ground:
- *
- * <ul>
- *   <li><b>Owned plots</b> — the owner's to build on however they like.</li>
- *   <li><b>The farmhouse plot</b> — read-only. It carries the barn, the desk and Sam, and is the one
- *       plot every Garden has, so it is the one plot whose contents can be relied upon.</li>
- *   <li><b>Locked plots</b> — read-only and off-limits until bought.</li>
- *   <li><b>Plots being cleared</b> — bought, but still overgrown: the owner may walk in and break the
- *       debris ({@link ClearingService}) and do nothing else until enough of it is gone.</li>
- * </ul>
- *
- * <p>Plus the <b>floor course</b> under every plot, which is all that stands between a shovel and a
- * fall out of the world.
- *
- * <p>Players are stopped at the obvious doors — breaking, placing, buckets, right-clicks — and so is
- * everything that moves blocks <em>without</em> a player: pistons, flowing liquids, explosions, growing
- * trees, dispensers, falling blocks. An infinite farm is built out of exactly those, and each was a way
- * to reach into the farmhouse or a locked plot from next door.
- *
- * <p>Only the owner may build in their Garden. {@code royalgarden.bypass} (operators by default) skips
- * all of it, the same shape as the host's {@code royalskyblock.bypass}. Each rule can be switched off
- * under {@code protection:} in {@code config.yml}.
+ * What may change inside a Garden. Owned plots are the owner's; the farmhouse plot, locked plots and the
+ * floor course are read-only; plots being cleared allow breaking debris only. Non-player block movers
+ * (pistons, liquids, explosions, trees, dispensers, falling blocks) are held to the same lines.
+ * {@code royalgarden.bypass} skips all of it; each rule can be switched off under {@code protection:}.
  */
 public final class GardenProtection implements Listener {
 
@@ -86,8 +66,8 @@ public final class GardenProtection implements Listener {
     }
 
     /**
-     * Blocks another listener opens on right-click, such as the Composter. Right-clicks on them are left
-     * to it: it cancels the vanilla use itself, and a refusal here would talk over its menu.
+     * Blocks another listener opens on right-click, such as the Composter. Right-clicks on them are left to
+     * it: a refusal here would talk over its menu.
      */
     public void setMachines(java.util.function.Predicate<Block> machines) {
         this.machines = machines == null ? block -> false : machines;
@@ -102,12 +82,7 @@ public final class GardenProtection implements Listener {
         return clearing != null && clearing.blocks(state, px, pz);
     }
 
-    // ── the rules ──────────────────────────────────────────────────────────────
-
-    /**
-     * Whether a position is ground nothing may change: off the board, the farmhouse, a locked plot, or
-     * the floor. The question every non-player rule asks.
-     */
+    // Off the board, the farmhouse, a locked plot, or the floor: the question every non-player rule asks.
     private boolean isProtected(World world, int x, int y, int z) {
         if (!GardenWorlds.isGarden(world)) {
             return false;
@@ -137,19 +112,14 @@ public final class GardenProtection implements Listener {
         return isProtected(at.getWorld(), at.getBlockX(), at.getBlockY(), at.getBlockZ());
     }
 
-    /** The plot a block is on, packed for comparison, or -1 off the board. */
+    // Packed for comparison, or -1 off the board.
     private static int plotKey(Block block) {
         int px = GardenLayout.plotAt(block.getX());
         int pz = GardenLayout.plotAt(block.getZ());
         return GardenLayout.inGrid(px, pz) ? pz * GardenLayout.grid() + px : -1;
     }
 
-    /**
-     * Why this player may not change this block, as a message key, or null if they may.
-     *
-     * <p>Returns the reason rather than a boolean so the message the player gets is decided in the same
-     * place as the decision — a refusal with the wrong explanation is its own kind of bug.
-     */
+    // A message key, or null if allowed. Returns the reason so the message is decided with the refusal.
     private String refuse(Player player, Block block, boolean breaking) {
         World world = block.getWorld();
         if (!GardenWorlds.isGarden(world) || player.hasPermission(BYPASS)) {
@@ -192,7 +162,6 @@ public final class GardenProtection implements Listener {
         return false;
     }
 
-    /** {@code %plot%}, and for a plot being cleared how far along it is. */
     private String[] placeholders(Block block) {
         int px = GardenLayout.plotAt(block.getX());
         int pz = GardenLayout.plotAt(block.getZ());
@@ -203,20 +172,9 @@ public final class GardenProtection implements Listener {
         return new String[]{"%plot%", GardenLayout.plotName(px, pz)};
     }
 
-    // ── movement ───────────────────────────────────────────────────────────────
-
-    /**
-     * Keep a player out of a plot they have not unlocked.
-     *
-     * <p>This, not the border, is what makes locking exact: a world border is a square and cannot cut a
-     * locked plot out of the middle of the board. Only block-to-block movement is considered — looking
-     * around fires this event constantly, and comparing block coordinates first keeps the common case to
-     * two integer comparisons.
-     *
-     * <p>A player who is somehow already <em>inside</em> a locked plot is sent back to the farmhouse
-     * rather than frozen: cancelling every move whose destination is locked used to cancel the steps
-     * that would have walked them out, too.
-     */
+    // The border is a square and cannot cut out a locked plot, so this does. Block-to-block moves only,
+    // since looking around fires this constantly. A player already inside a locked plot is sent to the
+    // farmhouse; cancelling every move would also cancel the steps out.
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Location to = event.getTo();
@@ -239,11 +197,8 @@ public final class GardenProtection implements Listener {
         messages.actionBar(player, "deny-locked", "%plot%", plotName(to));
     }
 
-    /**
-     * Ender pearls, chorus fruit and anything else that moves a player by teleport within a Garden are
-     * held to the same rule as walking. Plugin and command teleports pass — they are how the desk's
-     * "go here" and admin tools work.
-     */
+    // Pearls, chorus fruit and other teleports are held to the walking rule. Plugin and command teleports
+    // pass: they are how the desk's "go here" and admin tools work.
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {
         Location to = event.getTo();
@@ -260,7 +215,7 @@ public final class GardenProtection implements Listener {
         }
     }
 
-    /** Boats, minecarts and mounts carry a player without a move event of their own. */
+    // Boats, minecarts and mounts carry a player without a move event of their own.
     @EventHandler(priority = EventPriority.NORMAL)
     public void onVehicleMove(VehicleMoveEvent event) {
         Location to = event.getTo();
@@ -286,7 +241,7 @@ public final class GardenProtection implements Listener {
         int px = GardenLayout.plotAt(at.getBlockX());
         int pz = GardenLayout.plotAt(at.getBlockZ());
         if (!GardenLayout.inGrid(px, pz)) {
-            return false;                           // off the board entirely — the world border has that
+            return false;                           // off the board entirely: the world border has that
         }
         GardenState state = worlds.stateOf(at.getWorld());
         return state != null && !state.isUnlocked(px, pz);
@@ -295,8 +250,6 @@ public final class GardenProtection implements Listener {
     private static String plotName(Location at) {
         return GardenLayout.plotName(GardenLayout.plotAt(at.getBlockX()), GardenLayout.plotAt(at.getBlockZ()));
     }
-
-    // ── what players do ────────────────────────────────────────────────────────
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
@@ -308,7 +261,7 @@ public final class GardenProtection implements Listener {
         check(event.getPlayer(), event.getBlock(), event);
     }
 
-    /** Buckets place blocks without a BlockPlaceEvent, so water would otherwise flood a locked plot. */
+    // Buckets place blocks without a BlockPlaceEvent, so water would otherwise flood a locked plot.
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBucketEmpty(PlayerBucketEmptyEvent event) {
         check(event.getPlayer(), event.getBlock(), event);
@@ -319,14 +272,8 @@ public final class GardenProtection implements Listener {
         check(event.getPlayer(), event.getBlock(), event);
     }
 
-    /**
-     * Right-clicks and trampling.
-     *
-     * <p>Hoes, shovels, axes, bone meal and flint all change blocks through an interact rather than a
-     * place or break, so without this the farmhouse's logs could be stripped and locked grass tilled.
-     * Blocks listed in {@code protection.interact-allow} can still be used. The item in hand is only
-     * denied when it is not food, so a player looking at the farmhouse floor can still eat.
-     */
+    // Hoes, shovels, axes, bone meal and flint change blocks through an interact, not a place or break.
+    // The item in hand is only denied when it is not food, so a player can still eat.
     @EventHandler(priority = EventPriority.HIGH)
     public void onInteract(PlayerInteractEvent event) {
         Block block = event.getClickedBlock();
@@ -347,8 +294,7 @@ public final class GardenProtection implements Listener {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK || machines.test(block)) {
             return;
         }
-        // Doors, trapdoors and gates on the farmhouse plot open for the owner: a farmhouse built from a
-        // schematic has them, and a building you cannot walk into is scenery. Containers stay shut — the
+        // Doors, trapdoors and gates on the farmhouse plot open for the owner. Containers stay shut: the
         // farmhouse is rebuilt when it changes, and anything stored in it would go with it.
         boolean farmhouseDoor = !visitor && block.getBlockData() instanceof org.bukkit.block.data.Openable
                 && GardenLayout.isCentre(GardenLayout.plotAt(block.getX()), GardenLayout.plotAt(block.getZ()))
@@ -379,7 +325,7 @@ public final class GardenProtection implements Listener {
         return state != null && state.isUnlocked(px, pz) ? "deny-uncleared" : "deny-locked";
     }
 
-    /** Item frames and paintings. */
+    // Item frames and paintings.
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onHangingPlace(HangingPlaceEvent event) {
         if (event.getPlayer() != null) {
@@ -396,7 +342,7 @@ public final class GardenProtection implements Listener {
         }
     }
 
-    /** Armour stands, boats, minecarts and end crystals. */
+    // Armour stands, boats, minecarts and end crystals.
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onEntityPlace(EntityPlaceEvent event) {
         if (event.getPlayer() != null) {
@@ -404,9 +350,6 @@ public final class GardenProtection implements Listener {
         }
     }
 
-    // ── what moves blocks without a player ─────────────────────────────────────
-
-    /** Water and lava may flow within a plot, never across into protected ground. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onFlow(BlockFromToEvent event) {
         if (!config.protect("liquids")) {
@@ -418,7 +361,6 @@ public final class GardenProtection implements Listener {
         }
     }
 
-    /** A piston may not push into, or pull out of, protected ground. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPistonExtend(BlockPistonExtendEvent event) {
         if (config.protect("pistons")
@@ -454,7 +396,6 @@ public final class GardenProtection implements Listener {
         return false;
     }
 
-    /** Explosions still happen, but they leave protected ground alone. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onEntityExplode(EntityExplodeEvent event) {
         if (config.protect("explosions")) {
@@ -469,7 +410,6 @@ public final class GardenProtection implements Listener {
         }
     }
 
-    /** A tree grown on an owned plot keeps its branches out of the next one. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onGrow(StructureGrowEvent event) {
         if (config.protect("growth")) {
@@ -489,7 +429,6 @@ public final class GardenProtection implements Listener {
         event.getBlocks().removeIf((BlockState state) -> isProtected(state.getLocation()));
     }
 
-    /** Dispensers can place water, lava and blocks — not into protected ground. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDispense(BlockDispenseEvent event) {
         Block block = event.getBlock();
@@ -502,7 +441,7 @@ public final class GardenProtection implements Listener {
         }
     }
 
-    /** Falling sand and gravel, and anything else that turns into a block where it lands. */
+    // Falling sand and gravel, and anything else that turns into a block where it lands.
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onEntityChangeBlock(EntityChangeBlockEvent event) {
         if (event.getEntity() instanceof Player) {
@@ -513,16 +452,8 @@ public final class GardenProtection implements Listener {
         }
     }
 
-    // ── spawning ───────────────────────────────────────────────────────────────
-
-    /**
-     * Nothing spawns in a Garden unless its reason is listed in {@code world.allowed-spawn-reasons}.
-     *
-     * <p>The gamerule already stops natural spawning, but that is only the natural path: breeding, spawn
-     * eggs, spawners and village mechanics all arrive by other routes. {@code CUSTOM} — the reason a
-     * plugin-spawned entity uses — is allowed by default, so EcoMobs and Sam keep working; add
-     * {@code BREEDING}, {@code SPAWNER_EGG} or {@code SPAWNER} to allow animal and mob farms.
-     */
+    // Only reasons in world.allowed-spawn-reasons. CUSTOM (plugin spawns) is allowed by default so EcoMobs
+    // and Sam work; add BREEDING, SPAWNER_EGG or SPAWNER to allow animal and mob farms.
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onSpawn(CreatureSpawnEvent event) {
         if (!GardenWorlds.isGarden(event.getLocation().getWorld())) {
@@ -533,7 +464,7 @@ public final class GardenProtection implements Listener {
         }
     }
 
-    /** Sweep vanilla mobs out of each chunk as its entities load. */
+    // Sweep vanilla mobs out of each chunk as its entities load.
     @EventHandler(priority = EventPriority.MONITOR)
     public void onEntitiesLoad(EntitiesLoadEvent event) {
         World world = event.getWorld();

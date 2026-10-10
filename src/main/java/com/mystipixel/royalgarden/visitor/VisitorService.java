@@ -33,18 +33,10 @@ import java.util.logging.Logger;
 import java.util.random.RandomGenerator;
 
 /**
- * Visitors: who arrives at a Garden and when, what they ask for, and paying them.
- *
- * <p>Visitors arrive one per {@code arrivals.interval} while their host is online, up to a queue of
- * {@code arrivals.max-queue} (which can grow with Garden level). Time offline counts at
- * {@code arrivals.offline-rate}. Each arrival is a visitor picked by weight from those the Garden's
- * level allows, with one of their requests picked by weight, its amounts scaled up by Garden level.
- *
- * <p>Accepting takes the items and pays the offer's Copper (through a console command, so the currency
- * lives in EcoBits and is spent in an EcoShop shop) and Garden XP, then every stacked reward:
- * {@code rewards.every-visit}, {@code rewards.first-visit} the first time a visitor is served,
- * {@code rewards.by-served.<n>} on the n-th visitor served, and the rarity's and the visitor's own
- * commands and messages.
+ * Visitors. One arrives per {@code arrivals.interval} while the host is online, up to {@code
+ * arrivals.max-queue}; offline time counts at {@code arrivals.offline-rate}. Accepting takes the items and
+ * pays Copper (through a console command), Garden XP, and every stacked reward: {@code every-visit},
+ * {@code first-visit}, {@code by-served.<n>}, and the rarity's and visitor's own.
  */
 public final class VisitorService implements Listener {
 
@@ -80,18 +72,18 @@ public final class VisitorService implements Listener {
         return store;
     }
 
-    /** How a Garden's level is read: it gates visitors, scales requests and sizes the queue. */
+    /** The level gates visitors, scales requests and sizes the queue. */
     public void setLevels(ToIntFunction<UUID> level, XpSink xp) {
         this.level = level;
         this.xp = xp;
     }
 
-    /** Who counts as having a Garden, for {@code arrivals.require-garden}. */
+    /** For {@code arrivals.require-garden}. */
     public void setHasGarden(Predicate<UUID> hasGarden) {
         this.hasGarden = hasGarden;
     }
 
-    /** Told whenever a player's queue changes — how the NPCs at the barn stay in step. */
+    /** Told whenever a player's queue changes; this is how the NPCs at the barn stay in step. */
     public void onChange(Consumer<UUID> changed) {
         this.changed = changed == null ? owner -> { } : changed;
     }
@@ -104,9 +96,7 @@ public final class VisitorService implements Listener {
         return config.maxQueue(level(owner));
     }
 
-    // ── arrivals ───────────────────────────────────────────────────────────────
-
-    /** Check every online player for visitors that are due. Runs on a timer. */
+    /** Runs on a timer. */
     public void tickAll() {
         if (!config.enabled()) {
             return;
@@ -116,7 +106,6 @@ public final class VisitorService implements Listener {
         }
     }
 
-    /** Let in any visitors due for this player. */
     public void tick(Player player) {
         UUID owner = player.getUniqueId();
         if (!config.enabled() || (config.requireGarden() && !hasGarden.test(owner)) || store.readOnly(owner)) {
@@ -157,7 +146,7 @@ public final class VisitorService implements Listener {
     }
 
     /**
-     * Force a visitor to arrive (admin), ignoring the clock, the queue limit and level requirements.
+     * Admin: ignores the clock, the queue limit and level requirements.
      *
      * @param visitorId a visitor to send, or null for a random pick
      * @return the new offer, or null if there was no such visitor
@@ -190,7 +179,7 @@ public final class VisitorService implements Listener {
         return offer;
     }
 
-    /** Send every waiting visitor away without counting a refusal (admin, and {@code /garden reset}). */
+    /** Without counting a refusal (admin, and {@code /garden reset}). */
     public void clear(UUID owner) {
         if (store.readOnly(owner)) {
             return;
@@ -200,7 +189,7 @@ public final class VisitorService implements Listener {
         changed.accept(owner);
     }
 
-    /** Pick a visitor this player may receive, and roll their offer. Null if nobody is eligible. */
+    // Null if nobody is eligible.
     Offer generate(Player player, VisitorStore.Data data, int lvl, RandomGenerator random) {
         List<VisitorType> eligible = new ArrayList<>();
         for (VisitorType type : config.visitors()) {
@@ -246,12 +235,11 @@ public final class VisitorService implements Listener {
                 VisitorMath.scale(gardenXp.roll(random), rewardScale), System.currentTimeMillis());
     }
 
-    /** Milliseconds until the next visitor, or -1 while the queue is full. */
+    /** -1 while the queue is full. */
     public long untilNext(UUID owner) {
         return untilNext(owner, store.get(owner));
     }
 
-    /** {@link #untilNext(UUID)} for data already in hand. */
     public long untilNext(UUID owner, VisitorStore.Data data) {
         if (data.queued() >= maxQueue(owner)) {
             return -1;
@@ -261,8 +249,6 @@ public final class VisitorService implements Listener {
         }
         return Math.max(0, data.lastArrival() + config.intervalMillis() - System.currentTimeMillis());
     }
-
-    // ── joining and leaving ────────────────────────────────────────────────────
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
@@ -279,8 +265,8 @@ public final class VisitorService implements Listener {
     }
 
     /**
-     * Credit time away to a player who has arrived (or who was online across an extension reload): the
-     * part of it {@code offline-rate} does not count pushes their clock back.
+     * Credit time away to a player who has arrived (or was online across a reload): the part {@code
+     * offline-rate} does not count pushes their clock back.
      */
     public void welcome(Player player) {
         UUID owner = player.getUniqueId();
@@ -299,7 +285,7 @@ public final class VisitorService implements Listener {
         store.save(owner);
     }
 
-    /** On shutdown: everyone online is about to be "away", so their downtime counts as offline. */
+    /** Everyone online is about to be away, so their downtime counts as offline. */
     public void shutdown() {
         long now = System.currentTimeMillis();
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -311,9 +297,7 @@ public final class VisitorService implements Listener {
         store.saveAll();
     }
 
-    // ── serving ────────────────────────────────────────────────────────────────
-
-    /** Accept an offer: take the items and pay. Returns whether it went through. */
+    /** Take the items and pay. Returns whether it went through. */
     public boolean accept(Player player, String offerId) {
         UUID owner = player.getUniqueId();
         if (store.readOnly(owner)) {
@@ -332,7 +316,7 @@ public final class VisitorService implements Listener {
             TestableItem item = lookup(wanted.item());
             if (item == null) {
                 logger.warning("Visitor '" + offer.visitor() + "' wants '" + wanted.item()
-                        + "', which is not an item on this server — check visitors.yml.");
+                        + "', which is not an item on this server; check visitors.yml.");
                 messages.send(player, "visitor-bad-item", "%item%", wanted.item());
                 return false;
             }
@@ -372,7 +356,7 @@ public final class VisitorService implements Listener {
         return true;
     }
 
-    /** Refuse an offer: the visitor leaves with nothing. */
+    /** The visitor leaves with nothing. */
     public boolean refuse(Player player, String offerId) {
         UUID owner = player.getUniqueId();
         if (store.readOnly(owner)) {
@@ -398,7 +382,7 @@ public final class VisitorService implements Listener {
         return true;
     }
 
-    /** Pay Copper through {@code copper.give-command} — visitors, and anything else that pays Copper. */
+    /** Through {@code copper.give-command}. */
     public void payCopper(Player player, long amount) {
         if (!config.copperEnabled() || amount <= 0) {
             return;
@@ -453,11 +437,9 @@ public final class VisitorService implements Listener {
         }
     }
 
-    // ── items ──────────────────────────────────────────────────────────────────
-
     /**
-     * An eco item lookup ({@code wheat}, {@code ecoitems:enchanted_wheat}), or null if there is none. A
-     * lookup that matches nothing comes back as an empty item that is air.
+     * An eco item lookup ({@code wheat}, {@code ecoitems:enchanted_wheat}), or null if there is none. A lookup
+     * that matches nothing comes back as an empty item that is air.
      */
     public static TestableItem lookup(String id) {
         TestableItem item = Items.lookup(id);
@@ -468,7 +450,6 @@ public final class VisitorService implements Listener {
         return stack == null || stack.getType().isAir() ? null : item;
     }
 
-    /** How many matching items the inventory holds. */
     public static long count(PlayerInventory inventory, TestableItem item) {
         long total = 0;
         for (ItemStack stack : inventory.getStorageContents()) {
@@ -479,7 +460,7 @@ public final class VisitorService implements Listener {
         return total;
     }
 
-    /** Remove {@code amount} matching items. Only call once {@link #count} says there are enough. */
+    // Only call once count() says there are enough.
     private static void take(PlayerInventory inventory, TestableItem item, long amount) {
         ItemStack[] contents = inventory.getStorageContents();
         long left = amount;
@@ -499,7 +480,7 @@ public final class VisitorService implements Listener {
         inventory.setStorageContents(contents);
     }
 
-    /** What to call a wanted item: its configured name, else the item's own name. */
+    /** Its configured name, else the item's own name. */
     public String itemName(Offer.Wanted wanted) {
         if (wanted.name() != null && !wanted.name().isBlank()) {
             return wanted.name();
@@ -508,7 +489,7 @@ public final class VisitorService implements Listener {
         return item == null ? wanted.item() : itemName(item.getItem());
     }
 
-    /** An item's display name as {@code &} text: its custom name, item name, or the material prettified. */
+    /** As {@code &} text: custom name, item name, or the material prettified. */
     public static String itemName(ItemStack stack) {
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
@@ -533,11 +514,9 @@ public final class VisitorService implements Listener {
         return out.toString();
     }
 
-    // ── placeholders ───────────────────────────────────────────────────────────
-
     /**
-     * What visitor messages, menus and rewards can use: {@code %player% %uuid% %visitor% %visitor_name%
-     * %rarity% %rarity_name% %copper% %xp% %currency% %served% %visitor_served% %unique% %waiting%}.
+     * {@code %player% %uuid% %visitor% %visitor_name% %rarity% %rarity_name% %copper% %xp% %currency%
+     * %served% %visitor_served% %unique% %waiting%}.
      */
     public String[] placeholders(UUID owner, Offer offer) {
         VisitorType type = offer == null ? null : config.visitor(offer.visitor());
@@ -560,8 +539,8 @@ public final class VisitorService implements Listener {
     }
 
     /**
-     * Placeholders for one visitor rather than one offer — the Visitor Log: {@code %visitor%
-     * %visitor_name% %rarity% %rarity_name% %visitor_served% %garden_level%}.
+     * For the Visitor Log: {@code %visitor% %visitor_name% %rarity% %rarity_name% %visitor_served%
+     * %garden_level%}.
      */
     public String[] placeholders(UUID owner, VisitorType type) {
         return new String[]{
@@ -587,7 +566,7 @@ public final class VisitorService implements Listener {
         return player.getName() == null ? owner.toString() : player.getName();
     }
 
-    /** Placeholders for the Visitors page's stats: counts, the queue, and the next arrival. */
+    /** Counts, the queue, and the next arrival. */
     public String[] statPlaceholders(UUID owner) {
         VisitorStore.Data data = store.get(owner);
         long next = untilNext(owner);

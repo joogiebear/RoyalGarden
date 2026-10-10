@@ -9,14 +9,9 @@ import java.io.File;
 import java.util.logging.Logger;
 
 /**
- * Every line a player can read, from {@code messages.yml}.
- *
- * <p>Messages use {@code &} colour codes (and {@code &#rrggbb} hex) through RoyalSkyblock's own
- * {@link Text} helper, so they are written exactly the way the host's messages are. Placeholders are
- * {@code %name%} and are passed as pairs: {@code send(player, "unlocked", "%plot%", "B2")}.
- *
- * <p>An empty message is a message switched off: {@code send} skips it rather than sending a blank
- * line, which is how an admin silences something without a code change.
+ * Every line a player can read, from {@code messages.yml}, using {@code &} and {@code &#rrggbb} colours
+ * like the host. Placeholders come in pairs: {@code send(player, "unlocked", "%plot%", "B2")}. An empty
+ * message is switched off and never sent.
  */
 public final class Messages extends YamlFile {
 
@@ -24,7 +19,7 @@ public final class Messages extends YamlFile {
         super(dataFolder, "messages.yml", logger);
     }
 
-    /** The raw text of a message with placeholders filled, or the key itself if it is missing. */
+    /** Placeholders filled, or the key itself if the message is missing. */
     public String raw(String key, String... placeholders) {
         String text = yaml().getString(key);
         if (text == null) {
@@ -33,12 +28,11 @@ public final class Messages extends YamlFile {
         return fill(text, placeholders);
     }
 
-    /** A message as a component, placeholders filled. */
     public Component get(String key, String... placeholders) {
         return Text.color(raw(key, placeholders));
     }
 
-    /** Send a chat message with the configured prefix. Does nothing for an empty message. */
+    /** Adds the configured prefix. Does nothing for an empty message. */
     public void send(CommandSender to, String key, String... placeholders) {
         String text = raw(key, placeholders);
         if (text.isEmpty()) {
@@ -47,7 +41,7 @@ public final class Messages extends YamlFile {
         to.sendMessage(Text.color(yaml().getString("prefix", "") + text));
     }
 
-    /** Show a message in the action bar, where a refusal per swing does not flood chat. */
+    /** For refusals per swing, which would flood chat. */
     public void actionBar(Player to, String key, String... placeholders) {
         String text = raw(key, placeholders);
         if (text.isEmpty()) {
@@ -56,7 +50,7 @@ public final class Messages extends YamlFile {
         to.sendActionBar(Text.color(text));
     }
 
-    /** Replace {@code %name%} pairs in a string. Odd trailing arguments are ignored. */
+    /** Odd trailing arguments are ignored. */
     public static String fill(String text, String... placeholders) {
         String out = text;
         for (int i = 0; i + 1 < placeholders.length; i += 2) {

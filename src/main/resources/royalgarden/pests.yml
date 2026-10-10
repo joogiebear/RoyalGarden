@@ -1,33 +1,19 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RoyalGarden  ·  pests.yml  —  Pests
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Farming in your own Garden sometimes brings a pest onto a plot. A plot with
-#  pests on it farms worse — its owner holds the libreforge effects under
-#  `infested-effects:` while standing on it — until they are killed. Killing
-#  one pays Copper, Garden XP and the rewards below.
+# Pests. Farming in your own Garden sometimes brings a pest onto a plot. While
+# standing on an infested plot its owner holds the `infested-effects:` below,
+# until the pests are killed. Killing one pays Copper, Garden XP and `rewards:`.
 #
-#  The pests themselves are EcoMobs mobs (examples/EcoMobs/), spawned with the
-#  console command set per pest here. RoyalGarden tags each one with its plot,
-#  counts them, keeps them on their plot and pays for them. EcoMobs does how
-#  they look, move and fight; the vacuum (examples/EcoItems/items/vacuum.yml)
-#  is an EcoItems item.
+# Pests are EcoMobs mobs (examples/EcoMobs/), spawned with each pest's console
+# command. The vacuum (examples/EcoItems/items/vacuum.yml) is an EcoItems item.
 #
-#  Who pays what — so nothing is paid twice:
-#    · RoyalGarden pays `copper`, `garden-xp` and the `rewards:` below.
-#    · The example EcoMobs mobs drop nothing and their `kill` effects are
-#      empty. To pay through EcoMobs instead (its `drops:` or `effects.kill`),
-#      set copper and garden-xp here to 0.
+# RoyalGarden pays `copper`, `garden-xp` and `rewards:`; the example EcoMobs mobs
+# pay nothing. To pay through EcoMobs instead, set copper and garden-xp to 0.
 #
-#  Garden worlds only let CUSTOM and COMMAND spawns through
-#  (config.yml world.allowed-spawn-reasons); EcoMobs spawns with CUSTOM, so
-#  keep that one listed.
-#
-#  Reload with /garden reload.
-# ═══════════════════════════════════════════════════════════════════════════════
+# Garden worlds only let CUSTOM and COMMAND spawns through
+# (config.yml world.allowed-spawn-reasons); EcoMobs spawns with CUSTOM, so keep
+# that one listed. Reload with /garden reload.
 
 enabled: true
 
-# ── Spawning ───────────────────────────────────────────────────────────────────
 # Only a harvest that counts toward Crop Milestones, by the Garden's owner,
 # in their own Garden, can bring a pest.
 spawning:
@@ -36,7 +22,7 @@ spawning:
   # Per-crop chance instead (crop ids from milestones.yml).
   crop-chance: {}
   #   wheat: 1.5
-  # No new pest for this long after the last one, per Garden (30s, 2m, 1h…).
+  # No new pest for this long after the last one, per Garden (30s, 2m, 1h...).
   cooldown: 1m
   # Most pests at once on one plot, and in one Garden. 0 = no limit.
   max-per-plot: 3
@@ -51,13 +37,12 @@ spawning:
   # Random spots tried before giving up (a spot must have air to stand in).
   attempts: 6
 
-# ── Infestation ────────────────────────────────────────────────────────────────
 # A plot with at least this many pests is infested. 0 turns infestation off.
 infested-at: 1
 
 # Who is slowed down by an infested plot while standing on it:
-#   owner    — only the Garden's owner (default)
-#   everyone — anyone standing there
+#   owner:    only the Garden's owner (default)
+#   everyone: anyone standing there
 infested-applies-to: owner
 
 # libreforge effects held while standing on an infested plot. The plot's
@@ -65,13 +50,13 @@ infested-applies-to: owner
 #   %pests%   pests on this plot (capped at max-per-plot)
 #   %plot%    the plot (B2)
 #   %crop%    the crop being farmed when the newest pest came (wheat)
-#   %blocks%  that crop's blocks, from milestones.yml — write it alone as a value
+#   %blocks%  that crop's blocks, from milestones.yml; write it alone as a value
 #   %drops%   that crop's drop items, likewise
 # A pest spawned by an admin has no crop: %crop% is blank and %blocks% /
 # %drops% are every crop's.
 #
-# Default: each pest is a 5% chance that a crop broken there drops nothing —
-# plain libreforge, no other plugin needed.
+# Default: each pest is a 5% chance that a crop broken there drops nothing
+# (plain libreforge, no other plugin needed).
 infested-effects:
   - id: cancel_drops
     args:
@@ -83,28 +68,25 @@ infested-effects:
       blocks: "%blocks%"
 infested-conditions: []
 
-# Using EcoSkills instead — lower the shared Farming Fortune stat
-# (examples/EcoSkills/stats/farming_fortune.yml), so the debuff and every
-# bonus meet in one number:
+# Using EcoSkills instead: lower the shared Farming Fortune stat
+# (examples/EcoSkills/stats/farming_fortune.yml):
 #   infested-effects:
 #     - id: add_stat
 #       args:
 #         stat: farming_fortune
 #         amount: "%pests% * -10"
 
-# ── Staying put ────────────────────────────────────────────────────────────────
 # Pests never leave their plot: one found outside it is put back where it
 # first appeared. Checked this often.
 confine:
   check-every-seconds: 2
 
-# ── Pests ──────────────────────────────────────────────────────────────────────
 # One entry per kind of pest. The id is used in placeholders, commands and
 # the log, and must be a-z, 0-9 and _.
 #   command      console command that spawns it: %x% %y% %z% %world% %player%
 #                %uuid% %plot% %pest%. The syntax below is EcoMobs' own:
 #                ecomobs spawn <mob> <x> <y> <z> <world> [amount]
-#   mob          the EcoMobs id the command spawns — how RoyalGarden finds the
+#   mob          the EcoMobs id the command spawns; how RoyalGarden finds the
 #                new entity. Blank takes whatever the command spawned.
 #   weight       how often it is picked, against the others
 #   garden-level lowest Garden level it appears at
@@ -162,13 +144,12 @@ pests:
       - "&7Quick, and fond of"
       - "&7the granary."
 
-# ── Killing them ───────────────────────────────────────────────────────────────
 kills:
   # Only the Garden's owner is paid and has the kill counted. Anyone else who
   # kills a pest there just clears it.
   owner-only: true
 
-# Stacked, like visitor rewards: a kill gives everything that applies.
+# Rewards are stacked, like visitor rewards: a kill gives everything that applies.
 #   every-kill        every pest killed
 #   by-type.<pest>    a pest of that kind
 #   by-kills.<n>      the n-th pest the player has killed in total
@@ -194,8 +175,8 @@ sounds:
   spawn: "entity.silverfish.ambient"
   kill: "entity.experience_orb.pickup"
 
-# ── The Pests page (/garden pests, or the desk) ───────────────────────────────
-# One icon per plot, laid out like the desk. Left-click a plot with pests to
+# The Pests page (/garden pests, or the desk): one icon per plot, laid out like
+# the desk. Left-click a plot with pests to
 # go there. Rows are the board plus one.
 menu:
   title: "&8Pests"
@@ -210,7 +191,7 @@ menu:
       - "&7No pests."
   plot-infested:
     material: red_stained_glass_pane
-    name: "&cPlot %plot% &7— &c%pests% pest(s)"
+    name: "&cPlot %plot% &7- &c%pests% pest(s)"
     lore:
       - "%list%"
       - ""

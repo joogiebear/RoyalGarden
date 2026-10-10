@@ -25,23 +25,13 @@ import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 /**
- * One Garden world per player, created on first visit and loaded on every one after.
- *
- * <p>Garden worlds are SlimeWorlds obtained through RoyalSkyblock's own
- * {@link IslandWorldService}, which is deliberately name-based rather than island-based — it takes a
- * world name and hands back a Bukkit {@link World}. That is the whole reason The Garden can be an
- * extension: it gets ASP-backed per-player worlds, the unload grace period, and the save-on-shutdown
- * guarantees without owning any of that code, and without ever importing an ASP type.
- *
- * <p>Ownership needs no storage of its own: the world is named from the owner's UUID, so the name
- * <em>is</em> the record. Everything else about a Garden lives in {@link GardenStore}.
+ * One Garden world per player, created on first visit. Worlds come from RoyalSkyblock's name-based
+ * {@link IslandWorldService}, so this gets ASP-backed worlds, unload grace and save-on-shutdown without
+ * importing an ASP type. The world name is derived from the owner's UUID, so it is the ownership record.
  */
 public final class GardenWorlds {
 
-    /**
-     * World-name prefix. Distinct from RoyalSkyblock's {@code island_} so the two can never collide in
-     * a shared data source, and greppable in a slime-worlds directory.
-     */
+    // Distinct from RoyalSkyblock's island_ so the two never collide in a shared data source.
     private static final String PREFIX = "garden_";
 
     private final Plugin plugin;
@@ -52,10 +42,10 @@ public final class GardenWorlds {
     private final BuildQueue queue;
     private final Logger logger;
 
-    /** Opens in flight, so two requests for the same Garden share one load — or one creation. */
+    // Opens in flight, so two requests for the same Garden share one load or one creation.
     private final Map<UUID, CompletableFuture<World>> opening = new ConcurrentHashMap<>();
 
-    /** Run on every Garden once it is prepared; this is how Sam gets to the desk. */
+    // Run on every Garden once it is prepared; this is how Sam gets to the desk.
     private Consumer<World> onPrepared = world -> { };
 
     public GardenWorlds(Plugin plugin, GardenConfig config, IslandWorldService worlds, GardenStore store,
@@ -69,29 +59,24 @@ public final class GardenWorlds {
         this.logger = logger;
     }
 
-    /** The preset library — what can be stamped onto a plot. */
     public PresetLibrary presets() {
         return presets;
     }
 
-    /** Something to run on every Garden after {@link #prepare}. */
+    /** Run on every Garden after {@link #prepare}. */
     public void onPrepared(Consumer<World> action) {
         this.onPrepared = action == null ? world -> { } : action;
     }
 
-    // ── identity ───────────────────────────────────────────────────────────────
-
-    /** The world name for a player's Garden. */
     public static String worldName(UUID owner) {
         return PREFIX + owner;
     }
 
-    /** Whether a world is a Garden at all. */
     public static boolean isGarden(World world) {
         return world != null && world.getName().startsWith(PREFIX);
     }
 
-    /** Whose Garden this world is, or null if it is not a Garden. */
+    /** Null if it is not a Garden. */
     public static UUID ownerOf(World world) {
         if (!isGarden(world)) {
             return null;
@@ -103,7 +88,7 @@ public final class GardenWorlds {
         }
     }
 
-    /** Whether an id names a generated plot rather than a captured one. */
+    /** A generated plot rather than a captured one. */
     public static boolean isBuiltIn(String id) {
         return id == null
                 || id.equalsIgnoreCase(GardenBuilder.Base.FLAT.name())
@@ -114,30 +99,24 @@ public final class GardenWorlds {
         return id == null ? "flat" : id.toLowerCase(Locale.ROOT);
     }
 
-    // ── state ──────────────────────────────────────────────────────────────────
-
-    /** State for a Garden world, or null if it is not one. */
+    /** Null if it is not a Garden. */
     public GardenState stateOf(World world) {
         UUID owner = ownerOf(world);
         return owner == null ? null : store.get(owner);
     }
 
-    /** State for a player. */
     public GardenState state(UUID owner) {
         return store.get(owner);
     }
 
-    /** Persist a state changed from outside (admin commands). */
+    /** For a state changed from outside (admin commands). */
     public void save(GardenState state) {
         store.save(state);
     }
 
     /**
-     * Unlock a plot: record it and persist it.
-     *
-     * <p>Nothing is generated here — every plot is built when the Garden is created, locked or not, so
-     * unlocking is purely a change of what you are allowed onto (enforced by
-     * {@link GardenProtection}). Returns false if the plot was not a legal purchase.
+     * Records and persists the unlock. Nothing is generated: every plot is built with the Garden, so this
+     * only changes where the player may go. Returns false if it was not a legal purchase.
      */
     public boolean unlock(UUID owner, int px, int pz) {
         GardenState state = store.get(owner);
@@ -148,25 +127,16 @@ public final class GardenWorlds {
         return true;
     }
 
-    /** Whether this player has ever had a Garden — so looking at one does not create it. */
+    /** So looking at a Garden does not create it. */
     public boolean hasGarden(UUID owner) {
         return store.exists(owner) || worlds.isLoaded(worldName(owner));
     }
 
-    /** Whether this player's Garden is loaded right now. */
     public boolean isLoaded(UUID owner) {
         return worlds.isLoaded(worldName(owner));
     }
 
-    // ── presets ────────────────────────────────────────────────────────────────
-
-    /**
-     * Capture a plot and store it under a preset id.
-     *
-     * <p>Nothing already built changes. Capturing records what a plot looks like; applying it is a
-     * separate, destructive act, and keeping the two apart is what makes capture safe to run at any
-     * time while you are still building.
-     */
+    /** Nothing already built changes; applying a preset is a separate, destructive act. */
     public PlotTemplate capture(World world, int px, int pz, String id) throws IOException {
         PlotTemplate captured = PlotTemplate.capture(world, px, pz, config.maxTemplateHeight());
         presets.save(id, captured);
@@ -175,29 +145,20 @@ public final class GardenWorlds {
         return captured;
     }
 
-    /** Whether a plot is being written right now. */
     public boolean isBuilding(World world, int px, int pz) {
         return queue.isBuilding(world.getName(), px, pz);
     }
 
     /**
-     * Rebuild one plot from a preset, or from {@code flat} / {@code bedrock}.
-     *
-     * <p>Overwrites the plot completely. That is the intended behaviour and the reason it is only ever
-     * reached from a deliberate action: a plot someone has farmed for a week and a plot they just
-     * unlocked look the same to this method.
-     *
-     * <p>The rebuild is recorded as pending before it starts and cleared when it finishes, so one cut
-     * short by the world unloading is picked up again by {@link #prepare} on the next visit rather than
-     * leaving a plot that is half of two farms.
+     * Rebuilds one plot from a preset, or from {@code flat} / {@code bedrock}, overwriting it completely.
+     * Recorded as pending first, so a rebuild cut short by an unload resumes in {@link #prepare}.
      *
      * @param paced whether to take the slow, visible pace ({@code generation.paste-ticks-per-row})
      * @return false if the plot is already being written, or the preset could not be read
      */
     public boolean rebuild(World world, int px, int pz, String id, boolean paced) {
         if (queue.isBuilding(world.getName(), px, pz)) {
-            // A second paste over a plot already being written would interleave rows with the first
-            // and leave a plot that is half of each, with nothing to say which.
+            // A second paste over a plot already being written would interleave rows with the first.
             return false;
         }
         GardenBuilder.Base base = GardenBuilder.Base.BEDROCK.name().equalsIgnoreCase(id)
@@ -245,18 +206,10 @@ public final class GardenWorlds {
         return new PlotTemplate.PasteRules(config.resetCropAge(), config.neverPaste());
     }
 
-    // ── opening ────────────────────────────────────────────────────────────────
-
     /**
-     * Get a player's Garden, building it if this is the first time they have asked for one.
-     *
-     * <p>The returned future completes <b>on the server thread</b> with a world that has already been
-     * prepared, so callers can teleport into it directly. That is a deliberate departure from the host
-     * service's contract (which completes on an unspecified thread): every caller here would otherwise
-     * have to remember to hop back, and forgetting is the kind of bug that only shows up under load.
-     *
-     * <p>Two opens of the same Garden while the first is still in flight share it. Without that, a
-     * double-click on first visit made both find "no such world" and both try to create it.
+     * A player's Garden, built on first request. Completes <b>on the main thread</b> with a prepared world,
+     * unlike the host service, so callers can teleport straight in. Concurrent opens of the same Garden
+     * share one future, so a double-click cannot create it twice.
      */
     public CompletableFuture<World> open(UUID owner) {
         CompletableFuture<World> result = new CompletableFuture<>();
@@ -284,15 +237,8 @@ public final class GardenWorlds {
         return result;
     }
 
-    /**
-     * Load an existing Garden, completing with {@code null} if there isn't one yet.
-     *
-     * <p>The host service has no "does this world exist?" call — {@code loadIsland} simply fails for an
-     * unknown world — so absence has to be read out of the failure. It is identified by the exception's
-     * <em>class name</em> rather than by catching {@code UnknownWorldException} directly, because
-     * catching it would mean compiling against the ASP API and this extension is built precisely so
-     * that it never has to. A stringly check confined to one method is the cheaper end of that trade.
-     */
+    // Completes with null if there is no Garden yet. The host has no exists() call, so absence is read
+    // from loadIsland's failure by exception class name, to avoid compiling against the ASP API.
     private CompletableFuture<World> load(String name) {
         return worlds.loadIsland(name)
                 .handle((world, error) -> {
@@ -307,7 +253,7 @@ public final class GardenWorlds {
                 .thenCompose(future -> future);
     }
 
-    /** Create a Garden world, build the centre plot into it, and persist it before handing it back. */
+    // Builds the centre plot and persists the world before handing it back.
     private CompletableFuture<World> create(String name) {
         logger.info("Creating Garden world '" + name + "'.");
         return worlds.createIsland(name)
@@ -316,8 +262,7 @@ public final class GardenWorlds {
                     GardenBuilder.build(world, palette(), logger);
                     UUID owner = ownerOf(world);
                     if (owner != null) {
-                        // A new world has no walls from older versions to clear; say so now so the
-                        // first prepare does not walk the whole board looking for them.
+                        // A new world has no old walls to clear; recording that saves the first prepare a board-wide walk.
                         GardenState state = store.get(owner);
                         state.setLegacyWallsCleared(true);
                         state.setBarnVersion(GardenBuilder.BARN_VERSION);
@@ -328,18 +273,14 @@ public final class GardenWorlds {
                             + (System.nanoTime() - started) / 1_000_000 + "ms.");
                     return world;
                 }))
-                // Persist before returning: a crash between "built" and "first save" would otherwise
-                // leave an empty world that the load path would then happily accept as finished.
+                // Persist before returning: a crash before the first save would leave an empty world that loads as
+                // finished.
                 .thenCompose(world -> worlds.saveIsland(name).thenApply(ignored -> world));
     }
 
     /**
-     * Apply the settings a Garden should always have, on every load rather than only at creation.
-     *
-     * <p>Idempotent on purpose. World properties come from RoyalSkyblock's island config (the host's
-     * service builds the property map, and it does not know Gardens exist), so anything The Garden
-     * needs differently has to be re-asserted here — including on worlds built before a setting was
-     * added, and after a {@code /garden reload} changed one.
+     * Settings a Garden should always have, applied on every load. Idempotent: world properties come from
+     * the host's island config, so anything the Garden needs differently is re-asserted here.
      */
     public void prepare(World world) {
         applyRules(world);
@@ -361,14 +302,8 @@ public final class GardenWorlds {
         onPrepared.accept(world);
     }
 
-    /**
-     * Bring the farmhouse plot up to the farmhouse in use.
-     *
-     * <p>The built-in barn at an older version is renovated in place — its changes are additions. Anything
-     * else (a schematic added, changed or taken away) means a different building, so the plot is cleared
-     * and built again: the old one's walls would otherwise stand through the new one. Only the farmhouse
-     * plot is touched, and it is read-only to players, so nothing of theirs is on it to lose.
-     */
+    // An older built-in barn is renovated in place. Any other change (schematic added, changed or removed)
+    // clears and rebuilds the farmhouse plot, which is read-only to players, so nothing of theirs is lost.
     private void refreshFarmhouse(World world, GardenState state) {
         if (state == null || state.readOnly()) {
             return;
@@ -415,7 +350,7 @@ public final class GardenWorlds {
                 }));
     }
 
-    /** Send Sam, the Composter and the visitors to their spots again in every loaded Garden — after a spot moved. */
+    /** Sam, the Composter and the visitors back to their spots in every loaded Garden, after a spot moved. */
     public void refreshSpots() {
         for (World world : Bukkit.getWorlds()) {
             if (isGarden(world)) {
@@ -425,7 +360,7 @@ public final class GardenWorlds {
         }
     }
 
-    /** {@link #refreshFarmhouse} for every Garden loaded now — after a reload changed the farmhouse. */
+    /** {@link #refreshFarmhouse} for every loaded Garden, after a reload changed the farmhouse. */
     public void refreshFarmhouses() {
         for (World world : Bukkit.getWorlds()) {
             if (isGarden(world)) {
@@ -457,7 +392,7 @@ public final class GardenWorlds {
         // The host's resolver: it accepts both 26.2 ids and the classic camelCase names.
         GameRule<?> rule = IslandWorldRules.resolveRule(key);
         if (rule == null) {
-            logger.warning("world.gamerules: unknown gamerule '" + key + "' — skipped.");
+            logger.warning("world.gamerules: unknown gamerule '" + key + "'; skipped.");
             return;
         }
         try {
@@ -472,20 +407,9 @@ public final class GardenWorlds {
     }
 
     /**
-     * Remove vanilla mobs among some entities — called as each chunk's entities load.
-     *
-     * <p>Blocking spawns only stops new ones. A Garden built before that rule existed grew horses and
-     * sheep, and they were saved into the slime file, so they come back on every load until something
-     * takes them out.
-     *
-     * <p>This runs from {@code EntitiesLoadEvent} rather than when the world opens. Paper loads a
-     * chunk's entities separately from, and after, its blocks, so sweeping {@code world.getEntities()}
-     * at open time saw almost nothing and removed almost nothing.
-     *
-     * <p>The test is an <b>empty persistent data container</b>. Every plugin that spawns a mob and
-     * intends to keep it tags it: Sam carries this extension's key, and EcoMobs tags its own, so both
-     * survive while anything vanilla spawned does not. Only {@code Mob}s are considered — dropped items,
-     * armour stands, item frames and paintings are left exactly where they are.
+     * Removes vanilla mobs as each chunk's entities load (older Gardens saved some into the slime file).
+     * Called from {@code EntitiesLoadEvent}, since Paper loads entities after blocks. A {@code Mob} with an
+     * empty persistent data container is vanilla; Sam and EcoMobs tag theirs. Non-mobs are left alone.
      */
     public void sweepMobs(World world, Iterable<Entity> entities) {
         if (!config.sweepVanillaMobs()) {
@@ -504,12 +428,8 @@ public final class GardenWorlds {
     }
 
     /**
-     * Bring the world up to date with what it should contain: every plot generated, locked or not.
-     *
-     * <p>All plots are built, because a locked plot you can see across the board reads as a place you
-     * are going to own — an empty hole reads as a bug. Unlocking changes where you may go, not whether
-     * the ground exists. Plots already queued are skipped, so opening a Garden again while it is still
-     * generating does not start a second copy of the same work.
+     * Generates every plot, locked or not, so the board never shows holes. Plots already queued are skipped,
+     * so reopening a Garden mid-generation does not double the work.
      */
     public void sync(World world) {
         PlotTemplate fill = presets.defaultPreset();
@@ -534,14 +454,8 @@ public final class GardenWorlds {
         overgrow(world);
     }
 
-    /**
-     * Grow debris on every locked plot that has none yet — on a new Garden, and on Gardens built before
-     * plots had to be cleared.
-     *
-     * <p>Only locked plots: a plot already bought was bought without debris, and growing a forest over a
-     * farm someone has built would be the opposite of a feature. The debris is written only into air, so
-     * it is safe to queue behind the job still generating the same plot's ground.
-     */
+    // Grows debris on every locked plot that has none yet. Never on bought plots. Writes only into air, so
+    // it can queue behind the job generating the same plot's ground.
     private void overgrow(World world) {
         Overgrowth.Settings settings = config.clearing();
         UUID owner = ownerOf(world);
@@ -576,7 +490,7 @@ public final class GardenWorlds {
         }
     }
 
-    /** Restart rebuilds that were cut short by the world unloading. */
+    // Restart rebuilds that were cut short by the world unloading.
     private void resumePending(World world, GardenState state) {
         if (state == null || state.readOnly()) {
             return;
@@ -595,14 +509,9 @@ public final class GardenWorlds {
         }
     }
 
-    // ── admin ──────────────────────────────────────────────────────────────────
-
     /**
-     * Reset a player's Garden: forget its unlocks and presets, and optionally delete the world too.
-     *
-     * <p>With {@code wipeWorld}, anyone standing in it is sent to {@code evacuateTo} first, its queued
-     * builds are dropped, and the world is unloaded without saving and deleted through the host. The
-     * next {@code /garden} then builds a brand-new one — which is what a fresh contest needs.
+     * Forgets a Garden's unlocks and presets. With {@code wipeWorld}, occupants go to {@code evacuateTo},
+     * queued builds are dropped and the world is deleted, so the next {@code /garden} builds a new one.
      */
     public CompletableFuture<Void> reset(UUID owner, boolean wipeWorld, Location evacuateTo) {
         store.reset(owner);
@@ -623,9 +532,7 @@ public final class GardenWorlds {
         return unloaded.thenCompose(ignored -> worlds.deleteIsland(name));
     }
 
-    // ── plumbing ───────────────────────────────────────────────────────────────
-
-    /** Walk an async failure's cause chain looking for ASP's "no such world" signal. */
+    // Walks an async failure's cause chain looking for ASP's "no such world" signal.
     private static boolean isUnknownWorld(Throwable error) {
         for (Throwable t = error; t != null; t = t.getCause()) {
             if (t.getClass().getSimpleName().equals("UnknownWorldException")) {
@@ -638,7 +545,7 @@ public final class GardenWorlds {
         return false;
     }
 
-    /** Run {@code supplier} on the server thread, completing the returned future with its result. */
+    // Completes the returned future on the main thread.
     private <T> CompletableFuture<T> onMain(Supplier<T> supplier) {
         CompletableFuture<T> future = new CompletableFuture<>();
         Runnable task = () -> {

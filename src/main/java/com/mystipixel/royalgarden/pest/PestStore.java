@@ -18,17 +18,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Pests per player, one small YAML per player under {@code pests/}: the pests alive in their Garden, and
- * the pests they have killed.
- *
- * <p>The live pests are the Garden's own record of its tagged entities — kind, plot and where each first
- * appeared — so counts, caps and placeholders hold while the plot's chunks, or the whole Garden, are not
- * loaded. The world stays the judge: an entity that loads without a record is taken in if there is room
- * and removed if not, and a record whose chunk is loaded without its entity is dropped.
- *
- * <p>Written on every change, since kills pay out. Concurrent, because placeholders are read off the
- * server thread. A file that does not parse is copied aside and that player's pests are held read-only,
- * the same way visitors are.
+ * Pests per player, one YAML per player under {@code pests/}: live pests and kills. The live record lets
+ * counts and caps hold while chunks are unloaded; the world stays the judge, so an entity loading without
+ * a record is adopted if there is room (removed if not), and a record whose chunk loads without its entity
+ * is dropped. Written on every change since kills pay out; concurrent because placeholders read it off
+ * the main thread. An unparseable file is copied aside and the player held read-only.
  */
 public final class PestStore {
 
@@ -37,12 +31,11 @@ public final class PestStore {
      *
      * @param plot    the plot it belongs to, packed {@code pz * grid + px}
      * @param crop    the crop being farmed when it came, or blank
-     * @param spawned when it appeared
      */
     public record Alive(String type, int plot, String crop, double x, double y, double z, long spawned) {
     }
 
-    /** One player's pests. Mutable; save it through {@link #save} after changing it. */
+    /** Mutable; save it through {@link #save} after changing it. */
     public static final class Data {
         private final Map<UUID, Alive> alive = new ConcurrentHashMap<>();
         private final Map<String, Long> killsByType = new ConcurrentHashMap<>();
@@ -50,7 +43,7 @@ public final class PestStore {
         private volatile long lastSpawn;
         private volatile long clearedAt;
 
-        /** Every pest alive in this Garden, by entity id. A live view — copy it to iterate while changing. */
+        /** By entity id. A live view: copy it to iterate while changing. */
         public Map<UUID, Alive> alive() {
             return alive;
         }
@@ -67,7 +60,6 @@ public final class PestStore {
             alive.clear();
         }
 
-        /** Pests per plot. */
         public Map<Integer, Integer> counts() {
             Map<Integer, Integer> out = new HashMap<>();
             for (Alive pest : alive.values()) {
@@ -90,7 +82,6 @@ public final class PestStore {
             return alive.size();
         }
 
-        /** Pests killed in total. */
         public long kills() {
             return kills;
         }
@@ -109,7 +100,7 @@ public final class PestStore {
             killsByType.clear();
         }
 
-        /** When the last pest came, for the cooldown; 0 if none ever has. */
+        /** For the cooldown; 0 if none ever has. */
         public long lastSpawn() {
             return lastSpawn;
         }
@@ -118,7 +109,7 @@ public final class PestStore {
             this.lastSpawn = when;
         }
 
-        /** When the Garden was last cleared: a tagged pest from before then is never taken back in. */
+        /** A tagged pest from before this is never taken back in. */
         public long clearedAt() {
             return clearedAt;
         }
@@ -137,7 +128,7 @@ public final class PestStore {
         this.dir = new File(dataFolder, "pests");
         this.logger = logger;
         if (!dir.exists() && !dir.mkdirs()) {
-            logger.warning("Could not create " + dir + " — pests will not persist.");
+            logger.warning("Could not create " + dir + "; pests will not persist.");
         }
     }
 
@@ -145,21 +136,21 @@ public final class PestStore {
         return new File(dir, player + ".yml");
     }
 
-    /** A player's pests, read from disk the first time. */
+    /** Read from disk the first time. */
     public Data get(UUID player) {
         return cache.computeIfAbsent(player, id -> read(id, true));
     }
 
     /**
-     * A player's pests for reading only: the cached copy if there is one, else read from disk without
-     * caching it — for placeholders asked about offline players. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
+     * caching. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
         return cached != null ? cached : read(player, false);
     }
 
-    /** Whether this player's file could not be read, so nothing of theirs may change. */
+    /** True if this player's file could not be read, so nothing of theirs may change. */
     public boolean readOnly(UUID player) {
         get(player);
         return unreadable.contains(player);
@@ -223,7 +214,7 @@ public final class PestStore {
         return data;
     }
 
-    /** Write one player now. Returns false if it could not be written. */
+    /** Returns false if it could not be written. */
     public boolean save(UUID player) {
         Data data = cache.get(player);
         if (data == null || unreadable.contains(player)) {
@@ -256,26 +247,22 @@ public final class PestStore {
         }
     }
 
-    /** Write every player held in memory. */
     public void saveAll() {
         for (UUID player : Set.copyOf(cache.keySet())) {
             save(player);
         }
     }
 
-    /** Players whose pests are held in memory. */
     public Set<UUID> loaded() {
         return Set.copyOf(cache.keySet());
     }
 
-    /** Save and forget a player — unless their Garden is still loaded, whose pests are still being watched. */
+    /** Skipped while their Garden is still loaded, since its pests are still being watched. */
     public void unload(UUID player) {
         save(player);
         cache.remove(player);
         unreadable.remove(player);
     }
-
-    // ── plots ──────────────────────────────────────────────────────────────────
 
     public static int pack(int px, int pz) {
         return pz * GardenLayout.grid() + px;

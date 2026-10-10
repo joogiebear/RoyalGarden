@@ -16,16 +16,9 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Garden Levels: XP earned by farming a Garden, and the levels it adds up to.
- *
- * <p>XP belongs to the Garden — it is saved in the owner's Garden state next to their unlocks, so a
- * {@code /garden reset} clears it with everything else. It comes from milestone tiers and plot
- * purchases out of the box, and from anything else through {@code /garden xp <player> give <n>}, which
- * is how quests, skills or visitors can pay it without this extension knowing about them.
- *
- * <p>Levels only ever go up with XP; nothing spends it. Reaching a level pays {@code rewards.every-level}
- * plus {@code rewards.by-level.<n>}, once — a gain that jumps several levels pays each one. Levels also
- * gate things: a plot or preset can require one ({@code garden-level:} in its config).
+ * Garden Levels. XP is saved in the owner's Garden state, so {@code /garden reset} clears it. It comes
+ * from milestone tiers, plot purchases and {@code /garden xp <player> give <n>}. Nothing spends XP; each
+ * level reached pays {@code rewards.every-level} plus {@code rewards.by-level.<n>} once.
  */
 public final class GardenLevels {
 
@@ -52,7 +45,7 @@ public final class GardenLevels {
     }
 
     /**
-     * Give XP to a Garden and pay out any levels it reaches.
+     * Pays out any levels the gain reaches.
      *
      * @param reason a message key describing the source, or null to say nothing about the gain
      */
@@ -79,7 +72,7 @@ public final class GardenLevels {
         }
     }
 
-    /** Set a Garden's XP outright (admin). Pays nothing — it is a correction, not progress. */
+    /** Admin correction: pays nothing. */
     public void set(UUID owner, long xp) {
         GardenState state = gardens.state(owner);
         if (state.readOnly()) {
@@ -128,7 +121,6 @@ public final class GardenLevels {
         }
     }
 
-    /** The placeholders level messages, menus and rewards can use, for a Garden's current standing. */
     public String[] placeholders(UUID owner) {
         long xp = xp(owner);
         int level = config.levelOf(xp);

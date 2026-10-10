@@ -17,10 +17,8 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * The Crop Milestones page of the desk: one icon per crop, with its tier and progress to the next.
- *
- * <p>Built per opening, for one player's progress — usually the viewer's own, or another player's when
- * an admin looks them up. Every line comes from {@code menu:} in {@code milestones.yml}.
+ * The Crop Milestones page of the desk, for one player's progress (the viewer's own, or another
+ * player's when an admin looks them up). Every line comes from menu: in milestones.yml.
  */
 public final class MilestoneMenu {
 
@@ -32,7 +30,6 @@ public final class MilestoneMenu {
         this.back = back;
     }
 
-    /** Show {@code owner}'s milestones to {@code viewer}. */
     public void open(Player viewer, UUID owner, String ownerName) {
         MilestoneConfig config = milestones.config();
         ConfigurationSection menu = config.menu();

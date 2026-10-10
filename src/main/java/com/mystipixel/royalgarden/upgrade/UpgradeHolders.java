@@ -29,19 +29,10 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Crop upgrades as libreforge effect holders — so what an upgrade <em>does</em> is written in the eco
- * dialect, not implemented here.
- *
- * <p>Each level of each crop is compiled once, from the {@code effects:} / {@code conditions:} template
- * in {@code upgrades.yml} with {@code %level%}, {@code %crop%}, {@code %blocks%} and {@code %drops%}
- * filled in. A player holds the holder for their current level of every crop they have upgraded, while
- * {@code apply-in} says they should (their own Garden, by default). That can be libreforge's
- * {@code multiply_drops}, EcoSkills' {@code add_stat}, a skill-XP boost — anything the installed eco
- * plugins register — and it stacks with whatever EcoSkills' own skills give.
- *
- * <p>Compiled through the host's {@code compileRoyalHolder}, the same path its island upgrades take, so
- * both read their chains identically. libreforge has no way to remove a provider, so on disable this one
- * is switched off rather than removed; a reload registers a fresh one.
+ * Crop upgrades as libreforge effect holders, compiled once per crop level from the {@code effects:} /
+ * {@code conditions:} template in {@code upgrades.yml}. A player holds their current level of every
+ * upgraded crop while {@code apply-in} allows. libreforge cannot remove a provider, so on disable this
+ * one is switched off; a reload registers a fresh one.
  */
 public final class UpgradeHolders implements HolderProvider {
 
@@ -55,21 +46,20 @@ public final class UpgradeHolders implements HolderProvider {
         this.upgrades = upgrades;
     }
 
-    /** Compile every level and start providing. */
     public void register() {
         compile();
         HolderProviderKt.registerHolderProvider(this);
         refreshAll();
     }
 
-    /** Stop providing, for good — this instance is never used again. */
+    /** Permanent: this instance is never used again. */
     public void disable() {
         active = false;
         holders = Map.of();
         refreshAll();
     }
 
-    /** Recompile after {@code upgrades.yml} or {@code milestones.yml} changed. */
+    /** After {@code upgrades.yml} or {@code milestones.yml} changed. */
     public void compile() {
         Map<String, Map<Integer, ProvidedHolder>> out = new HashMap<>();
         for (MilestoneCrop crop : upgrades.crops()) {
@@ -143,12 +133,12 @@ public final class UpgradeHolders implements HolderProvider {
         };
     }
 
-    /** Make libreforge ask again who holds what — after a level changes. */
+    /** Call after a level changes. */
     public static void refresh(Player player) {
         RoyalHolders.refresh(player);
     }
 
-    /** Make libreforge ask again for everyone online — after a reload recompiled the levels. */
+    /** Call after a reload recompiled the levels. */
     public static void refreshAll() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             RoyalHolders.refresh(player);

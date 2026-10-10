@@ -42,26 +42,15 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 
 /**
- * {@code /garden} — go to your Garden, building it if you have never been.
- *
- * <p>With arguments, and {@code royalgarden.admin}, it is also the admin tool: capturing and applying
- * presets, and managing other players' Gardens — which is most of what running a contest needs.
- *
- * <p>Registered through eco's command framework rather than a {@code plugin.yml} entry, because an
- * extension has no {@code plugin.yml} of its own to put one in. eco registers into the live command
- * map, which is what makes commands possible from an extension at all. The name comes from
- * {@code commands.garden} in the config.
+ * {@code /garden}: go to your Garden, building it on first visit. With arguments and {@code
+ * royalgarden.admin} it is also the admin tool. Registered through eco's command framework because an
+ * extension has no {@code plugin.yml}. The name comes from {@code commands.garden}.
  */
 public final class CommandGarden extends PluginCommand {
 
     /**
-     * The node this command needs.
-     *
-     * <p>Not the empty string. eco checks {@code sender.hasPermission(getPermission())} with no
-     * special case for a blank one, and Bukkit resolves an <em>unregistered</em> permission — which
-     * {@code ""} is — through {@code PermissionDefault.OP}. An empty permission therefore reads as
-     * "operators only", silently, which is the exact opposite of what it looks like it means. The node
-     * is registered with {@code default: true} on enable, matching the host's own player-facing nodes.
+     * Not blank: Bukkit resolves an unregistered permission (which {@code ""} is) as OP-only, and eco does
+     * not special-case it. Registered with {@code default: true} on enable.
      */
     public static final String PERMISSION = "royalgarden.garden";
 
@@ -99,51 +88,41 @@ public final class CommandGarden extends PluginCommand {
         this.evacuateTo = evacuateTo;
     }
 
-    /** Give the command its Crop Milestones subcommands. */
     public void setMilestones(MilestoneService service, MilestoneMenu menu) {
         this.milestones = service;
         this.milestoneMenu = menu;
     }
 
-    /** Give the command its Garden Level subcommands. */
     public void setLevels(GardenLevels levels) {
         this.levels = levels;
     }
 
-    /** Give the command its Visitors subcommands. */
     public void setVisitors(VisitorService service, VisitorMenu menu) {
         this.visitors = service;
         this.visitorMenu = menu;
     }
 
-    /** Give the command its Crop Upgrades subcommands. */
     public void setUpgrades(UpgradeService service, UpgradeMenu menu) {
         this.upgrades = service;
         this.upgradeMenu = menu;
     }
 
-    /** Give the command its Composter subcommands. */
     public void setComposter(ComposterService service, ComposterMenu menu) {
         this.composter = service;
         this.composterMenu = menu;
     }
 
-    /** Give the command its plot-clearing subcommand. */
     public void setClearing(ClearingService clearing) {
         this.clearing = clearing;
     }
 
-    /** Give the command its Pests subcommands. */
     public void setPests(PestService service, PestMenu menu) {
         this.pests = service;
         this.pestMenu = menu;
     }
 
-    /**
-     * The console's way in. Players are handled by {@link #onExecute(Player, List)}; from the console
-     * only the admin tools that need no player to stand anywhere are available — the ones other plugins
-     * call in their reward commands.
-     */
+    // The console gets only the admin tools that need no player standing anywhere, the ones other plugins
+    // call in reward commands.
     @Override
     public void onExecute(CommandSender sender, List<String> args) {
         if (sender instanceof Player) {
@@ -182,7 +161,7 @@ public final class CommandGarden extends PluginCommand {
             showLevel(player, null);
             return;
         }
-        // The one subcommand every player has: their own milestones. With a name it is an admin lookup.
+        // Every player can see their own milestones; with a name it is an admin lookup.
         if (args.get(0).equalsIgnoreCase("milestones") && milestoneMenu != null
                 && (args.size() == 1 || !player.hasPermission(ADMIN))) {
             milestoneMenu.open(player, player.getUniqueId(), player.getName());
@@ -310,12 +289,7 @@ public final class CommandGarden extends PluginCommand {
         return options;
     }
 
-    // ── admin ──────────────────────────────────────────────────────────────────
-
-    /**
-     * The admin subcommands. Kept as arguments on {@code /garden} rather than commands of their own —
-     * they do not need their own names in the command map, and one node gates all of them.
-     */
+    // Arguments on /garden rather than their own commands, so one node gates all of them.
     private void admin(Player player, List<String> args) {
         if (!player.hasPermission(ADMIN)) {
             messages.send(player, "no-permission");
@@ -329,7 +303,7 @@ public final class CommandGarden extends PluginCommand {
             case "capture" -> inGarden(player, world -> capture(player, world, lower(arg)));
             case "apply" -> {
                 if (arg == null) {
-                    // Deliberately not "flat": a bare /garden apply used to flatten the plot you stood on.
+                    // Deliberately not "flat": a bare /garden apply must never flatten the plot you stand on.
                     messages.send(player, "admin-apply-usage");
                     return;
                 }
@@ -399,7 +373,6 @@ public final class CommandGarden extends PluginCommand {
         }
     }
 
-    /** Capture the plot the player is standing on under a name. */
     private void capture(Player player, World world, String name) {
         if (name == null || !PresetLibrary.validId(name)) {
             messages.send(player, "admin-capture-usage");
@@ -430,7 +403,6 @@ public final class CommandGarden extends PluginCommand {
         }
     }
 
-    /** Stamp a preset onto the plot the player is standing on, or flatten it. */
     private void apply(Player player, World world, String name) {
         int px = GardenLayout.plotAt(player.getLocation().getBlockX());
         int pz = GardenLayout.plotAt(player.getLocation().getBlockZ());
@@ -454,7 +426,7 @@ public final class CommandGarden extends PluginCommand {
         messages.send(player, "admin-applying", "%preset%", name, "%plot%", plot);
     }
 
-    /** A player by name, online or known to the server; null (with a message) if there is none. */
+    // Null (with a message) if there is none.
     private OfflinePlayer target(CommandSender sender, String name) {
         if (name == null) {
             messages.send(sender, "admin-help");
@@ -480,7 +452,7 @@ public final class CommandGarden extends PluginCommand {
             visitors.clear(target.getUniqueId());       // a reset Garden has nobody waiting at it
         }
         if (pests != null) {
-            pests.clear(target.getUniqueId());          // nor any pests
+            pests.clear(target.getUniqueId());
             if (!target.isOnline()) {
                 pests.store().unload(target.getUniqueId());
             }
@@ -522,10 +494,8 @@ public final class CommandGarden extends PluginCommand {
                 "%player%", who, "%plot%", GardenLayout.plotName(plot[0], plot[1]));
     }
 
-    /**
-     * {@code /garden farmhouse set|unset <spot>} and {@code /garden farmhouse} to list them. A spot is taken
-     * from where the admin stands and faces; the Composter's from the block they are looking at.
-     */
+    // /garden farmhouse set|unset <spot>, or no arguments to list. A spot is taken from where the admin
+    // stands and faces; the Composter's from the block they are looking at.
     private void farmhouse(Player player, List<String> args) {
         String action = args.size() > 1 ? args.get(1).toLowerCase(Locale.ROOT) : "";
         String spot = args.size() > 2 ? args.get(2).toLowerCase(Locale.ROOT) : "";
@@ -576,7 +546,7 @@ public final class CommandGarden extends PluginCommand {
         messages.send(player, anchor == null ? "admin-farmhouse-unset" : "admin-farmhouse-set", "%spot%", spot);
     }
 
-    /** Mark a plot as cleared of its debris, whatever is left on it. */
+    // Marks a plot cleared, whatever debris is left on it.
     private void clear(CommandSender sender, String name, String plotName) {
         OfflinePlayer target = target(sender, name);
         if (target == null) {
@@ -641,7 +611,6 @@ public final class CommandGarden extends PluginCommand {
                 "%xp%", String.valueOf(state.xp()));
     }
 
-    /** Show a Garden's level: the sender's own, or a named player's. */
     private void showLevel(CommandSender sender, String name) {
         if (levels == null) {
             return;
@@ -671,11 +640,8 @@ public final class CommandGarden extends PluginCommand {
         messages.send(sender, "level-info", all);
     }
 
-    /**
-     * {@code /garden xp <player> <give|take|set> <amount> [silent]}. {@code give} pays any levels it
-     * reaches, exactly as earned XP does — it is how other plugins award Garden XP. {@code take} and
-     * {@code set} are corrections and pay nothing.
-     */
+    // /garden xp <player> <give|take|set> <amount> [silent]. give pays levels like earned XP (how other
+    // plugins award Garden XP); take and set are corrections and pay nothing.
     private void xp(CommandSender sender, List<String> args) {
         if (levels == null || args.size() < 4) {
             messages.send(sender, "admin-xp-usage");
@@ -712,11 +678,8 @@ public final class CommandGarden extends PluginCommand {
         messages.send(sender, "admin-xp-done", all);
     }
 
-    /**
-     * {@code /garden visitor <player> add [visitor]} sends a visitor now, ignoring the clock, the queue
-     * limit and level requirements; {@code clear} sends everyone waiting away; {@code stats} shows the
-     * counts and {@code reset-stats} zeroes them.
-     */
+    // /garden visitor <player> add [visitor] | clear | stats | reset-stats. add ignores the clock, queue
+    // limit and level requirements.
     private void visitor(CommandSender sender, List<String> args) {
         if (visitors == null || args.size() < 3) {
             messages.send(sender, "admin-visitor-usage");
@@ -757,10 +720,7 @@ public final class CommandGarden extends PluginCommand {
         }
     }
 
-    /**
-     * {@code /garden upgrade <player> <crop> <level>} sets a crop's upgrade level; {@code /garden upgrade
-     * <player> reset} clears them all. Neither charges nor pays anything — they are corrections.
-     */
+    // /garden upgrade <player> <crop> <level>, or <player> reset. Corrections: nothing is charged or paid.
     private void upgrade(CommandSender sender, List<String> args) {
         if (upgrades == null || args.size() < 3) {
             messages.send(sender, "admin-upgrade-usage");
@@ -800,11 +760,8 @@ public final class CommandGarden extends PluginCommand {
         }
     }
 
-    /**
-     * {@code /garden composter <player> give-matter|give-fuel <amount>} fills a Composter (up to its
-     * capacity), {@code collect} collects it into the player's inventory (they must be online), and
-     * {@code reset} empties it and forgets its upgrades. None of them charges anything.
-     */
+    // /garden composter <player> give-matter|give-fuel <amount> | collect | reset. collect needs the player
+    // online. Nothing is charged.
     private void composter(CommandSender sender, List<String> args) {
         if (composter == null || args.size() < 3) {
             messages.send(sender, "admin-composter-usage");
@@ -856,11 +813,8 @@ public final class CommandGarden extends PluginCommand {
         }
     }
 
-    /**
-     * {@code /garden pests <player> spawn [pest] [plot]} brings a pest onto their Garden now, off the
-     * cooldown and chance but within the caps (the Garden must be loaded); {@code clear} removes every pest
-     * from it; {@code stats} shows the counts and {@code reset-stats} zeroes the kills. None of them pays.
-     */
+    // /garden pests <player> spawn [pest] [plot] | clear | stats | reset-stats. spawn ignores cooldown and
+    // chance but not the caps, and needs the Garden loaded. Nothing pays.
     private void pests(CommandSender sender, List<String> args) {
         if (pests == null || args.size() < 3) {
             messages.send(sender, "admin-pests-usage");
@@ -935,10 +889,7 @@ public final class CommandGarden extends PluginCommand {
         }
     }
 
-    /**
-     * {@code /garden milestone <player> <crop> <amount>} sets a total; {@code /garden milestone <player>
-     * reset} clears them all. Neither pays rewards — they are corrections, not harvests.
-     */
+    // /garden milestone <player> <crop> <amount>, or <player> reset. Corrections: no rewards are paid.
     private void setMilestone(CommandSender sender, List<String> args) {
         if (milestones == null || args.size() < 3) {
             messages.send(sender, "admin-milestone-usage");
@@ -974,22 +925,19 @@ public final class CommandGarden extends PluginCommand {
                 "%tier%", String.valueOf(crop.tierOf(Math.max(0, amount))));
     }
 
-    // ── going to your Garden ───────────────────────────────────────────────────
-
     private void visit(Player player) {
         if (!worlds.isLoaded(player.getUniqueId())) {
             messages.send(player, "garden-opening");
         }
         worlds.open(player.getUniqueId()).whenComplete((world, error) -> {
             if (error != null) {
-                // The future can fail on either thread; log the whole chain — the message alone is
-                // usually the least useful part.
+                // The future can fail on either thread; log the whole chain, not just the message.
                 getPlugin().getLogger().log(Level.SEVERE, "Failed to open Garden for " + player.getName(), error);
                 messages.send(player, "garden-open-failed");
                 return;
             }
-            // open() completes on the server thread with the world prepared (Sam included), so the
-            // player can be moved straight in.
+            // open() completes on the main thread with the world prepared (Sam included), so the player can be
+            // moved straight in.
             player.teleportAsync(GardenBuilder.spawn(world)).thenAccept(moved -> {
                 if (moved) {
                     messages.send(player, "garden-welcome");

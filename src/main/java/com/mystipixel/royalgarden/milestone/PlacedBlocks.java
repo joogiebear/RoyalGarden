@@ -19,12 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Remembers which crop blocks a player placed, so they never count toward milestones.
- *
- * <p>Without it, a melon or a stack of sugar cane is a milestone you can place and break forever.
- * Positions live in each chunk's persistent data — which Garden worlds save with the rest of the
- * chunk — so they survive restarts and need no file of their own. A block that grows into a spot clears
- * any stale mark, and pistons carry marks with the blocks they move.
+ * Marks crop blocks a player placed so they never count toward milestones. Marks live in chunk
+ * persistent data; a block growing into a spot clears a stale mark, and pistons carry marks along.
  */
 public final class PlacedBlocks implements Listener {
 

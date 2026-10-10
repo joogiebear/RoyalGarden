@@ -16,11 +16,8 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 /**
- * {@code pests.yml}: how often pests come and where, what an infested plot does, each kind of pest, what
- * killing one pays, and the Pests page.
- *
- * <p>Read without the shipped file as defaults, since the pests are the admin's to delete; every
- * setting has its fallback in code.
+ * {@code pests.yml}. Read without the shipped file as defaults, since the pests are the admin's to
+ * delete; every setting has its fallback in code.
  */
 public final class PestConfig extends YamlFile {
 
@@ -45,12 +42,12 @@ public final class PestConfig extends YamlFile {
                     continue;
                 }
                 if (!id.matches("[a-z0-9_]+")) {
-                    logger.warning("pests.yml: pest id '" + id + "' must be a-z, 0-9 and _ — skipped.");
+                    logger.warning("pests.yml: pest id '" + id + "' must be a-z, 0-9 and _; skipped.");
                     continue;
                 }
                 String command = pest.getString("command", "");
                 if (command.isBlank()) {
-                    logger.warning("pests.yml: pests." + id + " has no command to spawn it — skipped.");
+                    logger.warning("pests.yml: pests." + id + " has no command to spawn it; skipped.");
                     continue;
                 }
                 Material icon = Material.matchMaterial(pest.getString("icon", "spider_eye"));
@@ -82,8 +79,6 @@ public final class PestConfig extends YamlFile {
         return yaml().getBoolean("enabled", true);
     }
 
-    // ── the pests ──────────────────────────────────────────────────────────────
-
     public Collection<PestType> pests() {
         return pests.values();
     }
@@ -102,8 +97,6 @@ public final class PestConfig extends YamlFile {
         }
         return out;
     }
-
-    // ── spawning ───────────────────────────────────────────────────────────────
 
     /** Percent chance a counted harvest of this crop brings a pest. */
     public double chance(String crop) {
@@ -140,8 +133,6 @@ public final class PestConfig extends YamlFile {
         return Math.clamp(yaml().getInt("spawning.attempts", 6), 1, 50);
     }
 
-    // ── infestation ────────────────────────────────────────────────────────────
-
     public int infestedAt() {
         return yaml().getInt("infested-at", 1);
     }
@@ -151,7 +142,6 @@ public final class PestConfig extends YamlFile {
         return "everyone".equalsIgnoreCase(raw == null ? "" : raw.trim()) ? AppliesTo.EVERYONE : AppliesTo.OWNER;
     }
 
-    /** The {@code infested-effects:} template as parsed. */
     public List<?> effects() {
         List<?> list = yaml().getList("infested-effects");
         return list == null ? List.of() : list;
@@ -162,12 +152,10 @@ public final class PestConfig extends YamlFile {
         return list == null ? List.of() : list;
     }
 
-    /** How often pests are held to their plot, in ticks. */
+    /** In ticks. */
     public long confineTicks() {
         return Math.max(10L, Math.round(yaml().getDouble("confine.check-every-seconds", 2) * 20));
     }
-
-    // ── killing ────────────────────────────────────────────────────────────────
 
     public boolean ownerOnly() {
         return yaml().getBoolean("kills.owner-only", true);
@@ -184,8 +172,6 @@ public final class PestConfig extends YamlFile {
     public String killSound() {
         return yaml().getString("sounds.kill", "entity.experience_orb.pickup");
     }
-
-    // ── the menu ───────────────────────────────────────────────────────────────
 
     public ConfigurationSection menu() {
         return yaml().getConfigurationSection("menu");

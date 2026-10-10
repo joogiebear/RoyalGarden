@@ -22,16 +22,9 @@ import org.bukkit.plugin.Plugin;
 import java.util.function.Consumer;
 
 /**
- * The Composter's block in the barn: right-click it to open the Composter.
- *
- * <p>It stands at {@code block.x / y / z} in {@code composter.yml} — by default one of the composters
- * the barn is already dressed with — and is marked in its chunk's persistent data, which Garden worlds
- * save with the chunk. Only a block that is both marked and still the configured material opens the
- * menu, so the barn's other composters stay scenery. The mark is written whenever a Garden is prepared,
- * which also puts the block back if it is missing.
- *
- * <p>The click is handled at {@code LOWEST} and the vanilla use cancelled, so a crop in hand is never
- * composted the vanilla way; the farmhouse's protection is told to leave this block to us.
+ * The Composter's block in the barn. Only a block marked in chunk data and still the configured material
+ * opens the menu, so the barn's other composters stay scenery. The click is handled at LOWEST with the
+ * vanilla use cancelled, so a crop in hand is never composted the vanilla way.
  */
 public final class ComposterBlock implements Listener {
 
@@ -51,11 +44,8 @@ public final class ComposterBlock implements Listener {
         return ((block.getY() + 4096) << 8) | ((block.getX() & 15) << 4) | (block.getZ() & 15);
     }
 
-    /**
-     * Where the Composter goes: a farmhouse schematic's {@code [composter]} sign if it has one, the
-     * configured spot for the built-in barn, or nowhere — a schematic without the sign would otherwise get
-     * a composter put wherever the built-in barn had one, likely in a wall.
-     */
+    // A schematic's [composter] sign, the configured spot for the built-in barn, or nowhere: a schematic
+    // without the sign would otherwise get a composter wherever the built-in barn had one.
     private Block spot(World world) {
         com.mystipixel.royalgarden.garden.Farmhouse farmhouse = com.mystipixel.royalgarden.garden.Farmhouse.current();
         com.mystipixel.royalgarden.garden.Farmhouse.Anchor marked = farmhouse.anchor("composter");
@@ -69,7 +59,7 @@ public final class ComposterBlock implements Listener {
         return world.getBlockAt(at[0], GardenLayout.groundY() + at[1], at[2]);
     }
 
-    /** Put the Composter in place in a prepared Garden, and mark it. Runs on the server thread. */
+    /** Places and marks the Composter in a prepared Garden. Main thread only. */
     public void ensure(World world) {
         if (!config.enabled() || !config.blockEnabled() || !GardenWorlds.isGarden(world)) {
             return;
@@ -84,7 +74,7 @@ public final class ComposterBlock implements Listener {
         block.getChunk().getPersistentDataContainer().set(key, PersistentDataType.INTEGER, pack(block));
     }
 
-    /** {@link #ensure} for every Garden loaded now — after a reload has moved or re-enabled it. */
+    /** {@link #ensure} for every loaded Garden, after a reload. */
     public void ensureAll() {
         for (World world : Bukkit.getWorlds()) {
             if (GardenWorlds.isGarden(world)) {
@@ -93,7 +83,6 @@ public final class ComposterBlock implements Listener {
         }
     }
 
-    /** Whether a block is the Composter. */
     public boolean isComposter(Block block) {
         if (!config.enabled() || !config.blockEnabled() || block.getType() != config.blockMaterial()
                 || !GardenWorlds.isGarden(block.getWorld())) {

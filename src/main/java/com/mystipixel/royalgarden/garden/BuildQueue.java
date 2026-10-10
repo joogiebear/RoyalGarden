@@ -14,29 +14,15 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Every plot being written, in every Garden, sharing one block budget per tick.
- *
- * <p>Plots used to be laid by a task per Garden, each with its own budget. That was fine for one
- * player and wrong for a contest opening: ten Gardens created in the same minute meant ten budgets'
- * worth of block writes every tick. One queue with one budget costs the server the same whether one
- * Garden is building or fifty — the fifty just take longer.
- *
- * <p>Jobs are served round-robin a row at a time, so a big template being stamped on one Garden does
- * not hold up another player's world being generated.
- *
- * <h2>When a job cannot finish</h2>
- *
- * <p>A job reports how it ended through its callback: {@link Outcome#DONE}, {@link Outcome#UNLOADED}
- * when the world went away under it (the host unloads an empty Garden after its grace period), or
- * {@link Outcome#FAILED} when writing threw. Failures are caught per job — an exception escaping a
- * repeating Bukkit task does not stop it, it just logs again every tick, forever.
+ * Every plot being written, in every Garden, sharing one block budget per tick, so fifty Gardens cost
+ * the server the same as one. Jobs are served round-robin a row at a time. Failures are caught per job:
+ * an exception escaping a repeating task would log every tick forever.
  */
 public final class BuildQueue {
 
-    /** How a job ended. */
+    /** {@code UNLOADED}: the world went away under the job (the host unloads an empty Garden). */
     public enum Outcome { DONE, UNLOADED, FAILED }
 
-    /** One plot to write. */
     public static final class Job {
         private final String world;
         private final int px;
@@ -55,8 +41,8 @@ public final class BuildQueue {
 
         /**
          * @param preset      template to paste, or null to generate {@code base}
-         * @param clearAbove  whether to clear everything above the new content — needed when replacing
-         *                    a plot, wasted work when generating into empty air
+         * @param clearAbove  whether to clear everything above the new content: needed when replacing a plot,
+         *                    wasted work when generating into empty air
          * @param ticksPerRow {@code 0} to write at full speed, otherwise one row every this many ticks
          */
         public Job(String world, int px, int pz, PlotTemplate preset, GardenBuilder.Base base,
@@ -77,10 +63,8 @@ public final class BuildQueue {
         }
 
         /**
-         * Lay a plot's debris over whatever ground it already has.
-         *
-         * <p>Writes only into air above the ground, so it may share the queue with the job generating the
-         * same plot's ground: the two never write the same block.
+         * Lays a plot's debris. Writes only into air above the ground, so it can share the queue with the job
+         * generating the same plot's ground.
          */
         public Job(String world, int px, int pz, Overgrowth.Plan growth, Consumer<Outcome> whenDone) {
             this.world = world;
@@ -117,7 +101,7 @@ public final class BuildQueue {
         this.logger = logger;
     }
 
-    /** Queue a plot to be written. Must be called on the server thread. */
+    /** Main thread only. */
     public void submit(Job job) {
         jobs.addLast(job);
         if (task == null) {
@@ -125,7 +109,7 @@ public final class BuildQueue {
         }
     }
 
-    /** Whether a plot is queued or being written right now. */
+    /** Queued or being written right now. */
     public boolean isBuilding(String world, int px, int pz) {
         for (Job job : jobs) {
             if (job.covers(world, px, pz)) {
@@ -135,7 +119,7 @@ public final class BuildQueue {
         return false;
     }
 
-    /** Whether a plot's debris is queued or being laid right now. */
+    /** Queued or being laid right now. */
     public boolean isGrowing(String world, int px, int pz) {
         for (Job job : jobs) {
             if (job.growth != null && job.covers(world, px, pz)) {
@@ -145,7 +129,6 @@ public final class BuildQueue {
         return false;
     }
 
-    /** Whether any plot of a world is queued. */
     public boolean isBuilding(String world) {
         for (Job job : jobs) {
             if (job.world.equals(world)) {
@@ -155,19 +138,14 @@ public final class BuildQueue {
         return false;
     }
 
-    /**
-     * Drop every queued job for one world, without calling back — for a Garden that is being deleted,
-     * where finishing its plots would only write into a world that is about to stop existing.
-     */
+    /** Drops every queued job for one world without calling back, for a Garden being deleted. */
     public void cancel(String world) {
         jobs.removeIf(job -> job.world.equals(world));
     }
 
     /**
-     * Stop, dropping every queued job without calling back.
-     *
-     * <p>Used on disable. Unfinished rebuilds are already recorded as pending in each Garden's state,
-     * so they resume on the next load; unfinished generation is found missing and redone the same way.
+     * Drops every queued job without calling back. Unfinished rebuilds are recorded as pending in each
+     * Garden's state and resume on the next load.
      */
     public void shutdown() {
         if (task != null) {
@@ -227,7 +205,6 @@ public final class BuildQueue {
         }
     }
 
-    /** Write one row of one plot, from the template if there is one. */
     private int writeRow(World world, Job job) {
         if (job.growth != null) {
             return Math.max(1, job.growth.writeRow(world, job.px, job.pz, job.row));

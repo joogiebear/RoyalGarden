@@ -1,20 +1,13 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-#  RoyalGarden  ·  visitors.yml  —  Visitors and Copper
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Visitors turn up at the barn over time and ask for crops. Right-click one (or
-#  use the Visitors button on the desk, or /garden visitors) to see what they
-#  want and what they pay; accept to hand the items over, or refuse.
+# Visitors turn up at the barn over time and ask for crops. Right-click one (or
+# use the desk, or /garden visitors) to see what they want and what they pay.
+# They pay Copper, Garden XP and any commands you like. Copper is an EcoBits
+# currency paid by a console command below and spent in an EcoShop shop
+# ("SkyMart"); see the README. Reload with /garden reload.
 #
-#  They pay Copper, Garden XP and any commands you like. Copper is an EcoBits
-#  currency, paid by a console command below, and spent in an EcoShop shop
-#  ("SkyMart") — see the README for both files. Reload with /garden reload.
-#
-#  Durations: 2d, 4h, 30m, 45s, 1h30m.  Amounts: 64, or a range like 32-64.
-# ═══════════════════════════════════════════════════════════════════════════════
+# Durations: 2d, 4h, 30m, 45s, 1h30m.  Amounts: 64, or a range like 32-64.
 
 enabled: true
 
-# ── Arrivals ───────────────────────────────────────────────────────────────────
 arrivals:
   # One visitor per interval while the player is online.
   interval: 15m
@@ -40,8 +33,7 @@ arrivals:
 accept-sound: "entity.villager.yes"
 refuse-sound: "entity.villager.no"
 
-# ── Scaling ────────────────────────────────────────────────────────────────────
-# Requests grow with Garden level: amounts × (1 + per-level × (level - 1)),
+# Requests grow with Garden level: amounts * (1 + per-level * (level - 1)),
 # capped at max-multiplier (0 = no cap). With rewards: true the Copper and
 # Garden XP a visitor pays grow by the same multiplier.
 scaling:
@@ -49,14 +41,12 @@ scaling:
   max-multiplier: 2.0
   rewards: true
 
-# ── Copper ─────────────────────────────────────────────────────────────────────
 # Paid with this console command. %player% %uuid% %amount% %currency%
 copper:
   enabled: true
   currency: copper
   give-command: "ecobits givesilent %player% %currency% %amount%"
 
-# ── SkyMart ────────────────────────────────────────────────────────────────────
 # The button on the Visitors page that opens the Copper shop. With EcoShop, a
 # shop whose `command:` is skymart opens with the command below. Run as the
 # player unless as-console is true (then use %player% in it).
@@ -65,11 +55,11 @@ skymart:
   command: "skymart"
   as-console: false
 
-# ── Where visitors stand ───────────────────────────────────────────────────────
+# Where visitors stand.
 # Positions are "x, z, yaw" or "x, y, z, yaw", measured from the middle of the
 # farmhouse plot (the barn doors face +z; the spawn point is at 0.5, 9.5).
 # Without y they stand on the ground. yaw: 0 faces +z, 90 faces -x, -90 faces
-# +x, 180 faces -z. Visitors beyond the number of places still wait — on the
+# +x, 180 faces -z. Visitors beyond the number of places still wait on the
 # Visitors page.
 
 # The drive-through: visitors queue in single file at the window in the front
@@ -103,8 +93,7 @@ spots:
 # Name shown above a visitor. Visitor placeholders (see messages.yml).
 npc-name: "%visitor_name% &8[%rarity_name%&8]"
 
-# ── Rewards ────────────────────────────────────────────────────────────────────
-# Stacked. Serving a visitor gives its offer's Copper and Garden XP, then the
+# Rewards are stacked. Serving a visitor gives its offer's Copper and Garden XP, then the
 # commands and messages of: every-visit, first-visit (the first time you serve
 # that visitor), by-served.<n> (your n-th visitor in total), the visitor's
 # rarity, and the visitor itself.
@@ -117,12 +106,11 @@ rewards:
   first-visit:
     commands: []
     messages:
-      - "&6&lNEW VISITOR! &f%visitor_name% &7— %unique% different visitors served."
+      - "&6&lNEW VISITOR! &f%visitor_name% &7- %unique% different visitors served."
   by-served: {}
   #  100:
   #    commands: ["broadcast %player% has served 100 visitors!"]
 
-# ── Rarities ───────────────────────────────────────────────────────────────────
 # weight: how likely a visitor of this rarity is to come (a visitor's own
 #         weight: overrides it)
 # rewards: copper and garden-xp ADD to each visitor's own, plus commands and
@@ -149,21 +137,21 @@ rarities:
       copper: 40
       garden-xp: 25
 
-# ── Visitors ───────────────────────────────────────────────────────────────────
+# Visitors:
 #    name, rarity, weight (optional), garden-level (the level they start
 #    visiting at), permission (optional)
 #    icon            : the item shown for them in menus
-#    head            : their face in the Visitor Log once served — a skin
+#    head            : their face in the Visitor Log once served: a skin
 #                      texture (the base64 "textures" value, e.g. from a
 #                      head database) or a player name whose skin to borrow
-#                      (MHF_Villager, MHF_Pig, …). Blank for a plain head.
-#    entity          : what they are drawn as — villager, wandering_trader,
-#                      piglin, zombie_villager, witch… (any living mob)
-#    profession      : for villagers — farmer, librarian, cleric, nitwit…
-#    villager-type   : for villagers — plains, desert, jungle, savanna, snow,
+#                      (MHF_Villager, MHF_Pig, ...). Blank for a plain head.
+#    entity          : what they are drawn as: villager, wandering_trader,
+#                      piglin, zombie_villager, witch... (any living mob)
+#    profession      : for villagers: farmer, librarian, cleric, nitwit...
+#    villager-type   : for villagers: plains, desert, jungle, savanna, snow,
 #                      swamp, taiga
 #    dialogue        : lines on their offer
-#    requests        : what they may ask for — one is picked by weight each
+#    requests        : what they may ask for; one is picked by weight each
 #                      visit. Items are an item and an amount: "wheat 64",
 #                      "carrot 32-64", "ecoitems:enchanted_wheat 2-4". Or
 #                      {item: ..., amount: ..., name: "&aShown name"}.
@@ -217,7 +205,7 @@ visitors:
     entity: villager
     profession: farmer
     villager-type: swamp
-    dialogue: "&7\"Mash, chips, roast — I'm not fussy.\""
+    dialogue: "&7\"Mash, chips, roast: I'm not fussy.\""
     requests:
       - weight: 2
         items: ["potato 64-128"]
@@ -387,7 +375,6 @@ visitors:
   #    rewards:
   #      copper: 30
 
-# ── Menus ──────────────────────────────────────────────────────────────────────
 menu:
   title: "&8Visitors"
   filler: black_stained_glass_pane
@@ -410,7 +397,7 @@ menu:
       - "%rewards%"
       - ""
       - "&eClick to see the offer."
-  # Shown when nobody is waiting. %next% %waiting% %max_queue% …
+  # Shown when nobody is waiting. %next% %waiting% %max_queue% ...
   empty:
     material: gray_stained_glass_pane
     name: "&7Nobody is waiting"

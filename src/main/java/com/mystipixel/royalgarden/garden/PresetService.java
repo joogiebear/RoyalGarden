@@ -13,26 +13,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * A player choosing a preset for one of their plots, from the desk.
- *
- * <p>Applying a preset is destructive and, for a contest, valuable — a freshly stamped farm is a
- * harvest. So it has more gates than an unlock:
- *
- * <ul>
- *   <li>the preset must be listed as {@code selectable} in {@code presets.yml}, and the player must
- *       hold its {@code permission} if it names one;</li>
- *   <li>the plot must be theirs, unlocked, not the farmhouse, not already being built, and cleared of
- *       its debris — a preset stamped over the overgrowth would clear it for the price of the preset;</li>
- *   <li>a <b>cooldown</b> per plot, from the preset or {@code presets.players.cooldown};</li>
- *   <li>a <b>cost</b>, charged through the host's currencies;</li>
- *   <li>a <b>second click</b> to confirm, within {@code presets.players.confirm-window}.</li>
- * </ul>
- *
- * <p>{@code royalgarden.bypass.cooldown} skips the cooldown, for staff setting up showcase Gardens.
+ * Choosing a preset for a plot from the desk. Applying one is destructive and, in a contest, valuable,
+ * so it needs: a {@code selectable} preset (and its {@code permission}), a plot that is theirs, unlocked,
+ * not the farmhouse, not being built and cleared of debris, an expired per-plot cooldown, the cost, and a
+ * second click within {@code presets.players.confirm-window}.
  */
 public final class PresetService {
 
-    /** Skips the per-plot cooldown between rebuilds. */
+    /** Skips the per-plot cooldown between rebuilds, for staff setting up showcase Gardens. */
     public static final String BYPASS_COOLDOWN = "royalgarden.bypass.cooldown";
 
     private record Armed(int px, int pz, String id, long until) {
@@ -58,7 +46,7 @@ public final class PresetService {
         this.clearing = clearing;
     }
 
-    /** Whether this plot must be cleared before a preset can go on it; tells the player so if it must. */
+    /** Tells the player if the plot must be cleared first. */
     public boolean refuseUncleared(Player player, GardenState state, int px, int pz) {
         if (clearing == null || !clearing.blocks(state, px, pz)) {
             return false;
@@ -67,22 +55,22 @@ public final class PresetService {
         return true;
     }
 
-    /** Where presets read Garden levels from, for their {@code garden-level:} gate. */
+    /** For the {@code garden-level:} gate. */
     public void setLevels(java.util.function.ToIntFunction<UUID> levels) {
         this.levels = levels;
     }
 
-    /** The Garden level a player has, or the highest possible without levels. */
+    /** The highest possible level when levels are not set up. */
     public int level(Player player) {
         return levels == null ? Integer.MAX_VALUE : levels.applyAsInt(player.getUniqueId());
     }
 
-    /** The cooldown that applies to a preset: its own, or the configured default. */
+    /** The preset's own, or the configured default. */
     public long cooldownFor(PresetLibrary.Entry entry) {
         return entry.cooldownMillis() >= 0 ? entry.cooldownMillis() : config.presetCooldownMillis();
     }
 
-    /** How long until this plot may be rebuilt with this preset; 0 if it may now. */
+    /** 0 if the plot may be rebuilt now. */
     public long cooldownLeft(Player player, GardenState state, int px, int pz, PresetLibrary.Entry entry) {
         if (player.hasPermission(BYPASS_COOLDOWN)) {
             return 0;
@@ -94,14 +82,12 @@ public final class PresetService {
         return Math.max(0, last + cooldownFor(entry) - System.currentTimeMillis());
     }
 
-    /** How a cost reads in a menu or message. */
     public String display(Cost cost) {
         return cost.isFree() ? messages.raw("cost-free") : currency.format(cost);
     }
 
     /**
-     * Handle a click on a preset. The first click arms it and explains what will happen; a second click
-     * on the same preset for the same plot, soon enough, applies it.
+     * The first click arms the preset; a second click on it for the same plot, soon enough, applies it.
      *
      * @return true once the rebuild has started, so the caller can close the menu
      */

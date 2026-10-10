@@ -7,7 +7,7 @@ import org.bukkit.entity.Player;
 import java.util.Locale;
 
 /**
- * Plot clearing for {@code %royalgarden_<key>%}, for tab lists, scoreboards and the like.
+ * Plot clearing for {@code %royalgarden_<key>%}.
  *
  * <pre>
  *   %royalgarden_clearing_plot%       the plot you are standing on, blank off the board
@@ -21,8 +21,7 @@ import java.util.Locale;
  *   %royalgarden_clearing_&lt;plot&gt;%     one of your plots by name, e.g. clearing_b2, wherever you are
  * </pre>
  *
- * <p>"The plot you are standing on" is in whichever Garden you are in, yours or one you are visiting.
- * Answered for online players only: reading an offline player's Garden would cache it for good.
+ * <p>Online players only: reading an offline player's Garden would cache it for good.
  */
 public final class ClearingPlaceholders {
 
@@ -36,7 +35,7 @@ public final class ClearingPlaceholders {
         this.messages = messages;
     }
 
-    /** The value for {@code key}, or null if the key is not one of ours. */
+    /** Null if the key is not one of ours. */
     public String resolve(OfflinePlayer offline, String key) {
         String params = key.toLowerCase(Locale.ROOT);
         if (!params.startsWith("clearing_")) {
@@ -72,7 +71,6 @@ public final class ClearingPlaceholders {
         return percent(worlds.state(player.getUniqueId()), plot[0], plot[1]);
     }
 
-    /** One of the placeholders about the plot the player is standing on. */
     private String here(Player player, String params) {
         GardenState state = worlds.stateOf(player.getWorld());
         int px = GardenLayout.plotAt(player.getLocation().getBlockX());
@@ -90,7 +88,7 @@ public final class ClearingPlaceholders {
         };
     }
 
-    /** A plot's clearing %, 100 once it is clear, blank while it is locked. */
+    // 100 once clear, blank while locked.
     private String percent(GardenState state, int px, int pz) {
         return state.isUnlocked(px, pz) ? String.valueOf(state.clearingPercent(px, pz)) : "";
     }

@@ -17,10 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SchematicTest {
 
-    /**
-     * A 3x2x3 Sponge v3 schematic: a layer of grass, then air with a standing sign in the middle — a
-     * [sam] marker whose writing faces east — and a plain sign in a corner.
-     */
+    // A 3x2x3 Sponge v3 schematic: a layer of grass, then air with a standing sign in the middle (a [sam]
+    // marker whose writing faces east) and a plain sign in a corner.
     private static byte[] sample(String markerLine) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(new GZIPOutputStream(bytes))) {

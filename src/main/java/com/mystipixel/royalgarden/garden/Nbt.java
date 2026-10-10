@@ -12,15 +12,9 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Just enough of Minecraft's NBT format to read a WorldEdit schematic.
- *
- * <p>Our own rather than a library: the format is ten tag types and a length prefix, and the one NBT
- * library on a Paper server arrives transitively, not as something the API promises. Reading only — a
- * schematic is made in WorldEdit and consumed here, never written.
- *
- * <p>Tags come back as plain Java: {@code Map<String, Object>} for a compound, {@code List<Object>} for a
- * list, {@code byte[]} / {@code int[]} / {@code long[]} for the arrays, and boxed numbers and strings for
- * the rest.
+ * Just enough of NBT to read a WorldEdit schematic (Paper's NBT library is transitive, not API). Tags
+ * come back as plain Java: {@code Map<String, Object>} for a compound, {@code List<Object>} for a list,
+ * {@code byte[]} / {@code int[]} / {@code long[]} for arrays, boxed numbers and strings for the rest.
  */
 public final class Nbt {
 
@@ -29,7 +23,7 @@ public final class Nbt {
     private Nbt() {
     }
 
-    /** Read a file's root compound, gzipped or not. */
+    /** Gzipped or not. */
     public static Map<String, Object> read(InputStream raw) throws IOException {
         PushbackInputStream in = new PushbackInputStream(new BufferedInputStream(raw), 2);
         int first = in.read();
@@ -108,7 +102,7 @@ public final class Nbt {
         };
     }
 
-    /** An array or list length, refused if negative or absurd rather than trusted into an allocation. */
+    // Refused if negative or absurd rather than trusted into an allocation.
     private static int length(DataInputStream in) throws IOException {
         int length = in.readInt();
         if (length < 0 || length > 64 * 1024 * 1024) {
@@ -117,29 +111,25 @@ public final class Nbt {
         return length;
     }
 
-    // ── reading values out ─────────────────────────────────────────────────────
-
-    /** A compound child, or null if absent or not a compound. */
+    /** Null if absent or not a compound. */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> compound(Map<String, Object> parent, String key) {
         Object value = parent == null ? null : parent.get(key);
         return value instanceof Map<?, ?> map ? (Map<String, Object>) map : null;
     }
 
-    /** A list child, or an empty list if absent or not a list. */
+    /** Empty if absent or not a list. */
     @SuppressWarnings("unchecked")
     public static List<Object> list(Map<String, Object> parent, String key) {
         Object value = parent == null ? null : parent.get(key);
         return value instanceof List<?> list ? (List<Object>) list : List.of();
     }
 
-    /** A whole number child, or {@code fallback}. */
     public static int integer(Map<String, Object> parent, String key, int fallback) {
         Object value = parent == null ? null : parent.get(key);
         return value instanceof Number number ? number.intValue() : fallback;
     }
 
-    /** A string child, or null. */
     public static String string(Map<String, Object> parent, String key) {
         Object value = parent == null ? null : parent.get(key);
         return value instanceof String text ? text : null;

@@ -22,23 +22,10 @@ import org.bukkit.plugin.Plugin;
 import java.util.Locale;
 
 /**
- * Sam, who runs the desk in the farmhouse.
- *
- * <p>A plain Bukkit villager with its AI switched off, not a Citizens NPC. Citizens would give better
- * skins and pathing, but it would also make The Garden refuse to work on any server that hasn't
- * installed it — a hard dependency bought for cosmetics. A villager is always available, survives a
- * world save without any of our own persistence, and can be found again by the tag stamped on it.
- *
- * <p>He is identified by persistent data rather than by his name or position, so renaming him, pushing
- * him, or moving the barn cannot orphan him into a second Sam. His name, profession and whether he
- * exists at all are under {@code sam:} in {@code config.yml}.
- *
- * <h2>When he is checked</h2>
- *
- * <p>Paper loads a chunk's entities after its blocks, and separately. Looking for Sam before his chunk's
- * entities had arrived found nobody and spawned a second one, which is why {@link #ensure} only runs once
- * the desk's chunk reports its entities loaded — either straight away, if they already are, or from
- * {@link EntitiesLoadEvent} when they arrive.
+ * Sam, who runs the desk in the farmhouse: a plain villager with AI off, so Citizens is not a hard
+ * dependency. Found by a persistent-data tag, so renaming or moving him never orphans a second Sam.
+ * Paper loads a chunk's entities after its blocks, so {@link #ensure} only runs once the desk chunk's
+ * entities are loaded, otherwise a duplicate is spawned.
  */
 public final class Sam implements Listener {
 
@@ -54,10 +41,7 @@ public final class Sam implements Listener {
         this.menu = menu;
     }
 
-    /**
-     * Put Sam at the desk once it is safe to look for him: now if the desk chunk's entities are
-     * loaded, otherwise when they are.
-     */
+    /** Runs {@link #ensure} now if the desk chunk's entities are loaded, otherwise when they are. */
     public void ensureWhenLoaded(World world) {
         Chunk chunk = GardenBuilder.samPost(world).getChunk();
         if (chunk.isEntitiesLoaded()) {
@@ -79,8 +63,8 @@ public final class Sam implements Listener {
     }
 
     /**
-     * Make sure exactly one Sam is standing at the desk in this world — or none, with {@code sam.enabled}
-     * off. Any duplicates are removed, so "exactly one" is enforced rather than hoped for.
+     * Exactly one Sam at the desk in this world, or none with {@code sam.enabled} off. Duplicates are
+     * removed.
      */
     public void ensure(World world) {
         Location post = GardenBuilder.samPost(world);
@@ -104,13 +88,12 @@ public final class Sam implements Listener {
             world.spawn(post, Villager.class, this::dress);
             return;
         }
-        // He exists; put him back where he belongs and re-apply anything the config changed.
         kept.teleport(post);
         kept.setRotation(post.getYaw(), post.getPitch());   // an AI-less mob's head does not follow a teleport
         dress(kept);
     }
 
-    /** Apply everything that makes a villager into Sam. Idempotent — also used to repair an existing one. */
+    // Idempotent: also used to repair an existing Sam.
     private void dress(Villager villager) {
         villager.setAdult();
         Villager.Profession profession = Registry.VILLAGER_PROFESSION.get(
@@ -133,25 +116,18 @@ public final class Sam implements Listener {
         villager.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
     }
 
-    /** Whether an entity is Sam. */
     public boolean isSam(Entity entity) {
         return entity.getPersistentDataContainer().has(key, PersistentDataType.BYTE);
     }
 
-    /**
-     * Right-clicking Sam opens the desk.
-     *
-     * <p>{@code LOWEST} and cancelled unconditionally: the click must never reach the villager trading
-     * screen, and cancelling early means nothing else has begun opening one by the time we do.
-     */
+    // LOWEST and cancelled unconditionally, so the click never reaches the villager trading screen.
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onInteract(PlayerInteractEntityEvent event) {
         if (!isSam(event.getRightClicked())) {
             return;
         }
         event.setCancelled(true);
-        // The event fires once per hand; opening on both would open the desk twice per click. The
-        // off-hand copy is still cancelled above so it can never reach the trading screen.
+        // Fires once per hand; the off-hand copy is still cancelled above.
         if (event.getHand() == EquipmentSlot.HAND) {
             menu.open(event.getPlayer());
         }
