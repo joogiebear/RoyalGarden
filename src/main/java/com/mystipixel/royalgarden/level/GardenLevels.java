@@ -138,8 +138,8 @@ public final class GardenLevels {
                 "%percent%", String.valueOf((int) Math.floor(fraction * 100)),
                 "%bar%", Tiers.bar(fraction,
                         bar == null ? 20 : bar.getInt("length", 20),
-                        bar == null ? "&a|" : bar.getString("filled", "&a|"),
-                        bar == null ? "&7|" : bar.getString("empty", "&7|"))};
+                        bar.getString("filled"),
+                        bar.getString("empty"))};
     }
 
     private static String[] append(String[] base, String... more) {

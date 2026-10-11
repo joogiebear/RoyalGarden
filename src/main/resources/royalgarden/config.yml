@@ -135,6 +135,12 @@ clearing:
     chance: 0.06
     # Single-block plants only, a tall plant's top half goes without a trace.
     blocks: [short_grass, short_grass, short_grass, fern, dandelion, poppy, cornflower]
+  # The %bar% in the clearing lore (menu: clearing below): length in characters, then the
+  # filled and empty character.
+  progress-bar:
+    length: 20
+    filled: "&a|"
+    empty: "&7|"
   # When a plot is cleared. Placeholders: %player% %uuid% %plot%
   #   commands: ["garden xp %player% give 50"]
   rewards:

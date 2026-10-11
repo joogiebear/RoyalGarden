@@ -113,7 +113,8 @@ public final class ClearingService implements Listener {
                 "%plot%", GardenLayout.plotName(px, pz),
                 "%percent%", String.valueOf(percent),
                 "%required%", String.valueOf(required()),
-                "%bar%", Tiers.bar(required() <= 0 ? 1 : percent / (double) required(), 20, "&a|", "&7|"),
+                "%bar%", Tiers.bar(required() <= 0 ? 1 : percent / (double) required(), config.clearingBarLength(),
+                        config.clearingBarFilled(), config.clearingBarEmpty()),
                 "%cleared%", String.valueOf(state.clearingDone(px, pz)),
                 "%total%", String.valueOf(state.clearingTotal(px, pz))};
     }
