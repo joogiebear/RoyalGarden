@@ -45,9 +45,9 @@ public final class ComposterMenu {
         }
         composter.update(player.getUniqueId());
         ConfigurationSection menu = config.menu();
-        int rows = Math.clamp(menu == null ? 6 : menu.getInt("rows", 6), 3, 6);
+        int rows = Math.clamp(menu.getInt("rows", 6), 3, 6);
         MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(
-                menu == null ? "&8Composter" : menu.getString("title", "&8Composter")));
+                menu.getString("title")));
         boolean[][] used = new boolean[rows + 1][10];
 
         place(builder, used, rows, section(menu, "matter"), 2, 3, Material.WHEAT,

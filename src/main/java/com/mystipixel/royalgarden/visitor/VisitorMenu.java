@@ -51,9 +51,8 @@ public final class VisitorMenu {
         return menu == null ? null : menu.getConfigurationSection(path);
     }
 
-    private String string(String path, String fallback) {
-        ConfigurationSection menu = menu();
-        return menu == null ? fallback : menu.getString(path, fallback);
+    private String string(String path) {
+        return menu().getString(path);
     }
 
     /** For the viewer's own Garden. */
@@ -66,7 +65,7 @@ public final class VisitorMenu {
         List<Offer> queue = service.store().get(owner).queue();
         int shown = Math.min(36, Math.max(queue.size(), 1));
         int rows = Math.min(6, (shown + 8) / 9 + 1);
-        MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(string("title", "&8Visitors")));
+        MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(string("title")));
         boolean[][] used = new boolean[rows + 1][10];
 
         if (queue.isEmpty()) {
@@ -135,7 +134,7 @@ public final class VisitorMenu {
         int rows = pages > 1 ? 6 : Math.min(6, Math.max(1, (shown + 8) / 9) + 1);
         String[] paging = {"%page%", String.valueOf(current), "%pages%", String.valueOf(pages)};
         MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(Messages.fill(
-                string("log.title", "&8Visitor Log"), paging)));
+                string("log.title"), paging)));
         boolean[][] used = new boolean[rows + 1][10];
 
         VisitorStore.Data data = service.store().get(owner);
@@ -163,7 +162,7 @@ public final class VisitorMenu {
         String[] placeholders = service.placeholders(owner, type);
         int level = service.level(owner);
         String requirement = type.gardenLevel() > level
-                ? Messages.fill(string("log.requirement", "&cNeeds Garden level %garden_level%"), placeholders)
+                ? Messages.fill(string("log.requirement"), placeholders)
                 : "";
         String[] all = append(placeholders, "%requirement%", requirement);
         if (!served) {
@@ -202,7 +201,7 @@ public final class VisitorMenu {
         VisitorType type = service.config().visitor(offer.visitor());
         String[] base = service.placeholders(owner, offer);
         MenuBuilder builder = Menu.builder(4).setTitle(Text.legacy(Messages.fill(
-                string("offer.title", "&8%visitor_name%"), base)));
+                string("offer.title"), base)));
         boolean[][] used = new boolean[5][10];
 
         List<String> dialogue = type == null ? List.of() : type.dialogue();
@@ -281,14 +280,13 @@ public final class VisitorMenu {
         if (meta == null) {
             return stack;
         }
-        String name = string("offer.item.name", "");
+        String name = string("offer.item.name");
         if (!name.isBlank()) {
             meta.displayName(Text.color(Messages.fill(name, placeholders)).decoration(TextDecoration.ITALIC, false));
         }
         List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
         ConfigurationSection menu = menu();
-        List<String> lines = menu == null ? List.of("", "&7Wanted: &e%amount%", "%status%")
-                : menu.getStringList("offer.item.lore");
+        List<String> lines = menu.getStringList("offer.item.lore");
         for (String line : lines) {
             for (String part : Messages.fill(line, placeholders).split("\n", -1)) {
                 lore.add(Text.color(part).decoration(TextDecoration.ITALIC, false));
@@ -316,7 +314,7 @@ public final class VisitorMenu {
         for (Offer.Wanted wanted : offer.items()) {
             TestableItem item = VisitorService.lookup(wanted.item());
             long have = item == null ? 0 : VisitorService.count(player.getInventory(), item);
-            lines.add(Messages.fill(string("item-line", "&8- &f%amount%x %item%"),
+            lines.add(Messages.fill(string("item-line"),
                     "%item%", service.itemName(wanted), "%amount%", String.format("%,d", wanted.amount()),
                     "%have%", String.format("%,d", have),
                     "%check%", messages.raw(have >= wanted.amount() ? "visitor-check-yes" : "visitor-check-no")));
@@ -328,11 +326,11 @@ public final class VisitorMenu {
     private String rewardLines(Offer offer) {
         List<String> lines = new ArrayList<>();
         if (offer.copper() > 0 && service.config().copperEnabled()) {
-            lines.add(Messages.fill(string("reward-copper", "&8+&c%copper% Copper"),
+            lines.add(Messages.fill(string("reward-copper"),
                     "%copper%", String.format("%,d", offer.copper())));
         }
         if (offer.xp() > 0) {
-            lines.add(Messages.fill(string("reward-xp", "&8+&2%xp% Garden XP"), "%xp%", String.format("%,d", offer.xp())));
+            lines.add(Messages.fill(string("reward-xp"), "%xp%", String.format("%,d", offer.xp())));
         }
         VisitorType type = service.config().visitor(offer.visitor());
         if (type != null && type.rewards() != null) {
@@ -358,7 +356,7 @@ public final class VisitorMenu {
     }
 
     private void fill(MenuBuilder builder, boolean[][] used, int rows) {
-        String raw = string("filler", "black_stained_glass_pane");
+        String raw = string("filler");
         Material material = raw == null || raw.isBlank() ? null : Material.matchMaterial(raw.trim());
         if (material == null || !material.isItem()) {
             return;

@@ -39,7 +39,7 @@ public final class UpgradeMenu {
         int shown = Math.min(45, crops.size());
         int rows = Math.max(2, Math.min(6, (shown + 8) / 9 + 1));
         MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(
-                menu == null ? "&8Crop Upgrades" : menu.getString("title", "&8Crop Upgrades")));
+                menu.getString("title")));
         boolean[][] used = new boolean[rows + 1][10];
 
         for (int i = 0; i < shown; i++) {
@@ -56,14 +56,14 @@ public final class UpgradeMenu {
             used[row][column] = true;
         }
         if (back != null) {
-            ConfigurationSection backItem = menu == null ? null : menu.getConfigurationSection("back");
+            ConfigurationSection backItem = menu.getConfigurationSection("back");
             int column = Math.clamp(backItem == null ? 5 : backItem.getInt("column", 5), 1, 9);
             builder.setSlot(rows, column, Slot.builder(ItemSpec.build(backItem, Material.ARROW))
                     .onLeftClick((event, slot, clicked) -> back.accept((Player) event.getWhoClicked()))
                     .build());
             used[rows][column] = true;
         }
-        String filler = menu == null ? "" : menu.getString("filler", "");
+        String filler = menu.getString("filler");
         Material material = filler == null || filler.isBlank() ? null : Material.matchMaterial(filler.trim());
         if (material != null && material.isItem()) {
             ItemStack pane = ItemSpec.plain(material, " ", List.of());
@@ -81,13 +81,10 @@ public final class UpgradeMenu {
     private ItemStack icon(Player player, MilestoneCrop crop) {
         ConfigurationSection menu = upgrades.config().menu();
         boolean maxed = upgrades.nextCost(player.getUniqueId(), crop) == null;
-        ConfigurationSection entry = menu == null ? null : menu.getConfigurationSection(maxed ? "entry-maxed" : "entry");
-        if (entry == null && menu != null) {
-            entry = menu.getConfigurationSection("entry");
-        }
+        ConfigurationSection entry = menu.getConfigurationSection(maxed ? "entry-maxed" : "entry");
         String[] placeholders = upgrades.placeholders(player.getUniqueId(), crop);
-        String name = entry == null ? "&a%crop_name% Upgrade &7(%level%/%max_level%)" : entry.getString("name", "");
-        List<String> lines = entry == null ? List.of("&7Next level: %next_cost%") : entry.getStringList("lore");
+        String name = entry.getString("name");
+        List<String> lines = entry.getStringList("lore");
         List<String> lore = new ArrayList<>();
         for (String line : lines) {
             String filled = Messages.fill(line, placeholders);

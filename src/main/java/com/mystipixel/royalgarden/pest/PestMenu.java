@@ -43,9 +43,8 @@ public final class PestMenu {
         return menu == null ? null : menu.getConfigurationSection(path);
     }
 
-    private String string(String path, String fallback) {
-        ConfigurationSection menu = service.config().menu();
-        return menu == null ? fallback : menu.getString(path, fallback);
+    private String string(String path) {
+        return service.config().menu().getString(path);
     }
 
     public void open(Player player) {
@@ -56,7 +55,7 @@ public final class PestMenu {
         int grid = GardenLayout.grid();
         int rows = grid + 1;
         int columnOffset = (9 - grid) / 2 + 1;
-        MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(string("title", "&8Pests")));
+        MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(string("title")));
         boolean[][] used = new boolean[rows + 1][10];
         for (int px = 0; px < grid; px++) {
             for (int pz = 0; pz < grid; pz++) {
@@ -100,7 +99,7 @@ public final class PestMenu {
         List<String> lines = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : byType.entrySet()) {
             PestType type = service.config().pest(entry.getKey());
-            lines.add(Messages.fill(string("list-line", "&8• %pest_name% &7×%count%"),
+            lines.add(Messages.fill(string("list-line"),
                     "%pest_name%", type == null ? entry.getKey() : type.displayName(),
                     "%count%", String.valueOf(entry.getValue())));
         }
@@ -154,7 +153,7 @@ public final class PestMenu {
         List<PestType> all = new ArrayList<>(service.config().pests());
         int shown = Math.min(45, all.size());
         int rows = Math.min(6, Math.max(1, (shown + 8) / 9) + 1);
-        MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(string("log.title", "&8Pest Log")));
+        MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(string("log.title")));
         boolean[][] used = new boolean[rows + 1][10];
         UUID owner = player.getUniqueId();
         PestStore.Data data = service.store().get(owner);
@@ -177,7 +176,7 @@ public final class PestMenu {
                 "%xp%", String.format("%,d", type.gardenXp()),
                 "%description%", String.join("\n", type.description()));
         if (!killed) {
-            String requirement = Messages.fill(string("log.requirement", "&cAppears from Garden level %garden_level%"),
+            String requirement = Messages.fill(string("log.requirement"),
                     placeholders);
             return ItemSpec.build(section("log.unknown"), Material.GRAY_DYE,
                     PestService.append(placeholders, "%requirement%", type.gardenLevel() > 1 ? requirement : ""));
@@ -208,7 +207,7 @@ public final class PestMenu {
     }
 
     private void fill(MenuBuilder builder, boolean[][] used, int rows) {
-        String raw = string("filler", "black_stained_glass_pane");
+        String raw = string("filler");
         Material material = raw == null || raw.isBlank() ? null : Material.matchMaterial(raw.trim());
         if (material == null || !material.isItem()) {
             return;

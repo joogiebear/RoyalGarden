@@ -105,8 +105,8 @@ public final class MilestoneService {
         ConfigurationSection bar = config.yaml().getConfigurationSection("progress-bar");
         String rendered = Tiers.bar(fraction,
                 bar == null ? 20 : bar.getInt("length", 20),
-                bar == null ? "&a|" : bar.getString("filled", "&a|"),
-                bar == null ? "&7|" : bar.getString("empty", "&7|"));
+                bar.getString("filled"),
+                bar.getString("empty"));
         return new String[]{
                 "%crop%", crop.id(),
                 "%crop_name%", crop.displayName(),

@@ -101,7 +101,7 @@ public final class GardenMenu {
         int rows = grid + 1;
         int columnOffset = (9 - grid) / 2 + 1;             // eco slots are 1-indexed
         MenuBuilder builder = Menu.builder(rows)
-                .setTitle(Text.legacy(config.yaml().getString("menu.title", "&8The Garden")));
+                .setTitle(Text.legacy(config.yaml().getString("menu.title")));
 
         boolean[][] used = new boolean[rows + 1][10];
         for (int px = 0; px < grid; px++) {
@@ -291,7 +291,7 @@ public final class GardenMenu {
         int rows = Math.min(6, (shown + 8) / 9 + 1);
         String plot = GardenLayout.plotName(px, pz);
         MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(Messages.fill(
-                config.yaml().getString("preset-menu.title", "&8Presets - Plot %plot%"), "%plot%", plot)));
+                config.yaml().getString("preset-menu.title"), "%plot%", plot)));
 
         for (int i = 0; i < shown; i++) {
             PresetLibrary.Entry entry = entries.get(i);

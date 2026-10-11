@@ -44,6 +44,18 @@ public final class GardenConfig extends YamlFile {
         return parsed;
     }
 
+    public int clearingBarLength() {
+        return Math.clamp(yaml().getInt("clearing.progress-bar.length"), 1, 100);
+    }
+
+    public String clearingBarFilled() {
+        return yaml().getString("clearing.progress-bar.filled");
+    }
+
+    public String clearingBarEmpty() {
+        return yaml().getString("clearing.progress-bar.empty");
+    }
+
     // Layout: read at startup only.
 
     public int grid() {
@@ -183,7 +195,7 @@ public final class GardenConfig extends YamlFile {
     }
 
     public String samName() {
-        return yaml().getString("sam.name", "&aSam &7- Garden Desk");
+        return yaml().getString("sam.name");
     }
 
     public String samProfession() {

@@ -319,10 +319,10 @@ public final class ComposterConfig extends YamlFile {
     }
 
     public String barFilled() {
-        return yaml().getString("progress-bar.filled", "&a|");
+        return yaml().getString("progress-bar.filled");
     }
 
     public String barEmpty() {
-        return yaml().getString("progress-bar.empty", "&7|");
+        return yaml().getString("progress-bar.empty");
     }
 }

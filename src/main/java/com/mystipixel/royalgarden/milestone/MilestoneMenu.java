@@ -38,7 +38,7 @@ public final class MilestoneMenu {
         int rows = Math.max(2, Math.min(6, (shown + 8) / 9 + 1));
 
         MenuBuilder builder = Menu.builder(rows).setTitle(Text.legacy(Messages.fill(
-                menu == null ? "&8Crop Milestones" : menu.getString("title", "&8Crop Milestones"),
+                menu.getString("title"),
                 "%player%", ownerName)));
 
         for (int i = 0; i < shown; i++) {
@@ -46,7 +46,7 @@ public final class MilestoneMenu {
             builder.setSlot(i / 9 + 1, i % 9 + 1, Slot.builder(icon(menu, crop, owner)).build());
         }
         if (back != null) {
-            ConfigurationSection backItem = menu == null ? null : menu.getConfigurationSection("back");
+            ConfigurationSection backItem = menu.getConfigurationSection("back");
             builder.setSlot(rows, 5, Slot.builder(ItemSpec.build(backItem, Material.ARROW))
                     .onLeftClick((event, slot, clicked) -> back.accept((Player) event.getWhoClicked()))
                     .build());
@@ -58,16 +58,10 @@ public final class MilestoneMenu {
         long total = milestones.store().total(owner, crop.id());
         int tier = crop.tierOf(total);
         String[] placeholders = milestones.placeholders(crop, tier, total);
-        ConfigurationSection entry = menu == null ? null
-                : menu.getConfigurationSection(tier >= crop.maxTier() ? "entry-maxed" : "entry");
-        if (entry == null && menu != null) {
-            entry = menu.getConfigurationSection("entry");
-        }
-        String name = entry == null ? "&6%crop_name% %tier_roman%" : entry.getString("name", "&6%crop_name% %tier_roman%");
+        ConfigurationSection entry = menu.getConfigurationSection(tier >= crop.maxTier() ? "entry-maxed" : "entry");
+        String name = entry.getString("name");
         List<String> lore = new ArrayList<>();
-        List<String> lines = entry == null
-                ? List.of("&7Total: &e%total%", "&7Next tier: &e%next%", "%bar% &7%percent%%")
-                : entry.getStringList("lore");
+        List<String> lines = entry.getStringList("lore");
         for (String line : lines) {
             lore.add(Messages.fill(line, placeholders));
         }
