@@ -2,6 +2,7 @@ package com.mystipixel.royalgarden.garden;
 
 import com.mystipixel.royalgarden.config.Durations;
 import com.mystipixel.royalgarden.config.GardenConfig;
+import com.mystipixel.royalgarden.config.Messages;
 import com.mystipixel.royalgarden.config.YamlFile;
 import com.mystipixel.royalskyblock.currency.Cost;
 import org.bukkit.Material;
@@ -39,11 +40,13 @@ public final class PresetLibrary {
     private final File dir;
     private final YamlFile index;
     private final Logger logger;
+    private final Messages messages;
     private final Map<String, PlotTemplate> cache = new HashMap<>();
 
-    public PresetLibrary(File dataFolder, Logger logger) {
+    public PresetLibrary(File dataFolder, Messages messages, Logger logger) {
         this.dir = new File(dataFolder, "presets");
         this.logger = logger;
+        this.messages = messages;
         if (!dir.exists() && !dir.mkdirs()) {
             logger.warning("Could not create " + dir + "; plot presets will not persist.");
         }
@@ -172,9 +175,9 @@ public final class PresetLibrary {
         if (!index.yaml().isSet("presets." + id)) {
             editIndex(yaml -> {
                 String path = "presets." + id;
-                yaml.set(path + ".display-name", "&a" + id);
+                yaml.set(path + ".display-name", messages.raw("captured-preset-name", "%preset%", id));
                 yaml.set(path + ".icon", "wheat");
-                yaml.set(path + ".lore", List.of("&7A captured farm."));
+                yaml.set(path + ".lore", messages.yaml().getStringList("captured-preset-lore"));
                 yaml.set(path + ".cost", "0 coins");
                 yaml.set(path + ".selectable", false);
             });

@@ -243,7 +243,7 @@ public final class RoyalGardenExtension extends Extension {
                 getLogger());
 
         GardenStore store = new GardenStore(data, getLogger());
-        this.presets = new PresetLibrary(data, getLogger());
+        this.presets = new PresetLibrary(data, messages, getLogger());
         this.queue = new BuildQueue(getPlugin(), config, worlds, getLogger());
         this.gardens = new GardenWorlds(getPlugin(), config, worlds, store, presets, queue, getLogger());
 

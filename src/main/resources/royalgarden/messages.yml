@@ -199,6 +199,10 @@ admin-capture-farmhouse: "&cThat is the farmhouse plot. Build presets on any oth
 admin-captured: "&aCaptured plot %plot% as '%preset%' (%layers% layers). &7Add it to presets.yml to offer it to players."
 # %error%
 admin-capture-failed: "&cCould not save the preset: %error%"
+# Starting name and lore written into presets.yml for a newly captured preset. %preset%
+captured-preset-name: "&a%preset%"
+captured-preset-lore:
+  - "&7A captured farm."
 admin-apply-usage: "&cName a preset: /garden apply <name>, or /garden flat, /garden bedrock"
 admin-apply-farmhouse: "&cThe farmhouse plot cannot be replaced."
 # %preset% %plot%
