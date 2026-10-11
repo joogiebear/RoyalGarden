@@ -1,3 +1,33 @@
+## 2026.41.0 - 2026-10-10
+
+### Features
+- ship eight ready-made farm presets (`9941a3f`)
+- ship farmbarn.schem as the default farmhouse (`9acf842`)
+- expose garden level, xp and max level (`0079e23`)
+- build the farmhouse from a WorldEdit schematic (`065dc36`)
+- show the visitor's face at the top of their offer (`5088a92`)
+- list wanted amounts on the accept button, one plain icon per item (`88c56c7`)
+- show a request's real amount on the offer page (`93f9f03`)
+- a drive-through window visitors queue and walk up to (`846a365`)
+- %royalgarden_clearing_...% placeholders for plot progress (`fd8c60e`)
+- overgrown locked plots that must be cleared before building (`ca203e7`)
+
+### Fixes
+- lay melon and pumpkin out as a snake of walkways (`2d5ef92`)
+- fill the barn's margin so it meets the surrounding ground (`666a07f`)
+- count farmable plots, not the farmhouse, in what players see (`9a71e72`)
+- find served visitors anywhere in the Garden, not only at the spots (`ffa59f4`)
+- turn Sam to face the desk instead of the back wall (`b1bbf06`)
+- read clearing settings through the shipped defaults (`bd8d6f4`)
+
+### Refactors
+- read the captured preset name and description from config (`8b10888`)
+- read all player-facing text from config (`daf558d`)
+
+### Documentation
+- add AGENTS.md with the suite's development standards (`6141cb1`)
+- clearing tools for EcoItems and a Garden sidebar for TAB (`586dfb3`)
+
 ## 2026.39.1 — 2026-09-26
 
 ### ✨ Features
