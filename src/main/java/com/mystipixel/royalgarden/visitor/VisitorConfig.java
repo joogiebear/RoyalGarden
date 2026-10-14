@@ -416,6 +416,24 @@ public final class VisitorConfig extends YamlFile {
         return yaml().getBoolean("skymart.as-console", false);
     }
 
+    /** Only takes effect with RoyalBazaar installed. */
+    public boolean bazaarEnabled() {
+        return yaml().getBoolean("bazaar.enabled", true);
+    }
+
+    /** Charged on top of the Bazaar's price; never below 1. */
+    public double bazaarMultiplier() {
+        return Math.max(1.0, yaml().getDouble("bazaar.price-multiplier", 1.0));
+    }
+
+    /** 0 buys on the first click. */
+    public long bazaarConfirmMillis() {
+        String raw = yaml().getString("bazaar.confirm-window", "10s").trim();
+        long window = Durations.parseMillis(raw);
+        // a typo parses as 0, which would take the confirm step off a purchase; only a written 0 does that
+        return window > 0 || raw.matches("0+ *[smhd]?") ? window : 10_000L;
+    }
+
     public Collection<VisitorType> visitors() {
         return Collections.unmodifiableCollection(visitors.values());
     }
