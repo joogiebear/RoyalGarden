@@ -59,7 +59,7 @@ public final class GardenLevels {
         }
         int before = config.levelOf(state.xp());
         state.setXp(state.xp() + amount);
-        gardens.save(state);
+        gardens.saveLater(state);
         int after = config.levelOf(state.xp());
 
         Player online = Bukkit.getPlayer(owner);

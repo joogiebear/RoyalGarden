@@ -485,8 +485,15 @@ public final class PestService implements Listener {
         UUID id = killer.getUniqueId();
         PestType type = config.pest(typeId);
         if (!store.readOnly(id)) {
-            store.get(id).recordKill(typeId);
-            store.save(id);
+            PestStore.Data stats = store.get(id);
+            stats.recordKill(typeId);
+            ConfigurationSection all = config.rewards();
+            // a kill-count reward is paid once, so that count is on disk before it is paid
+            if (all != null && all.getConfigurationSection("by-kills." + stats.kills()) != null) {
+                store.saveNow(id);
+            } else {
+                store.save(id);
+            }
         }
         RandomGenerator random = ThreadLocalRandom.current();
         long copperPaid = type == null ? 0 : type.copper().roll(random);

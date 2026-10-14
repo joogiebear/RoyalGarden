@@ -114,6 +114,11 @@ public final class GardenWorlds {
         store.save(state);
     }
 
+    /** Saved on the writer thread; for changes nothing was paid for. */
+    public void saveLater(GardenState state) {
+        store.saveLater(state);
+    }
+
     /**
      * Records and persists the unlock. Nothing is generated: every plot is built with the Garden, so this
      * only changes where the player may go. Returns false if it was not a legal purchase.

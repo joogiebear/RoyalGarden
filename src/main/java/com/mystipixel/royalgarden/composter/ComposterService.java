@@ -122,7 +122,7 @@ public final class ComposterService implements Listener {
         long now = System.currentTimeMillis();
         if (data.lastTick() <= 0) {
             data.setLastTick(now);
-            store.save(owner);
+            store.saveLater(owner);
             return;
         }
         if (now <= data.lastTick()) {
@@ -138,7 +138,7 @@ public final class ComposterService implements Listener {
             return;
         }
         data.addMade(result.made() + result.bonus());
-        store.save(owner);
+        store.saveLater(owner);
         Status after = ComposterMath.status(result.state(), machine);
         Player online = Bukkit.getPlayer(owner);
         if (online != null && before == Status.RUNNING && after != Status.RUNNING && config.notifyStopped()) {

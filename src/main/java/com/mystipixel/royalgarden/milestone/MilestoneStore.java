@@ -1,6 +1,6 @@
 package com.mystipixel.royalgarden.milestone;
 
-import com.mystipixel.royalgarden.garden.GardenStore;
+import com.mystipixel.royalgarden.garden.YamlWriter;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -13,25 +13,28 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Each player's lifetime harvest per crop, one YAML per player under {@code milestones/}. Totals change in
- * memory and dirty players are written on a timer, on quit and on shutdown, through a temp file moved into
- * place. A file that does not parse is copied aside and that player is held read-only.
+ * memory and dirty players are written on a timer, on quit and on shutdown, on the writer thread. A file that does not parse is copied aside and that player is held read-only.
  */
 public final class MilestoneStore {
 
     private final File dir;
     private final Logger logger;
+    private final YamlWriter writer;
     private final Map<UUID, Map<String, Long>> totals = new HashMap<>();
-    private final Set<UUID> dirty = new HashSet<>();
+    // concurrent: a failed write marks its player dirty again from the writer thread
+    private final Set<UUID> dirty = ConcurrentHashMap.newKeySet();
     private final Set<UUID> unreadable = new HashSet<>();
 
-    public MilestoneStore(File dataFolder, Logger logger) {
+    public MilestoneStore(File dataFolder, Logger logger, YamlWriter writer) {
         this.dir = new File(dataFolder, "milestones");
         this.logger = logger;
+        this.writer = writer;
         if (!dir.exists() && !dir.mkdirs()) {
             logger.warning("Could not create " + dir + "; milestones will not persist.");
         }
@@ -67,6 +70,7 @@ public final class MilestoneStore {
         totals.put(player, new HashMap<>());
         unreadable.remove(player);
         File file = fileFor(player);
+        writer.flush(file.toPath());
         if (file.exists() && !file.renameTo(new File(dir, player + ".yml.reset-" + System.currentTimeMillis()))) {
             logger.warning("Could not move " + file + " aside.");
         }
@@ -76,12 +80,12 @@ public final class MilestoneStore {
     private Map<String, Long> read(UUID player) {
         Map<String, Long> out = new HashMap<>();
         File file = fileFor(player);
-        if (!file.exists()) {
+        if (!writer.exists(file)) {
             return out;
         }
         YamlConfiguration yaml = new YamlConfiguration();
         try {
-            yaml.load(file);
+            writer.load(yaml, file);
         } catch (IOException | InvalidConfigurationException broken) {
             File aside = new File(dir, player + ".yml.broken-" + System.currentTimeMillis());
             try {
@@ -119,12 +123,7 @@ public final class MilestoneStore {
         for (Map.Entry<String, Long> entry : values.entrySet()) {
             yaml.set("crops." + entry.getKey(), entry.getValue());
         }
-        try {
-            GardenStore.writeAtomically(fileFor(player).toPath(), yaml.saveToString());
-        } catch (IOException e) {
-            dirty.add(player);
-            logger.log(Level.SEVERE, "Could not save milestones for " + player, e);
-        }
+        writer.write(fileFor(player).toPath(), yaml.saveToString(), () -> dirty.add(player));
     }
 
     public void saveAll() {
