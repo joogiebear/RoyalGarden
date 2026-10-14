@@ -23,6 +23,7 @@ import org.bukkit.inventory.meta.SkullMeta;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -35,11 +36,13 @@ public final class VisitorMenu {
     private final VisitorService service;
     private final Messages messages;
     private final Consumer<Player> back;
+    private final VisitorBazaar bazaar;
 
-    public VisitorMenu(VisitorService service, Messages messages, Consumer<Player> back) {
+    public VisitorMenu(VisitorService service, Messages messages, Consumer<Player> back, VisitorBazaar bazaar) {
         this.service = service;
         this.messages = messages;
         this.back = back;
+        this.bazaar = bazaar;
     }
 
     private ConfigurationSection menu() {
@@ -243,6 +246,23 @@ public final class VisitorMenu {
                 })
                 .build());
         used[4][7] = true;
+        if (bazaar.active() && !items.isEmpty()) {
+            Map<String, String> listings = bazaar.listings(offer);
+            ConfigurationSection spec = section("offer.bazaar");
+            int column = Math.clamp(spec == null ? 5 : spec.getInt("column", 5), 1, 9);
+            builder.setSlot(3, column, Slot.builder((viewer, shown) -> bazaar.icon(viewer, offer, listings,
+                            section("offer.bazaar"), string("bazaar-line"), base))
+                    .onLeftClick((event, slot, clicked) -> {
+                        Player who = (Player) event.getWhoClicked();
+                        if (bazaar.click(who, offer, listings)) {
+                            who.closeInventory();
+                        } else {
+                            clicked.refresh(who);
+                        }
+                    })
+                    .build());
+            used[3][column] = true;
+        }
         builder.setSlot(4, 5, Slot.builder(ItemSpec.build(section("offer.back"), Material.ARROW))
                 .onLeftClick((event, slot, clicked) -> open((Player) event.getWhoClicked()))
                 .build());

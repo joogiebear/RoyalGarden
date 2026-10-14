@@ -55,6 +55,18 @@ skymart:
   command: "skymart"
   as-console: false
 
+# A button on each offer that buys the items you are missing from RoyalBazaar,
+# at the Bazaar's own price, and then serves the visitor. Buying moves the
+# Bazaar price like any other buy. Without RoyalBazaar the button is not shown.
+bazaar:
+  enabled: true
+  # Charged on top of the Bazaar's price. 1.0 is the Bazaar price, 1.25 adds
+  # 25%. The extra is not paid to anyone. Never below 1.0.
+  price-multiplier: 1.0
+  # How long the first click stays armed, waiting for the second. 0 buys on
+  # the first click.
+  confirm-window: 10s
+
 # Where visitors stand.
 # Positions are "x, z, yaw" or "x, y, z, yaw", measured from the middle of the
 # farmhouse plot (the barn doors face +z; the spawn point is at 0.5, 9.5).
@@ -380,6 +392,8 @@ menu:
   filler: black_stained_glass_pane
   # One line of %items%. %item% %amount% %have% %check%
   item-line: "&8- &f%amount%x %item% %check%"
+  # One line of %items% on the offer's Bazaar button. %item% %amount%
+  bazaar-line: "&8- &f%amount%x %item%"
   # Lines of %rewards%. The visitor's rewards.lore lines follow them.
   reward-copper: "&8+&c%copper% Copper"
   reward-xp: "&8+&2%xp% Garden XP"
@@ -515,6 +529,24 @@ menu:
         - ""
         - "&7Rewards:"
         - "%rewards%"
+        - ""
+        - "%status%"
+    # Buys what you are missing from RoyalBazaar, then serves the visitor (see
+    # bazaar: above). In the row under the items; column picks the place.
+    # Visitor placeholders plus %items% (one bazaar-line per missing item),
+    # %cost% (the whole shortfall, multiplier included) and %status%
+    bazaar:
+      column: 5
+      material: gold_ingot
+      name: "&6Buy missing items"
+      lore:
+        - "&7Buy what you are missing from"
+        - "&7the Bazaar and serve %visitor_name%"
+        - "&7straight away."
+        - ""
+        - "%items%"
+        - ""
+        - "&7Cost: &6%cost%"
         - ""
         - "%status%"
     refuse:
