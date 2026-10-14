@@ -13,7 +13,9 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDropItemEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -76,18 +78,14 @@ public final class MilestoneListener implements Listener {
     }
 
     private int stackedAbove(Block block, MilestoneCrop crop) {
-        int count = 0;
+        // the whole column falls, so all of it is unmarked; at most 32 of its natural blocks count
+        List<Block> column = new ArrayList<>();
         Block above = block.getRelative(BlockFace.UP);
-        while (count < 32 && crop.blocks().contains(above.getType())) {
-            if (!crop.naturalOnly() || !placed.isPlaced(above)) {
-                count++;
-            }
-            if (crop.naturalOnly()) {
-                placed.unmark(above);
-            }
+        while (crop.blocks().contains(above.getType()) && (crop.naturalOnly() || column.size() < 32)) {
+            column.add(above);
             above = above.getRelative(BlockFace.UP);
         }
-        return count;
+        return Math.min(32, crop.naturalOnly() ? placed.unmarkColumn(column) : column.size());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -108,6 +106,7 @@ public final class MilestoneListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         milestones.store().unload(event.getPlayer().getUniqueId());
+        milestones.forget(event.getPlayer().getUniqueId());
     }
 
     /** Forget breaks whose drops never came, so the map cannot grow. */

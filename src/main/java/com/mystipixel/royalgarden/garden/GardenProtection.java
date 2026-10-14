@@ -352,7 +352,7 @@ public final class GardenProtection implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onFlow(BlockFromToEvent event) {
-        if (!config.protect("liquids")) {
+        if (!GardenWorlds.isGarden(event.getBlock().getWorld()) || !config.protect("liquids")) {
             return;
         }
         Block to = event.getToBlock();

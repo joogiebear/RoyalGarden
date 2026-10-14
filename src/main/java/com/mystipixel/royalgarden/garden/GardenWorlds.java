@@ -45,6 +45,9 @@ public final class GardenWorlds {
     // Opens in flight, so two requests for the same Garden share one load or one creation.
     private final Map<UUID, CompletableFuture<World>> opening = new ConcurrentHashMap<>();
 
+    // owners whose state a placeholder asked for off the main thread, waiting for the main thread to read it
+    private final java.util.Set<UUID> loadingForPeek = ConcurrentHashMap.newKeySet();
+
     // Run on every Garden once it is prepared; this is how Sam gets to the desk.
     private Consumer<World> onPrepared = world -> { };
 
@@ -107,6 +110,36 @@ public final class GardenWorlds {
 
     public GardenState state(UUID owner) {
         return store.get(owner);
+    }
+
+    /**
+     * For placeholders, which scoreboard plugins may resolve off the main thread: the cached state, else read
+     * on the main thread (now when already on it, or on the next tick, returning null meanwhile).
+     */
+    public GardenState peekState(UUID owner) {
+        GardenState cached = store.peek(owner);
+        if (cached != null) {
+            return cached;
+        }
+        if (Bukkit.isPrimaryThread()) {
+            return store.get(owner);
+        }
+        if (plugin.isEnabled() && loadingForPeek.add(owner)) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                loadingForPeek.remove(owner);
+                if (Bukkit.getPlayer(owner) != null) {
+                    store.get(owner);
+                }
+            });
+        }
+        return null;
+    }
+
+    /** Drop an owner's cached state when their Garden is not loaded, e.g. once they leave. Main thread. */
+    public void forget(UUID owner) {
+        if (!isLoaded(owner) && !opening.containsKey(owner)) {
+            store.unload(owner);
+        }
     }
 
     /** For a state changed from outside (admin commands). */
@@ -262,9 +295,10 @@ public final class GardenWorlds {
     private CompletableFuture<World> create(String name) {
         logger.info("Creating Garden world '" + name + "'.");
         return worlds.createIsland(name)
+                .thenCompose(this::buildCentre)
                 .thenCompose(world -> onMain(() -> {
                     long started = System.nanoTime();
-                    GardenBuilder.build(world, palette(), logger);
+                    Farmhouse.current().build(world, logger);
                     UUID owner = ownerOf(world);
                     if (owner != null) {
                         // A new world has no old walls to clear; recording that saves the first prepare a board-wide walk.
@@ -281,6 +315,29 @@ public final class GardenWorlds {
                 // Persist before returning: a crash before the first save would leave an empty world that loads as
                 // finished.
                 .thenCompose(world -> worlds.saveIsland(name).thenApply(ignored -> world));
+    }
+
+    // The centre plot's ground through the build queue, so Gardens created together share the per-tick budget.
+    // Completes once it is down, so nobody is sent into the world before there is ground to stand on.
+    private CompletableFuture<World> buildCentre(World world) {
+        CompletableFuture<World> built = new CompletableFuture<>();
+        onMain(() -> {
+            int centre = GardenLayout.centre();
+            queue.submit(new BuildQueue.Job(world.getName(), centre, centre, null, GardenBuilder.Base.FLAT,
+                    palette(), pasteRules(), false, 0, 0L, outcome -> {
+                        if (outcome == BuildQueue.Outcome.DONE) {
+                            built.complete(world);
+                        } else {
+                            built.completeExceptionally(new IllegalStateException(
+                                    "the centre plot of " + world.getName() + " was not built: " + outcome));
+                        }
+                    }));
+            return null;
+        }).exceptionally(error -> {
+            built.completeExceptionally(error);
+            return null;
+        });
+        return built;
     }
 
     /**

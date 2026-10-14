@@ -7,7 +7,9 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -25,6 +27,9 @@ public final class MilestoneService {
     private final MilestoneStore store;
     private final Messages messages;
     private TierListener tierListener = (player, crop, tier) -> { };
+    // when each player's progress was last put on their action bar; main thread only
+    private final Map<UUID, Long> lastActionBar = new HashMap<>();
+    private static final long ACTION_BAR_EVERY_MILLIS = 250L;
 
     public MilestoneService(MilestoneConfig config, MilestoneStore store, Messages messages) {
         this.config = config;
@@ -57,8 +62,18 @@ public final class MilestoneService {
             reach(player, crop, tier, after);
         }
         if (config.actionBarProgress()) {
-            messages.actionBar(player, "milestone-progress", placeholders(crop, tierAfter, after));
+            // fast harvesting breaks several blocks a tick; a tier-up always shows at once
+            long now = System.currentTimeMillis();
+            Long last = lastActionBar.get(id);
+            if (tierAfter > tierBefore || last == null || now - last >= ACTION_BAR_EVERY_MILLIS) {
+                lastActionBar.put(id, now);
+                messages.actionBar(player, "milestone-progress", placeholders(crop, tierAfter, after));
+            }
         }
+    }
+
+    public void forget(UUID player) {
+        lastActionBar.remove(player);
     }
 
     private void reach(Player player, MilestoneCrop crop, int tier, long total) {
@@ -102,11 +117,7 @@ public final class MilestoneService {
         long next = crop.nextThreshold(tier);
         long start = crop.tierStart(tier);
         double fraction = next < 0 ? 1.0 : (double) (total - start) / Math.max(1, next - start);
-        ConfigurationSection bar = config.yaml().getConfigurationSection("progress-bar");
-        String rendered = Tiers.bar(fraction,
-                bar == null ? 20 : bar.getInt("length", 20),
-                bar.getString("filled"),
-                bar.getString("empty"));
+        String rendered = config.bar(fraction);
         return new String[]{
                 "%crop%", crop.id(),
                 "%crop_name%", crop.displayName(),

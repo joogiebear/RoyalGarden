@@ -1,5 +1,6 @@
 package com.mystipixel.royalgarden.level;
 
+import com.mystipixel.royalgarden.garden.GardenState;
 import org.bukkit.OfflinePlayer;
 
 import java.util.Locale;
@@ -28,10 +29,20 @@ public final class LevelPlaceholders {
     public String resolve(OfflinePlayer player, String key) {
         String params = key.toLowerCase(Locale.ROOT);
         switch (params) {
-            case "level":
-                return player.isOnline() ? String.valueOf(levels.level(player.getUniqueId())) : "0";
-            case "xp":
-                return player.isOnline() ? String.valueOf(levels.xp(player.getUniqueId())) : "0";
+            case "level": {
+                if (!player.isOnline()) {
+                    return "0";
+                }
+                if (!levels.config().enabled()) {
+                    return String.valueOf(levels.config().maxLevel());
+                }
+                GardenState state = levels.peekState(player.getUniqueId());
+                return state != null ? String.valueOf(levels.levelOf(state)) : "0";
+            }
+            case "xp": {
+                GardenState state = player.isOnline() ? levels.peekState(player.getUniqueId()) : null;
+                return state != null ? String.valueOf(state.xp()) : "0";
+            }
             case "max_level":
                 return String.valueOf(levels.config().maxLevel());
             default:
