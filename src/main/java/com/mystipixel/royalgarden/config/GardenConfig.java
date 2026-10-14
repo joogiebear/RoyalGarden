@@ -11,7 +11,9 @@ import java.io.File;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
@@ -23,6 +25,9 @@ public final class GardenConfig extends YamlFile {
 
     // Parsed once per load: it is asked for on every block broken in a Garden.
     private Overgrowth.Settings clearing;
+    // Also once per load: asked for on every liquid flow, piston and creature spawn.
+    private volatile Set<SpawnReason> spawnReasons;
+    private volatile Map<String, Boolean> protections = new ConcurrentHashMap<>();
 
     public GardenConfig(File dataFolder, Logger logger) {
         super(dataFolder, "config.yml", logger);
@@ -32,6 +37,8 @@ public final class GardenConfig extends YamlFile {
     public void reload() {
         super.reload();
         clearing = null;
+        spawnReasons = null;
+        protections = new ConcurrentHashMap<>();     // replaced, not cleared: the super constructor runs reload() first
     }
 
     /** The debris locked plots grow and how much of it must be cleared. */
@@ -161,6 +168,15 @@ public final class GardenConfig extends YamlFile {
 
     /** Everything else is cancelled. */
     public Set<SpawnReason> allowedSpawnReasons() {
+        Set<SpawnReason> parsed = spawnReasons;
+        if (parsed == null) {
+            parsed = readSpawnReasons();
+            spawnReasons = parsed;
+        }
+        return parsed;
+    }
+
+    private Set<SpawnReason> readSpawnReasons() {
         Set<SpawnReason> out = EnumSet.noneOf(SpawnReason.class);
         for (String raw : yaml().getStringList("world.allowed-spawn-reasons")) {
             try {
@@ -174,7 +190,7 @@ public final class GardenConfig extends YamlFile {
 
     /** A switch under {@code protection:}; every one defaults to on. */
     public boolean protect(String key) {
-        return yaml().getBoolean("protection." + key, true);
+        return protections.computeIfAbsent(key, k -> yaml().getBoolean("protection." + k, true));
     }
 
     public boolean visitorsCanBuild() {
