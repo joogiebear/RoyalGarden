@@ -29,11 +29,13 @@ public final class GardenStore {
 
     private final File dir;
     private final Logger logger;
+    private final YamlWriter writer;
     private final Map<UUID, GardenState> cache = new HashMap<>();
 
-    public GardenStore(File dataFolder, Logger logger) {
+    public GardenStore(File dataFolder, Logger logger, YamlWriter writer) {
         this.dir = new File(dataFolder, "gardens");
         this.logger = logger;
+        this.writer = writer;
         if (!dir.exists() && !dir.mkdirs()) {
             logger.warning("Could not create " + dir + "; Garden unlocks will not persist.");
         }
@@ -45,7 +47,7 @@ public final class GardenStore {
     }
 
     public boolean exists(UUID owner) {
-        return cache.containsKey(owner) || fileFor(owner).exists();
+        return cache.containsKey(owner) || writer.exists(fileFor(owner));
     }
 
     private File fileFor(UUID owner) {
@@ -55,12 +57,12 @@ public final class GardenStore {
     private GardenState read(UUID owner) {
         GardenState state = new GardenState(owner);
         File file = fileFor(owner);
-        if (!file.exists()) {
+        if (!writer.exists(file)) {
             return state;                       // brand-new Garden: centre plot only
         }
         YamlConfiguration yaml = new YamlConfiguration();
         try {
-            yaml.load(file);
+            writer.load(yaml, file);
         } catch (IOException | InvalidConfigurationException unreadable) {
             File aside = new File(dir, owner + ".yml.broken-" + System.currentTimeMillis());
             try {
@@ -140,10 +142,31 @@ public final class GardenStore {
 
     /** Called on every change, so a crash never costs a player a plot they just bought. */
     public void save(GardenState state) {
+        String contents = snapshot(state);
+        if (contents == null) {
+            return;
+        }
+        try {
+            writer.writeNow(fileFor(state.owner()).toPath(), contents);
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Could not save Garden state for " + state.owner(), e);
+        }
+    }
+
+    /** As {@link #save}, but written on the writer thread: for changes nothing was paid for, such as XP. */
+    public void saveLater(GardenState state) {
+        String contents = snapshot(state);
+        if (contents != null) {
+            writer.write(fileFor(state.owner()).toPath(), contents);
+        }
+    }
+
+    // the file's new text, or null when the Garden must not be saved
+    private String snapshot(GardenState state) {
         if (state.readOnly()) {
             logger.warning("Not saving Garden " + state.owner() + ": it could not be read, so saving would "
                     + "overwrite it. Fix or reset it first.");
-            return;
+            return null;
         }
         YamlConfiguration yaml = new YamlConfiguration();
         List<String> plots = new ArrayList<>();
@@ -165,11 +188,7 @@ public final class GardenStore {
         yaml.set("barn-version", state.barnVersion());
         yaml.set("farmhouse", state.farmhouse());
         yaml.set("xp", state.xp());
-        try {
-            writeAtomically(fileFor(state.owner()).toPath(), yaml.saveToString());
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Could not save Garden state for " + state.owner(), e);
-        }
+        return yaml.saveToString();
     }
 
     private static void writeMap(YamlConfiguration yaml, String path, Map<Integer, ?> values) {
@@ -186,6 +205,7 @@ public final class GardenStore {
     public void reset(UUID owner) {
         cache.remove(owner);
         File file = fileFor(owner);
+        writer.flush(file.toPath());
         if (file.exists()) {
             File aside = new File(dir, owner + ".yml.reset-" + System.currentTimeMillis());
             if (!file.renameTo(aside)) {

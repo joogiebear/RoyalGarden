@@ -117,7 +117,7 @@ public final class VisitorService implements Listener {
         if (data.lastArrival() == 0) {
             // A new player's clock starts so the first visitor comes after first-arrival, not interval.
             data.setLastArrival(now - interval + Math.min(interval, config.firstArrivalMillis()));
-            store.save(owner);
+            store.saveLater(owner);
         }
         int lvl = level(owner);
         VisitorMath.Due due = VisitorMath.due(data.lastArrival(), now, interval, data.queued(), config.maxQueue(lvl));
@@ -134,7 +134,7 @@ public final class VisitorService implements Listener {
             data.add(offer);
             arrived.add(offer);
         }
-        store.save(owner);
+        store.saveLater(owner);
         if (arrived.isEmpty()) {
             return;
         }

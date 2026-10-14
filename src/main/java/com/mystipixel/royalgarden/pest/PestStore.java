@@ -1,7 +1,8 @@
 package com.mystipixel.royalgarden.pest;
 
 import com.mystipixel.royalgarden.garden.GardenLayout;
-import com.mystipixel.royalgarden.garden.GardenStore;
+import com.mystipixel.royalgarden.garden.PeekCache;
+import com.mystipixel.royalgarden.garden.YamlWriter;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -21,7 +22,7 @@ import java.util.logging.Logger;
  * Pests per player, one YAML per player under {@code pests/}: live pests and kills. The live record lets
  * counts and caps hold while chunks are unloaded; the world stays the judge, so an entity loading without
  * a record is adopted if there is room (removed if not), and a record whose chunk loads without its entity
- * is dropped. Written on every change since kills pay out; concurrent because placeholders read it off
+ * is dropped. Saved on every change, on the writer thread; concurrent because placeholders read it off
  * the main thread. An unparseable file is copied aside and the player held read-only.
  */
 public final class PestStore {
@@ -121,12 +122,15 @@ public final class PestStore {
 
     private final File dir;
     private final Logger logger;
+    private final YamlWriter writer;
     private final Map<UUID, Data> cache = new ConcurrentHashMap<>();
+    private final PeekCache<Data> peeked = new PeekCache<>();
     private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
-    public PestStore(File dataFolder, Logger logger) {
+    public PestStore(File dataFolder, Logger logger, YamlWriter writer) {
         this.dir = new File(dataFolder, "pests");
         this.logger = logger;
+        this.writer = writer;
         if (!dir.exists() && !dir.mkdirs()) {
             logger.warning("Could not create " + dir + "; pests will not persist.");
         }
@@ -142,12 +146,12 @@ public final class PestStore {
     }
 
     /**
-     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
-     * caching. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or a copy read from disk at most
+     * 30 seconds ago. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
-        return cached != null ? cached : read(player, false);
+        return cached != null ? cached : peeked.get(player, id -> read(id, false));
     }
 
     /** True if this player's file could not be read, so nothing of theirs may change. */
@@ -159,12 +163,12 @@ public final class PestStore {
     private Data read(UUID player, boolean keep) {
         Data data = new Data();
         File file = fileFor(player);
-        if (!file.exists()) {
+        if (!writer.exists(file)) {
             return data;
         }
         YamlConfiguration yaml = new YamlConfiguration();
         try {
-            yaml.load(file);
+            writer.load(yaml, file);
         } catch (IOException | InvalidConfigurationException broken) {
             if (!keep) {
                 return data;
@@ -214,11 +218,36 @@ public final class PestStore {
         return data;
     }
 
-    /** Returns false if it could not be written. */
+    /** Queued on the writer thread. Returns false if there is nothing that may be saved. */
     public boolean save(UUID player) {
+        String contents = snapshot(player);
+        if (contents == null) {
+            return false;
+        }
+        writer.write(fileFor(player).toPath(), contents);
+        return true;
+    }
+
+    /** Written before it returns, for a change a reward is paid on. Returns false if it could not be written. */
+    public boolean saveNow(UUID player) {
+        String contents = snapshot(player);
+        if (contents == null) {
+            return false;
+        }
+        try {
+            writer.writeNow(fileFor(player).toPath(), contents);
+            return true;
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Could not save the pests of " + player, e);
+            return false;
+        }
+    }
+
+    // the file's new text, or null when there is nothing that may be saved
+    private String snapshot(UUID player) {
         Data data = cache.get(player);
         if (data == null || unreadable.contains(player)) {
-            return false;
+            return null;
         }
         YamlConfiguration yaml = new YamlConfiguration();
         yaml.set("stats.kills", data.kills);
@@ -238,13 +267,7 @@ public final class PestStore {
             yaml.set(path + ".z", pest.z());
             yaml.set(path + ".spawned", pest.spawned());
         }
-        try {
-            GardenStore.writeAtomically(fileFor(player).toPath(), yaml.saveToString());
-            return true;
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Could not save the pests of " + player, e);
-            return false;
-        }
+        return yaml.saveToString();
     }
 
     public void saveAll() {
@@ -262,6 +285,7 @@ public final class PestStore {
         save(player);
         cache.remove(player);
         unreadable.remove(player);
+        peeked.forget(player);
     }
 
     public static int pack(int px, int pz) {

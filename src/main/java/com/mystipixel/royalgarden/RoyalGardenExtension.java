@@ -21,6 +21,7 @@ import com.mystipixel.royalgarden.garden.PresetLibrary;
 import com.mystipixel.royalgarden.garden.PresetService;
 import com.mystipixel.royalgarden.garden.Sam;
 import com.mystipixel.royalgarden.garden.UnlockService;
+import com.mystipixel.royalgarden.garden.YamlWriter;
 import com.mystipixel.royalgarden.hooks.BazaarHook;
 import com.mystipixel.royalgarden.hooks.RoyalGardenExpansion;
 import com.mystipixel.royalgarden.level.GardenLevels;
@@ -116,6 +117,7 @@ public final class RoyalGardenExtension extends Extension {
     private PestService pests;
     private PestHolders pestHolders;
     private BukkitTask pestConfiner;
+    private YamlWriter writer;
 
     public RoyalGardenExtension(EcoPlugin plugin) {
         super(plugin);
@@ -244,7 +246,8 @@ public final class RoyalGardenExtension extends Extension {
         com.mystipixel.royalgarden.garden.Farmhouse.configure(data, config.yaml().getConfigurationSection("farmhouse"),
                 getLogger());
 
-        GardenStore store = new GardenStore(data, getLogger());
+        this.writer = new YamlWriter(getLogger());
+        GardenStore store = new GardenStore(data, getLogger(), writer);
         this.presets = new PresetLibrary(data, messages, getLogger());
         this.queue = new BuildQueue(getPlugin(), config, worlds, getLogger());
         this.gardens = new GardenWorlds(getPlugin(), config, worlds, store, presets, queue, getLogger());
@@ -272,7 +275,7 @@ public final class RoyalGardenExtension extends Extension {
         declare(CommandGarden.ADMIN, PermissionDefault.OP, "Manage presets and other players' Gardens.");
 
         this.milestoneConfig = new MilestoneConfig(data, getLogger());
-        this.milestoneStore = new MilestoneStore(data, getLogger());
+        this.milestoneStore = new MilestoneStore(data, getLogger(), writer);
         MilestoneService milestones = new MilestoneService(milestoneConfig, milestoneStore, messages);
         this.placedBlocks = new PlacedBlocks(getPlugin(), milestoneConfig);
         this.milestoneListener = new MilestoneListener(milestones, placedBlocks);
@@ -302,7 +305,7 @@ public final class RoyalGardenExtension extends Extension {
         this.milestoneSweeper = Bukkit.getScheduler().runTaskTimer(getPlugin(), milestoneListener::clearStale, 20L, 20L);
 
         this.visitorConfig = new VisitorConfig(data, getLogger());
-        VisitorStore visitorStore = new VisitorStore(data, getLogger());
+        VisitorStore visitorStore = new VisitorStore(data, getLogger(), writer);
         this.visitors = new VisitorService(visitorConfig, visitorStore, messages, getLogger());
         visitors.setLevels(levels::level, (owner, amount) -> levels.give(owner, amount, "level-source-visitor"));
         visitors.setHasGarden(gardens::hasGarden);
@@ -333,7 +336,7 @@ public final class RoyalGardenExtension extends Extension {
 
         // The Composter runs while its owner is away and catches up when next touched.
         this.composterConfig = new ComposterConfig(data, getLogger(), milestoneConfig);
-        this.composter = new ComposterService(composterConfig, new ComposterStore(data, getLogger()), messages,
+        this.composter = new ComposterService(composterConfig, new ComposterStore(data, getLogger(), writer), messages,
                 currency, getLogger());
         composter.setXp((owner, amount) -> levels.give(owner, amount, "level-source-composter"));
         ComposterMenu composterMenu = new ComposterMenu(composter, messages, menu::open);
@@ -352,7 +355,7 @@ public final class RoyalGardenExtension extends Extension {
         scheduleComposter();
 
         this.pestConfig = new PestConfig(data, getLogger());
-        this.pests = new PestService(getPlugin(), pestConfig, new PestStore(data, getLogger()), messages, gardens,
+        this.pests = new PestService(getPlugin(), pestConfig, new PestStore(data, getLogger(), writer), messages, gardens,
                 getLogger());
         VisitorService copperPayer = visitors;
         pests.setPayment(levels::level, (player, amount) -> levels.give(player, amount, "level-source-pest"),
@@ -609,6 +612,10 @@ public final class RoyalGardenExtension extends Extension {
             HandlerList.unregisterAll(clearing);
             clearing.shutdown();
             clearing = null;
+        }
+        if (writer != null) {
+            writer.close();                          // after every save above
+            writer = null;
         }
         PluginManager plugins = Bukkit.getPluginManager();
         plugins.removePermission(CommandGarden.PERMISSION);

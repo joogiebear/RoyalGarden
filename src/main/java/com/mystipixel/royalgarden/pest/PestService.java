@@ -23,6 +23,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntitySpawnEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -484,8 +485,15 @@ public final class PestService implements Listener {
         UUID id = killer.getUniqueId();
         PestType type = config.pest(typeId);
         if (!store.readOnly(id)) {
-            store.get(id).recordKill(typeId);
-            store.save(id);
+            PestStore.Data stats = store.get(id);
+            stats.recordKill(typeId);
+            ConfigurationSection all = config.rewards();
+            // a kill-count reward is paid once, so that count is on disk before it is paid
+            if (all != null && all.getConfigurationSection("by-kills." + stats.kills()) != null) {
+                store.saveNow(id);
+            } else {
+                store.save(id);
+            }
         }
         RandomGenerator random = ThreadLocalRandom.current();
         long copperPaid = type == null ? 0 : type.copper().roll(random);
@@ -523,6 +531,12 @@ public final class PestService implements Listener {
             commands.addAll(layer.getStringList("commands"));
             lines.addAll(layer.getStringList("messages"));
         }
+    }
+
+    // loaded while they are online, so their placeholders read the cache rather than the file
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoin(PlayerJoinEvent event) {
+        store.get(event.getPlayer().getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

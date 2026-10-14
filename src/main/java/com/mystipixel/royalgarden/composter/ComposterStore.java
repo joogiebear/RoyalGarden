@@ -1,6 +1,7 @@
 package com.mystipixel.royalgarden.composter;
 
-import com.mystipixel.royalgarden.garden.GardenStore;
+import com.mystipixel.royalgarden.garden.PeekCache;
+import com.mystipixel.royalgarden.garden.YamlWriter;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -110,12 +111,15 @@ public final class ComposterStore {
 
     private final File dir;
     private final Logger logger;
+    private final YamlWriter writer;
     private final Map<UUID, Data> cache = new ConcurrentHashMap<>();
+    private final PeekCache<Data> peeked = new PeekCache<>();
     private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
-    public ComposterStore(File dataFolder, Logger logger) {
+    public ComposterStore(File dataFolder, Logger logger, YamlWriter writer) {
         this.dir = new File(dataFolder, "composter");
         this.logger = logger;
+        this.writer = writer;
         if (!dir.exists() && !dir.mkdirs()) {
             logger.warning("Could not create " + dir + "; Composters will not persist.");
         }
@@ -131,12 +135,12 @@ public final class ComposterStore {
     }
 
     /**
-     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
-     * caching. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or a copy read from disk at most
+     * 30 seconds ago. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
-        return cached != null ? cached : read(player, false);
+        return cached != null ? cached : peeked.get(player, id -> read(id, false));
     }
 
     /** True if this player's file could not be read, so nothing of theirs may change. */
@@ -148,12 +152,12 @@ public final class ComposterStore {
     private Data read(UUID player, boolean keep) {
         Data data = new Data();
         File file = fileFor(player);
-        if (!file.exists()) {
+        if (!writer.exists(file)) {
             return data;
         }
         YamlConfiguration yaml = new YamlConfiguration();
         try {
-            yaml.load(file);
+            writer.load(yaml, file);
         } catch (IOException | InvalidConfigurationException broken) {
             if (!keep) {
                 return data;
@@ -185,11 +189,34 @@ public final class ComposterStore {
         return data;
     }
 
-    /** Returns false if it could not be written, so the caller can undo. */
+    /** Written before it returns. Returns false if it could not be written, so the caller can undo. */
     public boolean save(UUID player) {
+        String contents = snapshot(player);
+        if (contents == null) {
+            return false;
+        }
+        try {
+            writer.writeNow(fileFor(player).toPath(), contents);
+            return true;
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Could not save the Composter of " + player, e);
+            return false;
+        }
+    }
+
+    /** Queued on the writer thread; for the timed Compost run, where nothing is paid or taken. */
+    public void saveLater(UUID player) {
+        String contents = snapshot(player);
+        if (contents != null) {
+            writer.write(fileFor(player).toPath(), contents);
+        }
+    }
+
+    // the file's new text, or null when there is nothing that may be saved
+    private String snapshot(UUID player) {
         Data data = cache.get(player);
         if (data == null || unreadable.contains(player)) {
-            return false;
+            return null;
         }
         YamlConfiguration yaml = new YamlConfiguration();
         yaml.set("organic-matter", data.matter);
@@ -202,13 +229,7 @@ public final class ComposterStore {
         for (Map.Entry<String, Integer> entry : data.upgrades.entrySet()) {
             yaml.set("upgrades." + entry.getKey(), entry.getValue());
         }
-        try {
-            GardenStore.writeAtomically(fileFor(player).toPath(), yaml.saveToString());
-            return true;
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Could not save the Composter of " + player, e);
-            return false;
-        }
+        return yaml.saveToString();
     }
 
     public void saveAll() {
@@ -225,15 +246,18 @@ public final class ComposterStore {
     public void reset(UUID player) {
         cache.put(player, new Data());
         unreadable.remove(player);
+        peeked.forget(player);
         File file = fileFor(player);
+        writer.flush(file.toPath());
         if (file.exists() && !file.renameTo(new File(dir, player + ".yml.reset-" + System.currentTimeMillis()))) {
             logger.warning("Could not move " + file + " aside.");
         }
     }
 
     public void unload(UUID player) {
-        save(player);
+        saveLater(player);
         cache.remove(player);
         unreadable.remove(player);
+        peeked.forget(player);
     }
 }

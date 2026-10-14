@@ -1,6 +1,7 @@
 package com.mystipixel.royalgarden.visitor;
 
-import com.mystipixel.royalgarden.garden.GardenStore;
+import com.mystipixel.royalgarden.garden.PeekCache;
+import com.mystipixel.royalgarden.garden.YamlWriter;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -128,13 +129,16 @@ public final class VisitorStore {
 
     private final File dir;
     private final Logger logger;
+    private final YamlWriter writer;
     // Concurrent: placeholders are often asked for off the main thread (scoreboards, tab lists).
     private final Map<UUID, Data> cache = new ConcurrentHashMap<>();
+    private final PeekCache<Data> peeked = new PeekCache<>();
     private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
-    public VisitorStore(File dataFolder, Logger logger) {
+    public VisitorStore(File dataFolder, Logger logger, YamlWriter writer) {
         this.dir = new File(dataFolder, "visitors");
         this.logger = logger;
+        this.writer = writer;
         if (!dir.exists() && !dir.mkdirs()) {
             logger.warning("Could not create " + dir + "; visitors will not persist.");
         }
@@ -150,12 +154,12 @@ public final class VisitorStore {
     }
 
     /**
-     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
-     * caching. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or a copy read from disk at most
+     * 30 seconds ago. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
-        return cached != null ? cached : read(player, false);
+        return cached != null ? cached : peeked.get(player, id -> read(id, false));
     }
 
     /** True if this player's file could not be read, so nothing of theirs may change. */
@@ -169,12 +173,12 @@ public final class VisitorStore {
     private Data read(UUID player, boolean keep) {
         Data data = new Data();
         File file = fileFor(player);
-        if (!file.exists()) {
+        if (!writer.exists(file)) {
             return data;
         }
         YamlConfiguration yaml = new YamlConfiguration();
         try {
-            yaml.load(file);
+            writer.load(yaml, file);
         } catch (IOException | InvalidConfigurationException broken) {
             if (!keep) {
                 return data;
@@ -227,10 +231,32 @@ public final class VisitorStore {
         return data;
     }
 
+    /** Written before it returns, as serving a visitor pays out right after. */
     public void save(UUID player) {
+        String contents = snapshot(player);
+        if (contents == null) {
+            return;
+        }
+        try {
+            writer.writeNow(fileFor(player).toPath(), contents);
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Could not save visitors for " + player, e);
+        }
+    }
+
+    /** Queued on the writer thread; for arrivals and other changes nothing is paid on. */
+    public void saveLater(UUID player) {
+        String contents = snapshot(player);
+        if (contents != null) {
+            writer.write(fileFor(player).toPath(), contents);
+        }
+    }
+
+    // the file's new text, or null when there is nothing that may be saved
+    private String snapshot(UUID player) {
         Data data = cache.get(player);
         if (data == null || unreadable.contains(player)) {
-            return;
+            return null;
         }
         YamlConfiguration yaml = new YamlConfiguration();
         yaml.set("last-arrival", data.lastArrival);
@@ -253,11 +279,7 @@ public final class VisitorStore {
         for (Map.Entry<String, Long> entry : data.servedBy.entrySet()) {
             yaml.set("stats.by-visitor." + entry.getKey(), entry.getValue());
         }
-        try {
-            GardenStore.writeAtomically(fileFor(player).toPath(), yaml.saveToString());
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Could not save visitors for " + player, e);
-        }
+        return yaml.saveToString();
     }
 
     public void saveAll() {
@@ -267,8 +289,9 @@ public final class VisitorStore {
     }
 
     public void unload(UUID player) {
-        save(player);
+        saveLater(player);
         cache.remove(player);
         unreadable.remove(player);
+        peeked.forget(player);
     }
 }
