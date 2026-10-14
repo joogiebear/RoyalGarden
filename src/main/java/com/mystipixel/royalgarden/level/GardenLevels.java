@@ -41,7 +41,16 @@ public final class GardenLevels {
     }
 
     public int level(UUID owner) {
-        return config.enabled() ? config.levelOf(xp(owner)) : config.maxLevel();
+        return levelOf(gardens.state(owner));
+    }
+
+    public int levelOf(GardenState state) {
+        return config.enabled() ? config.levelOf(state.xp()) : config.maxLevel();
+    }
+
+    /** For placeholders: see {@link GardenWorlds#peekState}. Null while not loaded. */
+    public GardenState peekState(UUID owner) {
+        return gardens.peekState(owner);
     }
 
     /**

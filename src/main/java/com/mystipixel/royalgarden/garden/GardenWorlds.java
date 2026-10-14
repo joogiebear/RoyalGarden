@@ -45,6 +45,9 @@ public final class GardenWorlds {
     // Opens in flight, so two requests for the same Garden share one load or one creation.
     private final Map<UUID, CompletableFuture<World>> opening = new ConcurrentHashMap<>();
 
+    // owners whose state a placeholder asked for off the main thread, waiting for the main thread to read it
+    private final java.util.Set<UUID> loadingForPeek = ConcurrentHashMap.newKeySet();
+
     // Run on every Garden once it is prepared; this is how Sam gets to the desk.
     private Consumer<World> onPrepared = world -> { };
 
@@ -107,6 +110,36 @@ public final class GardenWorlds {
 
     public GardenState state(UUID owner) {
         return store.get(owner);
+    }
+
+    /**
+     * For placeholders, which scoreboard plugins may resolve off the main thread: the cached state, else read
+     * on the main thread (now when already on it, or on the next tick, returning null meanwhile).
+     */
+    public GardenState peekState(UUID owner) {
+        GardenState cached = store.peek(owner);
+        if (cached != null) {
+            return cached;
+        }
+        if (Bukkit.isPrimaryThread()) {
+            return store.get(owner);
+        }
+        if (plugin.isEnabled() && loadingForPeek.add(owner)) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                loadingForPeek.remove(owner);
+                if (Bukkit.getPlayer(owner) != null) {
+                    store.get(owner);
+                }
+            });
+        }
+        return null;
+    }
+
+    /** Drop an owner's cached state when their Garden is not loaded, e.g. once they leave. Main thread. */
+    public void forget(UUID owner) {
+        if (!isLoaded(owner) && !opening.containsKey(owner)) {
+            store.unload(owner);
+        }
     }
 
     /** For a state changed from outside (admin commands). */

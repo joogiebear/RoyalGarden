@@ -17,6 +17,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.LeavesDecayEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -157,6 +158,15 @@ public final class ClearingService implements Listener {
         Block to = event.getToBlock();
         if (!to.getType().isAir() && !to.isLiquid()) {
             removed(to, null);
+        }
+    }
+
+    // a Garden that is not loaded has nothing being cleared, so its state can go until it is needed again
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onQuit(PlayerQuitEvent event) {
+        UUID owner = event.getPlayer().getUniqueId();
+        if (!dirty.contains(owner)) {
+            worlds.forget(owner);
         }
     }
 

@@ -12,10 +12,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -30,7 +30,8 @@ public final class GardenStore {
     private final File dir;
     private final Logger logger;
     private final YamlWriter writer;
-    private final Map<UUID, GardenState> cache = new HashMap<>();
+    // concurrent: placeholders peek at it from scoreboard threads
+    private final Map<UUID, GardenState> cache = new ConcurrentHashMap<>();
 
     public GardenStore(File dataFolder, Logger logger, YamlWriter writer) {
         this.dir = new File(dataFolder, "gardens");
@@ -44,6 +45,16 @@ public final class GardenStore {
     /** Read from disk the first time and cached after. */
     public GardenState get(UUID owner) {
         return cache.computeIfAbsent(owner, this::read);
+    }
+
+    /** The cached state, or null; never reads the file. Safe from any thread. */
+    public GardenState peek(UUID owner) {
+        return cache.get(owner);
+    }
+
+    /** Forget the cached copy; every change is already saved or queued, so the next {@link #get} reads it back. */
+    public void unload(UUID owner) {
+        cache.remove(owner);
     }
 
     public boolean exists(UUID owner) {

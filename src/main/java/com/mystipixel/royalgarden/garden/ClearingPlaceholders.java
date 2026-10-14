@@ -5,6 +5,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Plot clearing for {@code %royalgarden_<key>%}.
@@ -50,7 +51,10 @@ public final class ClearingPlaceholders {
         }
         switch (params) {
             case "clearing_active": {
-                GardenState own = worlds.state(player.getUniqueId());
+                GardenState own = worlds.peekState(player.getUniqueId());
+                if (own == null) {
+                    return "0";
+                }
                 int active = 0;
                 for (int[] plot : own.plots()) {
                     if (clearing.blocks(own, plot[0], plot[1])) {
@@ -68,11 +72,13 @@ public final class ClearingPlaceholders {
         if (plot == null) {
             return null;
         }
-        return percent(worlds.state(player.getUniqueId()), plot[0], plot[1]);
+        GardenState own = worlds.peekState(player.getUniqueId());
+        return own != null ? percent(own, plot[0], plot[1]) : "";
     }
 
     private String here(Player player, String params) {
-        GardenState state = worlds.stateOf(player.getWorld());
+        UUID owner = GardenWorlds.ownerOf(player.getWorld());
+        GardenState state = owner == null ? null : worlds.peekState(owner);
         int px = GardenLayout.plotAt(player.getLocation().getBlockX());
         int pz = GardenLayout.plotAt(player.getLocation().getBlockZ());
         if (state == null || !GardenLayout.inGrid(px, pz)) {
