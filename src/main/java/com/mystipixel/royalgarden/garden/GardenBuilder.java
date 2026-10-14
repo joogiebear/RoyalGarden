@@ -65,14 +65,6 @@ public final class GardenBuilder {
         return post;
     }
 
-    /** Into a freshly created world; the farmhouse is built-in or a schematic. */
-    public static void build(World world, Palette palette, java.util.logging.Logger logger) {
-        for (int row = 0; row < GardenLayout.plotSize(); row++) {
-            generatePlotRow(world, GardenLayout.centre(), GardenLayout.centre(), row, Base.FLAT, palette);
-        }
-        Farmhouse.current().build(world, logger);
-    }
-
     // Onto bare ground, with its path and drive-through.
     static void buildBarn(World world) {
         barn(world);

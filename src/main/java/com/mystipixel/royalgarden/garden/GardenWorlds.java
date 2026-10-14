@@ -295,9 +295,10 @@ public final class GardenWorlds {
     private CompletableFuture<World> create(String name) {
         logger.info("Creating Garden world '" + name + "'.");
         return worlds.createIsland(name)
+                .thenCompose(this::buildCentre)
                 .thenCompose(world -> onMain(() -> {
                     long started = System.nanoTime();
-                    GardenBuilder.build(world, palette(), logger);
+                    Farmhouse.current().build(world, logger);
                     UUID owner = ownerOf(world);
                     if (owner != null) {
                         // A new world has no old walls to clear; recording that saves the first prepare a board-wide walk.
@@ -314,6 +315,29 @@ public final class GardenWorlds {
                 // Persist before returning: a crash before the first save would leave an empty world that loads as
                 // finished.
                 .thenCompose(world -> worlds.saveIsland(name).thenApply(ignored -> world));
+    }
+
+    // The centre plot's ground through the build queue, so Gardens created together share the per-tick budget.
+    // Completes once it is down, so nobody is sent into the world before there is ground to stand on.
+    private CompletableFuture<World> buildCentre(World world) {
+        CompletableFuture<World> built = new CompletableFuture<>();
+        onMain(() -> {
+            int centre = GardenLayout.centre();
+            queue.submit(new BuildQueue.Job(world.getName(), centre, centre, null, GardenBuilder.Base.FLAT,
+                    palette(), pasteRules(), false, 0, 0L, outcome -> {
+                        if (outcome == BuildQueue.Outcome.DONE) {
+                            built.complete(world);
+                        } else {
+                            built.completeExceptionally(new IllegalStateException(
+                                    "the centre plot of " + world.getName() + " was not built: " + outcome));
+                        }
+                    }));
+            return null;
+        }).exceptionally(error -> {
+            built.completeExceptionally(error);
+            return null;
+        });
+        return built;
     }
 
     /**
