@@ -1,6 +1,7 @@
 package com.mystipixel.royalgarden.composter;
 
 import com.mystipixel.royalgarden.garden.GardenStore;
+import com.mystipixel.royalgarden.garden.PeekCache;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -111,6 +112,7 @@ public final class ComposterStore {
     private final File dir;
     private final Logger logger;
     private final Map<UUID, Data> cache = new ConcurrentHashMap<>();
+    private final PeekCache<Data> peeked = new PeekCache<>();
     private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
     public ComposterStore(File dataFolder, Logger logger) {
@@ -131,12 +133,12 @@ public final class ComposterStore {
     }
 
     /**
-     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
-     * caching. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or a copy read from disk at most
+     * 30 seconds ago. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
-        return cached != null ? cached : read(player, false);
+        return cached != null ? cached : peeked.get(player, id -> read(id, false));
     }
 
     /** True if this player's file could not be read, so nothing of theirs may change. */
@@ -225,6 +227,7 @@ public final class ComposterStore {
     public void reset(UUID player) {
         cache.put(player, new Data());
         unreadable.remove(player);
+        peeked.forget(player);
         File file = fileFor(player);
         if (file.exists() && !file.renameTo(new File(dir, player + ".yml.reset-" + System.currentTimeMillis()))) {
             logger.warning("Could not move " + file + " aside.");
@@ -235,5 +238,6 @@ public final class ComposterStore {
         save(player);
         cache.remove(player);
         unreadable.remove(player);
+        peeked.forget(player);
     }
 }

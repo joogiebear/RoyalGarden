@@ -2,6 +2,7 @@ package com.mystipixel.royalgarden.pest;
 
 import com.mystipixel.royalgarden.garden.GardenLayout;
 import com.mystipixel.royalgarden.garden.GardenStore;
+import com.mystipixel.royalgarden.garden.PeekCache;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -122,6 +123,7 @@ public final class PestStore {
     private final File dir;
     private final Logger logger;
     private final Map<UUID, Data> cache = new ConcurrentHashMap<>();
+    private final PeekCache<Data> peeked = new PeekCache<>();
     private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
     public PestStore(File dataFolder, Logger logger) {
@@ -142,12 +144,12 @@ public final class PestStore {
     }
 
     /**
-     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
-     * caching. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or a copy read from disk at most
+     * 30 seconds ago. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
-        return cached != null ? cached : read(player, false);
+        return cached != null ? cached : peeked.get(player, id -> read(id, false));
     }
 
     /** True if this player's file could not be read, so nothing of theirs may change. */
@@ -262,6 +264,7 @@ public final class PestStore {
         save(player);
         cache.remove(player);
         unreadable.remove(player);
+        peeked.forget(player);
     }
 
     public static int pack(int px, int pz) {

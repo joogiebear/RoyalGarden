@@ -1,6 +1,7 @@
 package com.mystipixel.royalgarden.visitor;
 
 import com.mystipixel.royalgarden.garden.GardenStore;
+import com.mystipixel.royalgarden.garden.PeekCache;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -130,6 +131,7 @@ public final class VisitorStore {
     private final Logger logger;
     // Concurrent: placeholders are often asked for off the main thread (scoreboards, tab lists).
     private final Map<UUID, Data> cache = new ConcurrentHashMap<>();
+    private final PeekCache<Data> peeked = new PeekCache<>();
     private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
     public VisitorStore(File dataFolder, Logger logger) {
@@ -150,12 +152,12 @@ public final class VisitorStore {
     }
 
     /**
-     * Read-only view for placeholders about offline players: the cached copy, or read from disk without
-     * caching. Never write through it.
+     * Read-only view for placeholders about offline players: the cached copy, or a copy read from disk at most
+     * 30 seconds ago. Never write through it.
      */
     public Data peek(UUID player) {
         Data cached = cache.get(player);
-        return cached != null ? cached : read(player, false);
+        return cached != null ? cached : peeked.get(player, id -> read(id, false));
     }
 
     /** True if this player's file could not be read, so nothing of theirs may change. */
@@ -270,5 +272,6 @@ public final class VisitorStore {
         save(player);
         cache.remove(player);
         unreadable.remove(player);
+        peeked.forget(player);
     }
 }

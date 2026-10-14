@@ -1,6 +1,7 @@
 package com.mystipixel.royalgarden.upgrade;
 
 import com.mystipixel.royalgarden.garden.GardenStore;
+import com.mystipixel.royalgarden.garden.PeekCache;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -25,6 +26,7 @@ public final class UpgradeStore {
     private final File dir;
     private final Logger logger;
     private final Map<UUID, Map<String, Integer>> cache = new ConcurrentHashMap<>();
+    private final PeekCache<Map<String, Integer>> peeked = new PeekCache<>();
     private final Set<UUID> unreadable = ConcurrentHashMap.newKeySet();
 
     public UpgradeStore(File dataFolder, Logger logger) {
@@ -48,10 +50,10 @@ public final class UpgradeStore {
         return levels(player).getOrDefault(crop, 0);
     }
 
-    /** {@link #level} without caching an offline player, for placeholders. */
+    /** {@link #level} without loading an offline player; their file is read at most every 30 seconds. */
     public int peek(UUID player, String crop) {
         Map<String, Integer> cached = cache.get(player);
-        return (cached != null ? cached : read(player, false)).getOrDefault(crop, 0);
+        return (cached != null ? cached : peeked.get(player, id -> read(id, false))).getOrDefault(crop, 0);
     }
 
     /** True if this player's file could not be read, so their levels must not change. */
@@ -78,6 +80,7 @@ public final class UpgradeStore {
     public void reset(UUID player) {
         cache.put(player, new ConcurrentHashMap<>());
         unreadable.remove(player);
+        peeked.forget(player);
         File file = fileFor(player);
         if (file.exists() && !file.renameTo(new File(dir, player + ".yml.reset-" + System.currentTimeMillis()))) {
             logger.warning("Could not move " + file + " aside.");
@@ -139,5 +142,6 @@ public final class UpgradeStore {
     public void unload(UUID player) {
         cache.remove(player);
         unreadable.remove(player);
+        peeked.forget(player);
     }
 }
