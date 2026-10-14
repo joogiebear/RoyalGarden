@@ -36,8 +36,13 @@ public final class PlacedBlocks implements Listener {
         return ((block.getY() + 4096) << 8) | ((block.getX() & 15) << 4) | (block.getZ() & 15);
     }
 
+    // most chunks have no marks, and has() answers that without copying the array out
+    private int[] marks(PersistentDataContainer pdc) {
+        return pdc.has(key, PersistentDataType.INTEGER_ARRAY) ? pdc.get(key, PersistentDataType.INTEGER_ARRAY) : null;
+    }
+
     public boolean isPlaced(Block block) {
-        int[] marks = block.getChunk().getPersistentDataContainer().get(key, PersistentDataType.INTEGER_ARRAY);
+        int[] marks = marks(block.getChunk().getPersistentDataContainer());
         if (marks == null) {
             return false;
         }
@@ -63,29 +68,57 @@ public final class PlacedBlocks implements Listener {
     }
 
     public void unmark(Block block) {
-        PersistentDataContainer pdc = block.getChunk().getPersistentDataContainer();
-        int[] marks = pdc.get(key, PersistentDataType.INTEGER_ARRAY);
-        if (marks == null) {
-            return;
+        unmarkColumn(List.of(block));
+    }
+
+    /**
+     * Clears the marks of blocks that share one chunk, such as a cane column, with one read and at most one
+     * write. Returns how many of them were not marked.
+     */
+    public int unmarkColumn(List<Block> blocks) {
+        if (blocks.isEmpty()) {
+            return 0;
         }
-        int packed = pack(block);
-        int kept = 0;
-        int[] out = new int[marks.length];
-        for (int mark : marks) {
-            if (mark != packed) {
-                out[kept++] = mark;
+        PersistentDataContainer pdc = blocks.get(0).getChunk().getPersistentDataContainer();
+        int[] marks = marks(pdc);
+        if (marks == null) {
+            return blocks.size();
+        }
+        boolean[] cleared = new boolean[marks.length];
+        int kept = marks.length;
+        int unmarked = 0;
+        for (Block block : blocks) {
+            int packed = pack(block);
+            boolean found = false;
+            for (int i = 0; i < marks.length; i++) {
+                if (marks[i] == packed) {
+                    found = true;
+                    if (!cleared[i]) {
+                        cleared[i] = true;
+                        kept--;
+                    }
+                }
+            }
+            if (!found) {
+                unmarked++;
             }
         }
         if (kept == marks.length) {
-            return;
+            return unmarked;
         }
         if (kept == 0) {
             pdc.remove(key);
         } else {
             int[] trimmed = new int[kept];
-            System.arraycopy(out, 0, trimmed, 0, kept);
+            int at = 0;
+            for (int i = 0; i < marks.length; i++) {
+                if (!cleared[i]) {
+                    trimmed[at++] = marks[i];
+                }
+            }
             pdc.set(key, PersistentDataType.INTEGER_ARRAY, trimmed);
         }
+        return unmarked;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
