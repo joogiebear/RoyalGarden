@@ -106,6 +106,7 @@ public final class MilestoneListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         milestones.store().unload(event.getPlayer().getUniqueId());
+        milestones.forget(event.getPlayer().getUniqueId());
     }
 
     /** Forget breaks whose drops never came, so the map cannot grow. */

@@ -34,6 +34,9 @@ public final class MilestoneConfig extends YamlFile {
     private volatile boolean gardensOnly = true;
     private volatile List<Pattern> worldPatterns = List.of();
     private final Map<String, Boolean> countsByWorld = new ConcurrentHashMap<>();
+    private volatile int barLength = 20;
+    private volatile String barFilled = "&a|";
+    private volatile String barEmpty = "&7|";
 
     public MilestoneConfig(File dataFolder, Logger logger) {
         super(dataFolder, "milestones.yml", logger, false);
@@ -59,6 +62,10 @@ public final class MilestoneConfig extends YamlFile {
         }
         worldPatterns = List.copyOf(patterns);
         countsByWorld.clear();
+        ConfigurationSection bar = yaml().getConfigurationSection("progress-bar");
+        barLength = bar == null ? 20 : bar.getInt("length", 20);
+        barFilled = bar == null ? "&a|" : bar.getString("filled", "&a|");
+        barEmpty = bar == null ? "&7|" : bar.getString("empty", "&7|");
         ConfigurationSection root = yaml().getConfigurationSection("crops");
         if (root == null) {
             return;
@@ -190,6 +197,11 @@ public final class MilestoneConfig extends YamlFile {
     public boolean tracksPlacement(Material block) {
         MilestoneCrop crop = byBlock.get(block);
         return crop != null && crop.naturalOnly();
+    }
+
+    /** The {@code progress-bar:} for a fraction from 0 to 1. */
+    public String bar(double fraction) {
+        return Tiers.bar(fraction, barLength, barFilled, barEmpty);
     }
 
     public boolean counts(org.bukkit.World world) {
