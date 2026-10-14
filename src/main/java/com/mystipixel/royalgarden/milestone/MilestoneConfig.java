@@ -15,7 +15,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * {@code milestones.yml}. Read without the shipped file as defaults (its {@code crops:} is a list, and a
@@ -27,6 +29,11 @@ public final class MilestoneConfig extends YamlFile {
 
     private final Map<String, MilestoneCrop> crops = new LinkedHashMap<>();
     private final Map<Material, MilestoneCrop> byBlock = new EnumMap<>(Material.class);
+    // counts() runs on every crop break and growth, so the world rules are parsed once per load and the
+    // answer kept per world name
+    private volatile boolean gardensOnly = true;
+    private volatile List<Pattern> worldPatterns = List.of();
+    private final Map<String, Boolean> countsByWorld = new ConcurrentHashMap<>();
 
     public MilestoneConfig(File dataFolder, Logger logger) {
         super(dataFolder, "milestones.yml", logger, false);
@@ -45,6 +52,13 @@ public final class MilestoneConfig extends YamlFile {
         }
         crops.clear();
         byBlock.clear();
+        gardensOnly = gardensOnly();
+        List<Pattern> patterns = new ArrayList<>();
+        for (String pattern : worlds()) {
+            patterns.add(Pattern.compile("(?i)" + Pattern.quote(pattern).replace("*", "\\E.*\\Q")));
+        }
+        worldPatterns = List.copyOf(patterns);
+        countsByWorld.clear();
         ConfigurationSection root = yaml().getConfigurationSection("crops");
         if (root == null) {
             return;
@@ -179,13 +193,18 @@ public final class MilestoneConfig extends YamlFile {
     }
 
     public boolean counts(org.bukkit.World world) {
-        if (gardensOnly()) {
+        if (gardensOnly) {
             return com.mystipixel.royalgarden.garden.GardenWorlds.isGarden(world);
         }
-        String name = world.getName();
-        for (String pattern : worlds()) {
-            String regex = "(?i)" + java.util.regex.Pattern.quote(pattern).replace("*", "\\E.*\\Q");
-            if (name.matches(regex)) {
+        if (countsByWorld.size() > 4096) {
+            countsByWorld.clear();
+        }
+        return countsByWorld.computeIfAbsent(world.getName(), this::matchesWorlds);
+    }
+
+    private boolean matchesWorlds(String name) {
+        for (Pattern pattern : worldPatterns) {
+            if (pattern.matcher(name).matches()) {
                 return true;
             }
         }
