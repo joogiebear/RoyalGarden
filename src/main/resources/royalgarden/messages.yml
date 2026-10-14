@@ -112,14 +112,18 @@ visitor-bazaar-bought: "&aBought the missing items from the Bazaar for &6%cost%&
 visitor-bazaar-failed: "&cCould not buy from the Bazaar: %reason%"
 visitor-bazaar-partly: "&eBought some items for &6%cost%&e, then the Bazaar refused the rest: %reason%"
 visitor-bazaar-generic: "the purchase did not go through."
+# %cost%: the whole shortfall, checked before anything is bought
+visitor-bazaar-cannot-afford: "&cBuying the missing items costs &6%cost%&c, more than you have."
+visitor-bazaar-left: "the visitor left before everything was bought."
 visitor-bazaar-busy: "&cYour last Bazaar purchase is still going through."
 visitor-bazaar-nothing: "&aYou already have everything; accept the offer."
-# %items%: missing items the Bazaar does not sell, joined by visitor-missing-separator
-visitor-bazaar-unlisted: "&cThe Bazaar does not sell %items%."
+# %items%: missing items the Bazaar can't sell now (not listed, frozen, buying turned off, or over its
+# order limit), joined by visitor-missing-separator
+visitor-bazaar-unlisted: "&cThe Bazaar can't sell you %items% right now."
 visitor-bazaar-status-buy: "&eClick to buy!"
 visitor-bazaar-status-confirm: "&cClick again to confirm!"
 visitor-bazaar-status-none: "&aYou have everything already."
-visitor-bazaar-status-unlisted: "&cThe Bazaar does not sell %items%."
+visitor-bazaar-status-unlisted: "&cThe Bazaar can't sell you %items% right now."
 # %cost% when there is nothing to price
 visitor-bazaar-no-cost: "-"
 level-source-visitor: "visitor"

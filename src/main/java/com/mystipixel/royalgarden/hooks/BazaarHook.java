@@ -29,6 +29,7 @@ public final class BazaarHook {
     private Method quote;
     private Method buy;
     private Method format;
+    private Method balance;
     private boolean broken;
 
     public BazaarHook(Logger logger) {
@@ -63,6 +64,12 @@ public final class BazaarHook {
         }
         CompletableFuture<?> pending = (CompletableFuture<?>) call(buy, live, player, listingId, amount, maxCost, markup);
         return pending.thenApply(BazaarHook::purchase);
+    }
+
+    /** What the player has to spend at the Bazaar, or 0 without it. */
+    public double balance(Player player) {
+        Object live = api();
+        return live == null ? 0 : (double) call(balance, live, player);
     }
 
     public String format(double amount) {
@@ -110,6 +117,7 @@ public final class BazaarHook {
             quote = type.getMethod("quote", String.class, long.class);
             buy = type.getMethod("buy", Player.class, String.class, long.class, double.class, double.class);
             format = type.getMethod("format", double.class);
+            balance = type.getMethod("balance", Player.class);
             logger.info("RoyalBazaar found: visitors can buy missing items from the Bazaar.");
             return true;
         } catch (NoSuchMethodException e) {

@@ -29,11 +29,11 @@ import java.util.logging.Logger;
  */
 public final class VisitorBazaar {
 
-    /** {@code quote} is the Bazaar's price for {@code missing}, before the multiplier. */
+    // quote: the Bazaar's price for missing, before the multiplier
     record Need(Offer.Wanted wanted, String listing, long missing, double quote) {
     }
 
-    /** {@code cost} includes the multiplier; {@code unlisted} are missing items the Bazaar won't sell. */
+    // cost includes the multiplier; unlisted are missing items the Bazaar won't sell now
     record Shortfall(List<Need> needs, List<Offer.Wanted> unlisted, double cost) {
 
         boolean nothingMissing() {
@@ -53,6 +53,9 @@ public final class VisitorBazaar {
     private final Logger logger;
     private final Map<UUID, Armed> armed = new HashMap<>();
     private final Set<UUID> buying = new HashSet<>();
+    // item lookup to listing ("" for none): finding a listing scans the whole Bazaar
+    private final Map<String, String> listingCache = new HashMap<>();
+    private long listingCacheUntil;
 
     public VisitorBazaar(VisitorService service, BazaarHook bazaar, Messages messages, Logger logger) {
         this.service = service;
@@ -67,10 +70,20 @@ public final class VisitorBazaar {
 
     /** Visitor item lookup to Bazaar listing, null where the Bazaar doesn't list it. Build once per page. */
     public Map<String, String> listings(Offer offer) {
+        long now = System.currentTimeMillis();
+        if (now > listingCacheUntil) {
+            // short-lived, so a Bazaar reload that lists or delists an item shows up soon
+            listingCache.clear();
+            listingCacheUntil = now + 300_000L;
+        }
         Map<String, String> listings = new HashMap<>();
         for (Offer.Wanted wanted : offer.items()) {
-            TestableItem item = VisitorService.lookup(wanted.item());
-            listings.put(wanted.item(), item == null ? null : bazaar.listing(item.getItem()));
+            String listing = listingCache.computeIfAbsent(wanted.item(), key -> {
+                TestableItem item = VisitorService.lookup(key);
+                String found = item == null ? null : bazaar.listing(item.getItem());
+                return found == null ? "" : found;
+            });
+            listings.put(wanted.item(), listing.isEmpty() ? null : listing);
         }
         return listings;
     }
@@ -139,6 +152,10 @@ public final class VisitorBazaar {
             messages.send(player, "visitor-bazaar-busy");
             return false;
         }
+        if (!waiting(id, offer.id())) {
+            messages.send(player, "visitor-gone");
+            return true;
+        }
         Shortfall shortfall = shortfall(player, offer, listings);
         if (shortfall.nothingMissing()) {
             messages.send(player, "visitor-bazaar-nothing");
@@ -148,8 +165,13 @@ public final class VisitorBazaar {
             messages.send(player, "visitor-bazaar-unlisted", "%items%", names(shortfall.unlisted()));
             return false;
         }
+        if (bazaar.balance(player) < shortfall.cost()) {
+            messages.send(player, "visitor-bazaar-cannot-afford", "%cost%", bazaar.format(shortfall.cost()));
+            return false;
+        }
         long window = service.config().bazaarConfirmMillis();
         long now = System.currentTimeMillis();
+        armed.values().removeIf(stale -> stale.until() < now);
         Armed pending = armed.get(id);
         boolean live = pending != null && pending.offerId().equals(offer.id()) && pending.until() >= now;
         // a price that has dropped since the first click is still what they agreed to; one that rose isn't
@@ -161,11 +183,19 @@ public final class VisitorBazaar {
         }
         armed.remove(id);
         buying.add(id);
-        buyAll(id, shortfall.needs()).whenComplete((progress, failure) -> {
+        buyAll(id, offer.id(), shortfall.needs()).whenComplete((progress, failure) -> {
             buying.remove(id);
             finish(id, offer.id(), progress, failure);
+        }).exceptionally(failure -> {
+            logger.log(Level.SEVERE, "Serving a visitor after a Bazaar purchase failed for " + id, failure);
+            return null;
         });
         return true;
+    }
+
+    // still queued and the player's visitor data readable; it can leave while the page is open
+    private boolean waiting(UUID id, String offerId) {
+        return !service.store().readOnly(id) && service.store().get(id).offer(offerId) != null;
     }
 
     private boolean isArmed(UUID player, String offerId) {
@@ -174,7 +204,7 @@ public final class VisitorBazaar {
     }
 
     // one listing after another; the Bazaar takes one trade per player at a time
-    private CompletableFuture<Progress> buyAll(UUID id, List<Need> needs) {
+    private CompletableFuture<Progress> buyAll(UUID id, String offerId, List<Need> needs) {
         double multiplier = service.config().bazaarMultiplier();
         CompletableFuture<Progress> chain = CompletableFuture.completedFuture(new Progress(0, 0, null));
         for (Need need : needs) {
@@ -182,6 +212,10 @@ public final class VisitorBazaar {
                 Player player = Bukkit.getPlayer(id);
                 if (sofar.failure() != null || player == null) {
                     return CompletableFuture.completedFuture(sofar);
+                }
+                if (!waiting(id, offerId)) {
+                    return CompletableFuture.completedFuture(new Progress(sofar.spent(), sofar.bought(),
+                            messages.raw("visitor-bazaar-left")));
                 }
                 // the price may only have moved in the player's favour since they confirmed
                 return bazaar.buy(player, need.listing(), need.missing(), need.quote() * multiplier, multiplier)

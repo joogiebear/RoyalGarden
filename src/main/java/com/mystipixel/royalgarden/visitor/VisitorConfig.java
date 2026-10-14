@@ -428,7 +428,10 @@ public final class VisitorConfig extends YamlFile {
 
     /** 0 buys on the first click. */
     public long bazaarConfirmMillis() {
-        return Math.max(0L, Durations.parseMillis(yaml().getString("bazaar.confirm-window", "10s")));
+        String raw = yaml().getString("bazaar.confirm-window", "10s").trim();
+        long window = Durations.parseMillis(raw);
+        // a typo parses as 0, which would take the confirm step off a purchase; only a written 0 does that
+        return window > 0 || raw.matches("0+ *[smhd]?") ? window : 10_000L;
     }
 
     public Collection<VisitorType> visitors() {
