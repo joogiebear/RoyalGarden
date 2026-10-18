@@ -11,10 +11,13 @@
 # then reads a stray fragment as a lifecycle phase and fails with
 # LifecyclePhaseNotFoundException.
 
+# -EcoJar is the eco jar from your server's plugins folder.
+# -SkyblockJar defaults to a RoyalSkyblock checkout sitting next to this one
+# (<parent>/RoyalSkyblock beside <parent>/RoyalGarden). Pass it if yours lives elsewhere.
 param(
-    [string]$EcoJar = "S:\Claude\mcctl\instances\stock\plugins\eco-2026.33-ecohub.jar",
+    [Parameter(Mandatory = $true)][string]$EcoJar,
     [string]$EcoVersion = "2026.33",
-    [string]$SkyblockJar = "S:\Claude\minecraft\plugins\RoyalSkyblock\build\libs\RoyalSkyblock.jar",
+    [string]$SkyblockJar = (Join-Path $PSScriptRoot "..\..\RoyalSkyblock\build\libs\RoyalSkyblock.jar"),
     [string]$SkyblockVersion = "2026.32.0"
 )
 
