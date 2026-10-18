@@ -22,7 +22,7 @@ the fields behind them are private.
 ## Building
 
 ```powershell
-.\tools\install-deps.ps1     # once, and after updating eco or RoyalSkyblock
+.\tools\install-deps.ps1 -EcoJar <server>\plugins\eco-<ver>-ecohub.jar   # once, and after updating eco or RoyalSkyblock
 mvn clean package            # -> target/RoyalGarden.jar
 ```
 
